@@ -693,10 +693,10 @@ impl FeatureDialog {
         // runtime since 11-21, retaken 11-27: Second direction › Direction, Variable fillet › Vertices, Feature pattern ›
         // Features to pattern, Feature mirror › Features to mirror; older takes kept it on a checkbox or a select).
         let before_gone = active.as_deref().is_none_or(|a| !self.visible_selection_fields().contains(&a));
-        let tab = self.spec_for_path(path).is_some_and(|s| matches!(s.kind, ParamKind::Enum { .. }) && s.hints.has(Hints::HORIZONTAL_ENUM));
-        // From a tab, a field the edit swapped for its same-named twin isn't one it brought up (live
-        // loft-surface-thin-tabs: Surface trades Profiles for the wire profiles' Profiles; the keyboard stays off it);
-        // from a dropdown the twin takes it (live delete-part-ignore-composite: Entities to delete focused).
+        let tab = self.spec_for_path(path).is_some_and(|s| matches!(s.kind, ParamKind::Enum { .. }) && s.hints.has(Hints::HORIZONTAL_ENUM) && s.id != "bodyType");
+        // From a tab, a field the edit swapped for its same-named twin isn't one it brought up; the keyboard stays off it.
+        // From a dropdown or the Solid / Surface / Thin row the twin takes it (live delete-part-ignore-composite: Entities
+        // to delete focused; loft-surface-edges-ok: Surface trades Profiles for the wire profiles' Profiles, focused).
         let label = |q: &Option<String>| q.as_deref().and_then(|q| self.spec_for_path(q)).map(|s| s.label);
         let twin = tab && active.is_some() && label(&active) == label(&self.active_query);
         // (A field shown before takes it too when the active one went away: live routing-curve-multiple-csv, CSV file
@@ -3229,10 +3229,10 @@ impl FeatureDialog {
                             .child(div().min_w_0().truncate().child(crate::ui::spec_text(label)))
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                 // A tab takes no keyboard focus (live: the page has it after a tab click, also from a
-                                // selection field: loft-surface-thin-tabs), but Extrude's and Revolve's Thin leave it on
-                                // the field (live extrude-thin-tab, revolve-thin).
-                                let thin = id_s == "THIN" && matches!(this.feature.type_id.as_str(), "extrude" | "revolve");
-                                if !thin {
+                                // selection field: mirror-part-remove-boss-block-ok), but the Solid / Surface / Thin row
+                                // leaves it on the field (live's runtime since 11-21: loft-thin-ok, loft-surface-edges-ok,
+                                // sweep-thin-edge-no-trim-ok, extrude-thin-top-face-ok).
+                                if path_s != "bodyType" {
                                     window.focus(&this.focus, cx);
                                     this.keyboard_left = true;
                                 }
@@ -4804,6 +4804,10 @@ impl Render for FeatureDialog {
                                 if std::mem::take(&mut this.press_applies_typed) {
                                     this.apply_typed(window, cx);
                                 } else if !blocked {
+                                    // The click takes the keyboard, also when the dialog stays open (live
+                                    // mistake-extrude-remove-flipped-out: a missing Remove, nothing focused).
+                                    window.focus(&this.focus, cx);
+                                    this.keyboard_left = true;
                                     cx.emit(DialogEvent::Accept { repeat: false })
                                 }
                             })),
