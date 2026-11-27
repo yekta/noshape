@@ -3,23 +3,23 @@
 Updated 11-27 22:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 22:25 (lead 22:2x order: impeller A/B -> close if under the bar; fillet probe; blend #4/#5; SPLINE-FILLET)
-PULLEYS DONE: landed d123a5b646 (copies_touch distances in parallel; 90 -> 30-50 ms). qa told 22:1x.
-IMPELLER (IMPELLER-FILLET-FAILS-SLOWER). Same-run A/B 21:2x (main vs main with 664abc01's code reverted, 3 runs):
-zum Halter (#29) 4.3-4.7 s (main) vs 1.2-1.9 (reverted), Error both; Extrude Bohrungssitz (#46) 2.3 vs 0.6-0.8; whole
-doc 35-39 vs 42-51 s (Fillet 3 4.5-5.6 vs 7.5-8.5; Move face 1 Ok vs Error). So #29 = MY 664abc01 (its input body now
-live's), NOT bool's marcher; lead (22:1x) thinks bool's marcher (that was #38 Fillet Ansaugflansch 12.4 s; opt-in
-ccf1a1ed4d 21:16). qa told the attribution 22:1x. NEXT: .grn.sh (= green vs 0.4.73, 3 runs, #27 #29 #37 #38 #46 #47):
-reset worktree to origin/main first (local commits all landed; git cherry shows '-'), then rb.sh .grnw.sh. Tell lead
-the numbers: #29 will still be ~4.4 vs 1.3 s (>=2x, >=100 ms) unless fixed -> needs zum Halter failing fast.
-Fillet probe: core-scratch/xft.patch (XFT eprintln wrappers around fillet() and the blend fallbacks: section_blend,
-rolling_ball_blend, ring_blend, run_on_rim_blend, coaxial_round, cliff_end_round, cliff_rim_blend, cusp_wall_round);
-script .zh.sh/.zhw.sh. Its 22:2x run was INVALID: it built the 664-REVERTED code (the on-host patch -R / patch forward
-in .imp.sh left newer mtimes; rsync restored older ones, so cargo didn't rebuild). Touched those 5 files at 22:2x; never
-patch on the host again. Re-run: git apply xft.patch, rb.sh .zhw.sh, look at the ---- block of zum Halter (Fcb5e27428a0a).
-PART 1 INVALID (lead 20:1x, qa suite 70ab1b23 features 43-47): NOT reproduced on current main: query parts --check (has
-`valid`) on the final state gives all 8 parts valid (main 21:2x, reverted too). qa's check is per feature (rollback); 47
-is the last feature, so main's end state is valid. Tell lead/qa with the A/B.
+## IN FLIGHT 22:40 (lead 22:3x: extrude-hole P1 first; impeller P2; then probe/blend #4/#5/SPLINE-FILLET)
+EXTRUDE-PRESELECTED-SKETCH-FILLS-HOLE (P1, qa c3919286ce): UI side = psui (feature_preselection / pick_feature_into_
+dialog take every region; psui adds SketchRegionDisplay.inner + features::sketch::inner_regions(&SketchResult), port
+of parity.rs's qSketchRegion(..., true) rule; NOT LANDED at 22:40). Mine: eval.rs Reference::Sketch leaves out
+inner_regions too (ops `sketch:` refs, ops' extrude helpers). WIP uncommitted: eval.rs, T1 engine::a_whole_sketch_
+extrudes_around_its_holes, e2e an_extrude_of_a_whole_sketch_keeps_its_holes; psui's sketch.rs hunk copied verbatim
+(core-scratch/psui-inner.patch) only to test: drop it if psui lands first (identical hunk rebases clean anyway).
+Test run .exw.sh (also runs e2e::zz_probe = spline probe, NOT for landing: remove from e2e.rs before commit).
+IMPELLER: P0 -> P2 (lead 22:3x: bar = whole doc, +12 % median < 20 %). Green 05496d20 vs 0.4.73, 3 runs: doc 41.2 vs
+36.8 s; #29 Stevenrohr 6.1-6.6 vs 1.65 (xft: section_blend 1.3 s err, then 2nd rolling_ball_blend 4.1 s err); #37
+Delete face 4.0-4.3 vs 1.7-2.0; #46 Extrude Bohrungssitz 2.8-3.6 vs 0.45-0.70; #38 bool's 8.5 vs 9.3 (fixed). TICKETS
+row updated (uncommitted). All 8 parts valid on main's final state. xft.patch is APPLIED in the tree: git apply -R
+/root/core-scratch/xft.patch + touch -c the 3 files before any commit.
+SPLINE-FILLET-ASM-R2-END: analysis 22:3x: live's spline = ours (edge 39.461, spline face 710.295). R2 sweep alone
+removes 33.2015 mm3 exactly (tube formula), so any end shape gives <= 28329.455; live 28329.612 is above that ->
+Parasolid mass-property error on its procedural blend face, likely. Ours 28328.537 = sweep + tangent extension cut by
+y=0/30 planes (+0.46/end). Asked live (22:3x) for massproperties [min,max] bands + face areas; close if inside.
 VIBEX7 SLOT: bool's gate holds it ~1 h at a time; keep qa's 02:00-04:05 window free (lead 21:xx; vibex6 gone).
 Blend #4 box-corner test: cause = part x blend section on tool 1's cylinder (u 0..pi/2, seam on its edge): the run-on
 extension (run_to == nullptr branch) re-projects the 2d curve and it comes back off the 3d curve's parameter; WIP check
