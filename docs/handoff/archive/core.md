@@ -5212,3 +5212,60 @@ skasm meanwhile; I'll list what I change here before landing.
   Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there.
   19:2x probes: core-scratch/f18cde-probe.patch (f18c/d/e.out); state in the P0 entry above.  (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
+
+## Moved from the handoff 11-27 22:3x (landed/queued P0s of 11-26/27)
+- **SCREWS MOVE FACE 3: QUEUED 7f88950e (11-27 01:1x)** (commit 7211adcc2; T1 features_a::move_face_translate_slides_
+  split_pieces_along_a_bore; corpus A/B .ab8.sh ALL-SAME; model tests 655 ok, clippy clean). Note for bool: MF3 406 ms =
+  one boolean on the threaded body.
+- **IMPELLER CHAMFER -> FILLET 3: LANDING 11-27 05:3x** (lead 05:3x: zum Halter is already Error in 0.4.72 / main
+  1b395a8e per qa, so land). rim_chamfer cubic_through on the edge's parameter; boolean.cpp op_join_edges_at keeps the
+  line when its far end lies on it; build.cpp extend_straight for ruled B-splines + own_part Segment 5% past each end
+  along a ruled face's sections (live's JeG = face range +-5%); T1 kernel features::a_tube_ends_offset_chamfer_runs_on..
+  (+ round tip check). Gates 05:3x: kernel 617 ok, g++-13 ok; fresh import A 39 / B 40 Ok of 48 (Move face 1 and
+  Fillet Flansch zum Stroemungskanal Error->Ok, zum Halter Ok->Error in this import), regen 55.0 -> 43.0 s; Fillet 3 =
+  live face for face at Fillet Stevenrohr einnschub. Corpus (OLD 11-18 import): Sketch Bohrung Flansch "Select a sketch
+  plane." + 3 downstream: its plane is Extrude 6's CapEnd, whose sides Move face 1 offsets; Move face 1 was Error in
+  the import's build, now Ok, so the old name is gone (fresh import resolves it). knifehandle -0.02 mm3 (check vs live).
+- **P0 FIRST (lead 11-27 08:1x; qa compat on green 6c2c1fe9 vs 0.4.72): OLD-IMPORT REFERENCES IN c2-impeller-loft.**
+  Sketch Bohrung Flansch Ok -> Error "Select a sketch plane." (+ Remove/Extrude Bohrungssitz, Fillet Bohrungen Flansch,
+  Fillet Flansch zum Stroemungskanal). CAUSE (08:2x): 664abc017 (rim chamfer) made the old import's Move face 1 Ok
+  (compat 5e42155d clean, 6c2c1fe9 first bad). Move face 1 offsets Extrude 6's side + Extrude 4's CapStart by OCCT's
+  offset (direct.rs name_result with offset_role): every face it touches named Offset(the one it was), so Extrude 6's
+  CapEnd (only re-trimmed) -> Face{MF1, Offset(CapEnd)}, then Split by MF2; the saved sketch names the bare CapEnd.
+  FIX 65cc51362 (LANDING with f4b54ff9c): direct.rs alias_offset_faces at move_face's end: each Offset(k) this Move face made
+  whose k no longer resolves gets an alias k -> Offset(k) (Bodies aliases; edges by those faces follow too). T1
+  features_a::a_sketch_on_a_face_a_move_face_before_it_offsets_follows_the_face (.mf1.sh). Corpus A/B .ab12.sh on
+  vibex8: ONLY impeller differs; its 5 features back to 0.4.72's exact states (sketch Ok, Remove/Bohrungssitz Info,
+  Fillet Bohrungen 'Unfilleted edge overlapped', zum Stroemungskanal Ok); 8 parts (7 seat solids 255 mm3, as 0.4.72's 10). Probes: core-scratch/p0imp/{names,fg,dec}.py
+  (vibex7 ~/tmp/core: release vs green face names, decoded ids).
+- **RIB-FLIPPED-MESSAGE: COMMITTED f4b54ff9c (core-uip3, lands with the P0 fix)**: solid_a.rs rib one-piece branch: RIB_MISS unless
+  the user's "Extend profiles to part" extension misses the part (L22 -> RIB_FAILED); tests features_a::rib_in_l_bracket
+  (flipped -> miss), kernel_robustness hole_and_rib R3 no longer OPEN. Rib tests 14/14 ok (.rb1.sh,
+  08:1x). FACE-PATTERN-BOSS-LIVE-FAILS (lead 08:4x: match live's error):
+  pattern.rs copies_touch after a face pattern (copies vs the part's faces: no common vertex closer than 1e-7, or two
+  common vertices, no edge, their midpoint on both); T1 features_a::a_face_pattern_whose_copy_touches_the_part_along_
+  a_line_fails (8 along Error, 10 along Ok); model 662 ok; corpus A/B .ab13.sh ALL-SAME. QUEUED 0d26da5f 09:0x (with
+  the P0 fix 931a66b5's commits).
+- **KNIFEHANDLE SPLIT 1 -> CHAMFER 1: DONE, QUEUED 45a536cf (21f359d02, lead told 10:5x).** Split 1 exact (live's
+  5157 = its own area figure). Chamfer 1 curved run-on + 48 sections; Fillet 2 over the tip: build.cpp reface_on keeps
+  pcurves (holds()), blend_direct lies_on normals 0.05 rad. A/B .ab15: only knifehandle/hunting-knife; model 663, kernel 620.
+- **UIPDEP3 RERUN 09:4x (vibex8 ~/tmp/core/uip)**: mistake-rib-flipped-misses + mistake-linear-pattern-face-boss MATCH.
+  fillet-full-round-ok: live marks the first EMPTY selection field error (side1Face, side2Face, centerFaces in turn);
+  FIXED uncommitted detail.rs full_round err_at(first empty) + T1 features_c::a_full_round_names_its_first_empty_selection
+  (passes; 4 full-round tests ok). sweep-thin-edge-no-trim-ok: final state matches; live's Sweep 1 is "error" with Trim
+  ends ON (ours Ok + warning): qa 10:1x VERIFIED both fixes, Trim-ends-on kept under the parity rule (nothing to do). Live also
+  focuses "Faces and sketch regions to sweep" after the Thin tab click (ours none): psui's dialog focus, tell the lead.
+- **QA 11-27 uipdep3 rows: FULL-ROUND-SPLITS-PART 310cb8cb7 + SWEEP-THIN-EDGE-NO-TRIM f44aeb23f VERIFIED by qa on green
+  8cec2b630 (TICKETS d9d4673a0).** Left: nothing (RIB-FLIPPED-MESSAGE and FACE-PATTERN-BOSS queued above).
+- **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
+  features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
+  part NAMES still differ from live (later).
+- **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity_impeller_loft_regenerates_in_time < 40 s).
+- **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
+  7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
+  skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
+  (cli-hist). (2) knifehandle settle fix + T1 settle test: core-rf tip commit (land.sh after 66dba573); slow cuts
+  handed to bool 06:5x: vibex7 ~/agents/core-keep/kh-bool (Fillet 3 cut 244416f8 667 ms, Fillet 1 cut 856a411e 3.2 s).
+  (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands.
+- **KNIFEHANDLE FILLET 3**: settle fix (core-rf tip) (1380 -> 1100 ms; live 11). Left: run-on cut (bool's, above), 4 op_split
+  ~225 ms (closed/trimmed run-on), 1632 projections ~360 ms. Probe: gdb -x ~/tmp/core/spd/w/k/g.gdb.

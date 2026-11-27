@@ -1,30 +1,35 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 20:35 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 22:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 20:35 (lead: land before ~00:00 for the 05:00 cut, then the blend debug)
-P0 pulleys LANDING (this commit): 39141bac63's copies_touch cost 90 ms (46 face pairs with no shared vertex, one exact
-k::distance each, ~2 ms); now measured in parallel: 28-55 ms on loaded vibex7 (Circular pattern 1: no check 142-180,
-check 196-224, 0.4.73 141-208 ms in the same 5-run A/B; tight boxes filter none of the 46: hub faces go round).
-vibex7 release target was corrupt (mold undefined symbols; stale probe binaries until 19:07): cleaned.
-P0 impeller Part 1 invalid (lead 20:1x): qa suites 1126-1417 (111a6633) valid; 1127-1056 (70ab1b23) invalid from
-feature 43 on (it now adds 3 faces; before it changed nothing). Suspects 664abc01 (its msg: Fillet Flansch zum
-Stroemungskanal now builds), e9a9db4a, bool f95397a1/2a4ab01. .imp.sh: norim (code part of 664abc01 reverted:
-core-scratch/rim664.patch, `git apply -R`) vs probe, times #27-#46 + query parts --check.
-P0 #2 (qa) c2-impeller-loft 24.0 -> 33.2 s (vibex7 3-run, old=0.4.73 cli, new=qa 8c1284bc): NOSHAPE_BOOL_MARCH=0 takes
-Fillet Ansaugflansch zum Gehaeuse 10.0 -> 5.9 s (old 6.5): that part is bool's 2a4ab01fdf (tell qa/lead). Fillet Stevenrohr
-zum Halter 1.13 -> 4.08 s (Error in both) is NOT the marcher; suspect core 664abc017e (rim chamfer before it changes its
-body): build cli at 664abc017e^ / 664abc017e and time (core-scratch/spd/feat.sh on vibex7 ~/tmp/core/feat.sh). Also Delete
-face 2 1.2 -> 2.8, Extrude Bohrungssitz Ansaugflansch 0.33 -> 2.0 (Ok both). qa: holds the 05:00 cut unless fixed or
-explained by ~03:30.
+## IN FLIGHT 22:25 (lead 22:2x order: impeller A/B -> close if under the bar; fillet probe; blend #4/#5; SPLINE-FILLET)
+PULLEYS DONE: landed d123a5b646 (copies_touch distances in parallel; 90 -> 30-50 ms). qa told 22:1x.
+IMPELLER (IMPELLER-FILLET-FAILS-SLOWER). Same-run A/B 21:2x (main vs main with 664abc01's code reverted, 3 runs):
+zum Halter (#29) 4.3-4.7 s (main) vs 1.2-1.9 (reverted), Error both; Extrude Bohrungssitz (#46) 2.3 vs 0.6-0.8; whole
+doc 35-39 vs 42-51 s (Fillet 3 4.5-5.6 vs 7.5-8.5; Move face 1 Ok vs Error). So #29 = MY 664abc01 (its input body now
+live's), NOT bool's marcher; lead (22:1x) thinks bool's marcher (that was #38 Fillet Ansaugflansch 12.4 s; opt-in
+ccf1a1ed4d 21:16). qa told the attribution 22:1x. NEXT: .grn.sh (= green vs 0.4.73, 3 runs, #27 #29 #37 #38 #46 #47):
+reset worktree to origin/main first (local commits all landed; git cherry shows '-'), then rb.sh .grnw.sh. Tell lead
+the numbers: #29 will still be ~4.4 vs 1.3 s (>=2x, >=100 ms) unless fixed -> needs zum Halter failing fast.
+Fillet probe: core-scratch/xft.patch (XFT eprintln wrappers around fillet() and the blend fallbacks: section_blend,
+rolling_ball_blend, ring_blend, run_on_rim_blend, coaxial_round, cliff_end_round, cliff_rim_blend, cusp_wall_round);
+script .zh.sh/.zhw.sh. Its 22:2x run was INVALID: it built the 664-REVERTED code (the on-host patch -R / patch forward
+in .imp.sh left newer mtimes; rsync restored older ones, so cargo didn't rebuild). Touched those 5 files at 22:2x; never
+patch on the host again. Re-run: git apply xft.patch, rb.sh .zhw.sh, look at the ---- block of zum Halter (Fcb5e27428a0a).
+PART 1 INVALID (lead 20:1x, qa suite 70ab1b23 features 43-47): NOT reproduced on current main: query parts --check (has
+`valid`) on the final state gives all 8 parts valid (main 21:2x, reverted too). qa's check is per feature (rollback); 47
+is the last feature, so main's end state is valid. Tell lead/qa with the A/B.
+VIBEX7 SLOT: bool's gate holds it ~1 h at a time; keep qa's 02:00-04:05 window free (lead 21:xx; vibex6 gone).
 Blend #4 box-corner test: cause = part x blend section on tool 1's cylinder (u 0..pi/2, seam on its edge): the run-on
 extension (run_to == nullptr branch) re-projects the 2d curve and it comes back off the 3d curve's parameter; WIP check
 "its curve strays: projected" placed before into_period still fails split; kernel WIP + XDBG prints in blend_direct.cpp
 (copy core-scratch/blend_direct.xdbg.cpp; blend_section WIP core-scratch/blend_section.wip.rs).
 Queued after blend #4: SPLINE-FILLET-ASM-R2-END (P2, live 3e464c63): R2 fillet on a fit spline's top edge ends
 1.08 mm3 short; e2e the_depth_batch_starts_are_lives accepts 1.5 mm3 under it: back to 1e-3 when fixed.
-## REPORT PENDING (lead over 200k at 16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
+Then depth batch 8 (live 78dc566b, behaviours "Depth batch 8"): mass-properties-spline-part / -three-parts /
+-add-part / -asm-two-instances ("Instances to measure", no-material toast) / mistake-mass-properties-surface.
+## REPORT PENDING (lead at 395k at 20:40: not messaged): pulleys fix QUEUED 96280303. Earlier (16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
 (errors only when pieces < 2 AND an INTERNAL face/edge remains = a slit). Both said to lead 17:3x in thread.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
 - Suite 1126-2043 (190bd1b8; report vibex8 ~/tmp/qa/report.json, snapshot ~/tmp/qa/models-1126-2043-190bd1b8/<doc>/;
@@ -70,65 +75,10 @@ Queued after blend #4: SPLINE-FILLET-ASM-R2-END (P2, live 3e464c63): R2 fillet o
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
-- **SCREWS MOVE FACE 3: QUEUED 7f88950e (11-27 01:1x)** (commit 7211adcc2; T1 features_a::move_face_translate_slides_
-  split_pieces_along_a_bore; corpus A/B .ab8.sh ALL-SAME; model tests 655 ok, clippy clean). Note for bool: MF3 406 ms =
-  one boolean on the threaded body.
-- **IMPELLER CHAMFER -> FILLET 3: LANDING 11-27 05:3x** (lead 05:3x: zum Halter is already Error in 0.4.72 / main
-  1b395a8e per qa, so land). rim_chamfer cubic_through on the edge's parameter; boolean.cpp op_join_edges_at keeps the
-  line when its far end lies on it; build.cpp extend_straight for ruled B-splines + own_part Segment 5% past each end
-  along a ruled face's sections (live's JeG = face range +-5%); T1 kernel features::a_tube_ends_offset_chamfer_runs_on..
-  (+ round tip check). Gates 05:3x: kernel 617 ok, g++-13 ok; fresh import A 39 / B 40 Ok of 48 (Move face 1 and
-  Fillet Flansch zum Stroemungskanal Error->Ok, zum Halter Ok->Error in this import), regen 55.0 -> 43.0 s; Fillet 3 =
-  live face for face at Fillet Stevenrohr einnschub. Corpus (OLD 11-18 import): Sketch Bohrung Flansch "Select a sketch
-  plane." + 3 downstream: its plane is Extrude 6's CapEnd, whose sides Move face 1 offsets; Move face 1 was Error in
-  the import's build, now Ok, so the old name is gone (fresh import resolves it). knifehandle -0.02 mm3 (check vs live).
-- **P0 FIRST (lead 11-27 08:1x; qa compat on green 6c2c1fe9 vs 0.4.72): OLD-IMPORT REFERENCES IN c2-impeller-loft.**
-  Sketch Bohrung Flansch Ok -> Error "Select a sketch plane." (+ Remove/Extrude Bohrungssitz, Fillet Bohrungen Flansch,
-  Fillet Flansch zum Stroemungskanal). CAUSE (08:2x): 664abc017 (rim chamfer) made the old import's Move face 1 Ok
-  (compat 5e42155d clean, 6c2c1fe9 first bad). Move face 1 offsets Extrude 6's side + Extrude 4's CapStart by OCCT's
-  offset (direct.rs name_result with offset_role): every face it touches named Offset(the one it was), so Extrude 6's
-  CapEnd (only re-trimmed) -> Face{MF1, Offset(CapEnd)}, then Split by MF2; the saved sketch names the bare CapEnd.
-  FIX 65cc51362 (LANDING with f4b54ff9c): direct.rs alias_offset_faces at move_face's end: each Offset(k) this Move face made
-  whose k no longer resolves gets an alias k -> Offset(k) (Bodies aliases; edges by those faces follow too). T1
-  features_a::a_sketch_on_a_face_a_move_face_before_it_offsets_follows_the_face (.mf1.sh). Corpus A/B .ab12.sh on
-  vibex8: ONLY impeller differs; its 5 features back to 0.4.72's exact states (sketch Ok, Remove/Bohrungssitz Info,
-  Fillet Bohrungen 'Unfilleted edge overlapped', zum Stroemungskanal Ok); 8 parts (7 seat solids 255 mm3, as 0.4.72's 10). Probes: core-scratch/p0imp/{names,fg,dec}.py
-  (vibex7 ~/tmp/core: release vs green face names, decoded ids).
-- **RIB-FLIPPED-MESSAGE: COMMITTED f4b54ff9c (core-uip3, lands with the P0 fix)**: solid_a.rs rib one-piece branch: RIB_MISS unless
-  the user's "Extend profiles to part" extension misses the part (L22 -> RIB_FAILED); tests features_a::rib_in_l_bracket
-  (flipped -> miss), kernel_robustness hole_and_rib R3 no longer OPEN. Rib tests 14/14 ok (.rb1.sh,
-  08:1x). FACE-PATTERN-BOSS-LIVE-FAILS (lead 08:4x: match live's error):
-  pattern.rs copies_touch after a face pattern (copies vs the part's faces: no common vertex closer than 1e-7, or two
-  common vertices, no edge, their midpoint on both); T1 features_a::a_face_pattern_whose_copy_touches_the_part_along_
-  a_line_fails (8 along Error, 10 along Ok); model 662 ok; corpus A/B .ab13.sh ALL-SAME. QUEUED 0d26da5f 09:0x (with
-  the P0 fix 931a66b5's commits).
-- **KNIFEHANDLE SPLIT 1 -> CHAMFER 1: DONE, QUEUED 45a536cf (21f359d02, lead told 10:5x).** Split 1 exact (live's
-  5157 = its own area figure). Chamfer 1 curved run-on + 48 sections; Fillet 2 over the tip: build.cpp reface_on keeps
-  pcurves (holds()), blend_direct lies_on normals 0.05 rad. A/B .ab15: only knifehandle/hunting-knife; model 663, kernel 620.
-- **UIPDEP3 RERUN 09:4x (vibex8 ~/tmp/core/uip)**: mistake-rib-flipped-misses + mistake-linear-pattern-face-boss MATCH.
-  fillet-full-round-ok: live marks the first EMPTY selection field error (side1Face, side2Face, centerFaces in turn);
-  FIXED uncommitted detail.rs full_round err_at(first empty) + T1 features_c::a_full_round_names_its_first_empty_selection
-  (passes; 4 full-round tests ok). sweep-thin-edge-no-trim-ok: final state matches; live's Sweep 1 is "error" with Trim
-  ends ON (ours Ok + warning): qa 10:1x VERIFIED both fixes, Trim-ends-on kept under the parity rule (nothing to do). Live also
-  focuses "Faces and sketch regions to sweep" after the Thin tab click (ours none): psui's dialog focus, tell the lead.
 - **ZUM HALTER CORNER: PARKED (lead 11-27 07:4x; Error as in 0.4.72 and main): native-blend-faces candidate.** WIP
   core-scratch/imp/crease-turn-wip3.patch (notes core-scratch/imp/corner-notes.md; the full STATE text in the archive):
   crease junctions, both crease edges untrimmed, >= 32 stations at creases (0.06 um on the bevel), fuzzy Fuse retry
   (unsafe alone: fuzzy fuses returned valid shapes that lost the body). The crease TURNS break every Boolean.
-- **QA 11-27 uipdep3 rows: FULL-ROUND-SPLITS-PART 310cb8cb7 + SWEEP-THIN-EDGE-NO-TRIM f44aeb23f VERIFIED by qa on green
-  8cec2b630 (TICKETS d9d4673a0).** Left: nothing (RIB-FLIPPED-MESSAGE and FACE-PATTERN-BOSS queued above).
-- **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
-  features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
-  part NAMES still differ from live (later).
-- **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity_impeller_loft_regenerates_in_time < 40 s).
-- **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
-  7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
-  skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
-  (cli-hist). (2) knifehandle settle fix + T1 settle test: core-rf tip commit (land.sh after 66dba573); slow cuts
-  handed to bool 06:5x: vibex7 ~/agents/core-keep/kh-bool (Fillet 3 cut 244416f8 667 ms, Fillet 1 cut 856a411e 3.2 s).
-  (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands.
-- **KNIFEHANDLE FILLET 3**: settle fix (core-rf tip) (1380 -> 1100 ms; live 11). Left: run-on cut (bool's, above), 4 op_split
-  ~225 ms (closed/trimmed run-on), 1632 projections ~360 ms. Probe: gdb -x ~/tmp/core/spd/w/k/g.gdb.
 - **LEAD 11-26 08:0x: blend FAILURES first (ranked by documents hit), native blend faces only planned, then skasm's
   sweep items.** Impeller's 1432 ms final cut handed to bool (08:0x; vibex7 ~/agents/core-keep/imp-bool/ed1c251b6b5acedd).
   Ranking (gate cache vibex7 ~/agents/bool-gate/cache/9ad08dd0740c5c08-5839ab362e0e-suite.tsv = main + merge, 200 docs;
