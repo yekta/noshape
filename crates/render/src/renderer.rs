@@ -368,7 +368,7 @@ impl PickBuffer {
     /// gatherPicksFromPickPass: coverage its share of the square's pixels, distance its nearest pixel's from the centre,
     /// 0 there and 1 at a corner); then the lower id.
     pub fn pick(&self, x: i32, y: i32, radius: i32, priority: impl Fn(u32) -> i32) -> Option<u32> {
-        self.pick_reaching(x, y, radius, f64::from(radius), |_| PickClass::Other, |_| 0, priority)
+        self.pick_reaching(x, y, (radius, f64::from(radius)), |_| PickClass::Other, |_| 0, priority)
     }
 
     /// [`Self::pick`] where edges (picked at their drawn width, [`PickClass::Edge`]) are taken by their distance from
@@ -377,7 +377,7 @@ impl PickBuffer {
     /// the square's corners reached ~2 px further across them). Over another body's face (`body` ids differ, 0 for
     /// none) an edge reaches `radius`: its depth-biased end drawn into a part in front of it took the click on that
     /// part's face (live split-face-ok: the face, the edge's end 6.3 px off).
-    pub fn pick_reaching(&self, x: i32, y: i32, radius: i32, far_radius: f64, class: impl Fn(u32) -> PickClass, body: impl Fn(u32) -> u32, priority: impl Fn(u32) -> i32) -> Option<u32> {
+    pub fn pick_reaching(&self, x: i32, y: i32, (radius, far_radius): (i32, f64), class: impl Fn(u32) -> PickClass, body: impl Fn(u32) -> u32, priority: impl Fn(u32) -> i32) -> Option<u32> {
         let far = |id: u32| class(id) == PickClass::Edge;
         let under = self.id_at(x, y).filter(|&c| c != 0 && class(c) == PickClass::Face);
         let edge_reach = if under.is_some() { far_radius.max(f64::from(radius)) } else { f64::from(radius) };
@@ -4803,7 +4803,7 @@ mod tests {
         };
         let class = |id: u32| if id == 9 { PickClass::Edge } else { PickClass::Face };
         let body = |id: u32| if id == 8 { 2 } else { 1 };
-        let reach = |buf: &PickBuffer| (1..12).take_while(|d| buf.pick_reaching(2 + d, 10, 5, 6.5, class, body, |id| i32::from(id == 9)) == Some(9)).count();
+        let reach = |buf: &PickBuffer| (1..12).take_while(|d| buf.pick_reaching(2 + d, 10, (5, 6.5), class, body, |id| i32::from(id == 9)) == Some(9)).count();
         assert_eq!(reach(&at(8)), 5, "over part 2's face");
         assert_eq!(reach(&at(7)), 6, "over its own part's face (6 px between pixel centres, 7 from the drawn line's edge)");
     }
