@@ -202,7 +202,8 @@ pub fn loft() -> FeatureType {
             vec![ParamSpec::query(
                 "wireProfileEntities",
                 "Edges, curves and sketches",
-                QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::WIRE_BODY | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
+                // A sketch region too (live loft-thin-ok: "Face of Sketch 1").
+                QueryFilter::ANY_EDGE | QueryFilter::ANY_FACE | QueryFilter::SKETCH_REGION | QueryFilter::WIRE_BODY | QueryFilter::SHEET_BODY | QueryFilter::VERTEX,
             )],
         )
         .item_template("#wireProfileEntities")
