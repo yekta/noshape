@@ -2036,10 +2036,12 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
     // FULL_ROUND_COMMON_BODY); shapes it handles but we don't fail as
     // FILLET_FAILED.
     const UNSUPPORTED: &str = "Failed to fillet selections.";
-    let (Some(&(b1, f1)), Some(&(b2, f2))) = (s1.first(), s2.first()) else { return err("Select a first side face, a second side face, and one or more faces to round.") };
-    if center.is_empty() {
-        return err("Select a first side face, a second side face, and one or more faces to round.");
+    // (Live marks the first of the three still empty.)
+    let empty = [("side1Face", s1.is_empty()), ("side2Face", s2.is_empty()), ("centerFaces", center.is_empty())].into_iter().find(|f| f.1);
+    if let Some((param, _)) = empty {
+        return crate::regen::eval::err_at(&[param], "Select a first side face, a second side face, and one or more faces to round.");
     }
+    let (Some(&(b1, f1)), Some(&(b2, f2))) = (s1.first(), s2.first()) else { return err(UNSUPPORTED) };
     if b1 != b2 || center.iter().any(|c| c.0 != b1) {
         return err("Cannot use faces from more than one part or surface.");
     }

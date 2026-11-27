@@ -1573,6 +1573,41 @@ fn a_full_round_on_a_ridge_whose_slopes_meet_just_over_its_top_keeps_one_part() 
     assert!(near(v0 - volume(&r, 0), mm(1.0).powi(3) * removed, 1e-6), "{} vs {}", (v0 - volume(&r, 0)) * 1e9, removed);
 }
 
+/// Live (depth batch 3, fillet-full-round-ok): a Full round marks the first of its three selections still empty, First
+/// side face, then Second side face, then Faces to round.
+#[test]
+fn a_full_round_names_its_first_empty_selection() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(-10.0, 0.0), (10.0, 0.0), (10.0, 8.0), (-10.0, 8.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("30 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let pick = |want: DVec3| -> Reference {
+        let i = b.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.normalize().dot(want) > 0.999)).unwrap();
+        Reference::Face((*b.faces[i]).clone())
+    };
+    let (s1, s2, top) = (pick(DVec3::NEG_X), pick(DVec3::X), pick(DVec3::Z));
+    let picks = [s1, s2, top];
+    s.add("fillet", |f| f.set("filletType", en("FULL_ROUND")));
+    for (n, want) in [(0, Some("side1Face")), (1, Some("side2Face")), (2, Some("centerFaces")), (3, None)] {
+        let params = &mut s.ps.features.last_mut().unwrap().params;
+        for (k, id) in ["side1Face", "side2Face", "centerFaces"].iter().enumerate() {
+            params.set(id, ParamValue::Query(picks[..n].get(k).cloned().into_iter().collect()));
+        }
+        let st = s.regen().display.features.last().unwrap().clone();
+        match want {
+            Some(field) => assert_eq!((st.message.as_deref(), st.faulty), (Some("Select a first side face, a second side face, and one or more faces to round."), vec![field.to_string()]), "{n} picked"),
+            None => assert!(st.message.is_none(), "{:?}", st.message),
+        }
+    }
+}
+
 /// Live 2306 E: a full round on a rib tapering along its length (Top (0,−5) (40,−3) (40,3) (0,5), 20 up; sides the two
 /// slanted long faces, center the top) is one CONE, 6,119.2357 mm³ (the drafted rib above: 6,251.0565).
 #[test]
