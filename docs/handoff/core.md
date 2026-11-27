@@ -3,10 +3,25 @@
 Updated 11-27 16:55 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## REPORT PENDING (lead over 200k at 16:5x; tell it when under): e8d60855's failure was a SIGTERM of part-studio-ui's lib
-tests while the stack still carried bf790398 (landed since as 04b6d11a); re-landed docs-only 16:0x as 09995eb9 (on main).
-#1-#3 and #6 are all on main (3fd25195, 04b6d11a, 9161e809). 04b6d11a follows the split rule: it errors only when nothing
-splits (pieces < 2) AND the result holds an INTERNAL face/edge, i.e. ours would leave a slit; any valid split is kept.
+## IN FLIGHT 18:00 (lead: land before ~00:00 for the 05:00 cut, then the blend debug)
+P0 c2-config-parts-pulleys 0.48 -> 0.61 s vs 0.4.73 (bool blamed 39141bac63 copies_touch). vibex7 per-feature (cli
+`feature list`, ~/tmp/core/spd): Circular pattern 1 140 -> 250 ms in qa's 8c1284bc (~/tmp/core/spd/new). Uncommitted in
+pattern.rs: copies_touch's shared vertices from per-face vertex sets (was O(V) per pair) + TEMP XDBG_TOUCH eprintlns (remove
+before landing). Probe build (.spd.sh: release cli -> ~/tmp/core/spd/probe, pulleys x2): total 227/230 ms and NO
+copies_touch call printed -> check Circular pattern 1 is a face pattern at all (filter in .spd.sh used type 'pattern',
+lower-case: fix to 'Pattern'); A/B probe vs `new` vs probe-without-fix in one run before claiming. Then land, tell lead.
+P0 #2 (qa) c2-impeller-loft 24.0 -> 33.2 s (vibex7 3-run, old=0.4.73 cli, new=qa 8c1284bc): NOSHAPE_BOOL_MARCH=0 takes
+Fillet Ansaugflansch zum Gehaeuse 10.0 -> 5.9 s (old 6.5): that part is bool's 2a4ab01fdf (tell qa/lead). Fillet Stevenrohr
+zum Halter 1.13 -> 4.08 s (Error in both) is NOT the marcher; suspect core 664abc017e (rim chamfer before it changes its
+body): build cli at 664abc017e^ / 664abc017e and time (core-scratch/spd/feat.sh on vibex7 ~/tmp/core/feat.sh). Also Delete
+face 2 1.2 -> 2.8, Extrude Bohrungssitz Ansaugflansch 0.33 -> 2.0 (Ok both). qa: holds the 05:00 cut unless fixed or
+explained by ~03:30.
+Blend #4 box-corner test: cause = part x blend section on tool 1's cylinder (u 0..pi/2, seam on its edge): the run-on
+extension (run_to == nullptr branch) re-projects the 2d curve and it comes back off the 3d curve's parameter; WIP check
+"its curve strays: projected" placed before into_period still fails split; kernel WIP + XDBG prints in blend_direct.cpp
+(copy core-scratch/blend_direct.xdbg.cpp; blend_section WIP core-scratch/blend_section.wip.rs).
+## REPORT PENDING (lead over 200k at 16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
+(errors only when pieces < 2 AND an INTERNAL face/edge remains = a slit). Both said to lead 17:3x in thread.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
 - Suite 1126-2043 (190bd1b8; report vibex8 ~/tmp/qa/report.json, snapshot ~/tmp/qa/models-1126-2043-190bd1b8/<doc>/;
   copy core-scratch/suite/). blend parked: blend_direct.cpp is core's for now (note added to blend.md, acbf4dcd5).
