@@ -3,7 +3,7 @@
 Updated 11-27 22:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 22:40 (lead 22:3x: extrude-hole P1 first; impeller P2; then probe/blend #4/#5/SPLINE-FILLET)
+## IN FLIGHT 23:00 (compaction at 219k) (lead 22:3x: extrude-hole P1 first; impeller P2; then probe/blend #4/#5/SPLINE-FILLET)
 EXTRUDE-PRESELECTED-SKETCH-FILLS-HOLE (P1, qa c3919286ce): UI side = psui (feature_preselection / pick_feature_into_
 dialog take every region; psui adds SketchRegionDisplay.inner + features::sketch::inner_regions(&SketchResult), port
 of parity.rs's qSketchRegion(..., true) rule; NOT LANDED at 22:40). Mine: eval.rs Reference::Sketch leaves out
@@ -21,10 +21,12 @@ removes 33.2015 mm3 exactly (tube formula), so any end shape gives <= 28329.455;
 Parasolid mass-property error on its procedural blend face, likely. Ours 28328.537 = sweep + tangent extension cut by
 y=0/30 planes (+0.46/end). Asked live (22:3x) for massproperties [min,max] bands + face areas; close if inside.
 VIBEX7 SLOT: bool's gate holds it ~1 h at a time; keep qa's 02:00-04:05 window free (lead 21:xx; vibex6 gone).
-Blend #4 box-corner test: cause = part x blend section on tool 1's cylinder (u 0..pi/2, seam on its edge): the run-on
-extension (run_to == nullptr branch) re-projects the 2d curve and it comes back off the 3d curve's parameter; WIP check
-"its curve strays: projected" placed before into_period still fails split; kernel WIP + XDBG prints in blend_direct.cpp
-(copy core-scratch/blend_direct.xdbg.cpp; blend_section WIP core-scratch/blend_section.wip.rs).
+BLEND #4 (23:0x): box-corner test FIXED: GeomProjLib::Curve2d of the y=0 plane x tool 1 cylinder section started on
+the seam at u=2pi and stayed there (middle 3.5 mm off); the stray check now reprojects with curve_by_feet (GeomProjLib
+fallback). All 7 blend_section tests pass. Kernel diff = HEAD + that block only (debug copy core-scratch/
+blend_direct.xdbg3.cpp). RUNNING 22:58: core-scratch/bab-run.sh (B build + model tests + g++-13 kernel, then A = HEAD's
+blend files swapped in LOCALLY, corpus userdocs A/B, restore + touch). Don't edit those 2 files while it runs; if it died,
+restore from core-scratch/bab.F1 / bab.F2. Then: commit blend #4, land after psui's inner_regions (extrude commit).
 Queued after blend #4: SPLINE-FILLET-ASM-R2-END (P2, live 3e464c63): R2 fillet on a fit spline's top edge ends
 1.08 mm3 short; e2e the_depth_batch_starts_are_lives accepts 1.5 mm3 under it: back to 1e-3 when fixed.
 Then depth batch 8 (live 78dc566b, behaviours "Depth batch 8"): mass-properties-spline-part / -three-parts /
