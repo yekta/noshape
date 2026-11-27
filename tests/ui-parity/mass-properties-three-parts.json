@@ -1,0 +1,44 @@
+{
+ "name": "mass-properties-three-parts",
+ "about": "spline-parts: the three parts selected, Mass properties: the sums",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 3",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Mass properties"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "name": "export-3mf-maker-plate",
+ "about": "maker-plate: the filleted plate's Export\u2026, Format 3MF (its fields), Store file in a new tab, Export",
+ "area": "export",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "3MF"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Options",
+    "pick": "Store file in a new tab"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  }
+ ]
+}

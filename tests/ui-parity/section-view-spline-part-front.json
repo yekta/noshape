@@ -1,0 +1,34 @@
+{
+ "name": "section-view-spline-part-front",
+ "about": "spline-parts: Section view on Right through the spline part, \u2713",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Section view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

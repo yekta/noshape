@@ -1,0 +1,45 @@
+{
+ "name": "section-view-click-arrow",
+ "about": "block: the top face's Section view\u2026, click its arrow: the section flips (Section plane 1 (Bottom))",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Section view\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     20,
+     15,
+     22
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

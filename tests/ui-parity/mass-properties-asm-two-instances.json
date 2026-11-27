@@ -1,0 +1,32 @@
+{
+ "name": "mass-properties-asm-two-instances",
+ "about": "spline-fillet-asm: select Part 1 <1> and Part 3 <1>, Mass properties: the assembly's panel",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 3 <1>",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Mass properties"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  }
+ ]
+}

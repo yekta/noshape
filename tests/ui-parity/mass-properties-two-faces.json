@@ -1,0 +1,50 @@
+{
+ "name": "mass-properties-two-faces",
+ "about": "block: the top and front faces, Mass properties, the Face tab: the area sum",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Mass properties"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Face"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

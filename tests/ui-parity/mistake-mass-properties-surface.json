@@ -1,0 +1,20 @@
+{
+ "name": "mistake-mass-properties-surface",
+ "about": "surfaces: Mass properties with no part selected (surfaces only in the studio)",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "surfaces",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Mass properties"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

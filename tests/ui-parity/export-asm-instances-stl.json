@@ -1,0 +1,88 @@
+{
+ "name": "export-asm-instances-stl",
+ "about": "spline-fillet-asm: the assembly: Part 1 <1> and Part 3 <1> selected, right-click \u203a Export\u2026, STL, Export",
+ "area": "export",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 3 <1>",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 3 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "STL"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Options",
+    "pick": "Store file in a new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Resolution",
+    "pick": "Medium"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Units",
+    "pick": "Millimeter"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  }
+ ]
+}

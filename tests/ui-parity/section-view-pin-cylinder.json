@@ -1,0 +1,38 @@
+{
+ "name": "section-view-pin-cylinder",
+ "about": "spline-parts: Section view by the pin's cylindrical face, \u2713",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Section view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     82.83,
+     37.17,
+     12
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

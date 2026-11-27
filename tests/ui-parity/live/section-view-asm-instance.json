@@ -1,0 +1,1366 @@
+{
+ "scenario": "section-view-asm-instance",
+ "recorded": "2026-11-27T20:03:14.169Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "6d3fdaa2ed31c65e6493ad0b",
+  "start": "spline-fillet-asm",
+  "startElement": "4cc7f5c4bb654fbe3d052189",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start spline-fillet-asm asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 3 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 3 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    41.001,
+    28.927,
+    7.882
+   ],
+   "eye_mm": [
+    71.826,
+    -24.463,
+    43.476
+   ],
+   "width_mm": 125.311,
+   "height_mm": 66.363,
+   "mmPerPixel": 0.074902,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "face": [
+      20,
+      15,
+      20
+     ],
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 29281,
+   "tmove": 29846,
+   "moves": 1,
+   "hover": [
+    "JJO"
+   ],
+   "tdown": 31333,
+   "at": [
+    747,
+    389
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Section view\u2026",
+      "Suppress Part 1 <1>",
+      "Unfix",
+      "Use best available tessellation",
+      "Copy Part 1 <1>",
+      "Create Drawing of Part 1\u2026",
+      "Create Drawing of start spline-fillet-asm asm Copy 1\u2026",
+      "Export\u2026",
+      "Edit in context",
+      "Find in instance list",
+      "Add mate connector to instance origin\u2026",
+      "Replace Part 1 <1>\u2026",
+      "Switch to start spline-fillet-asm",
+      "Where used for Part 1\u2026",
+      "Select other\u2026",
+      "Add comment",
+      "Zoom to fit",
+      "Zoom to selection",
+      "View normal to",
+      "Delete Part 1 <1>"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34094,
+   "te": 34094
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Section view\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 34095,
+   "tmove": 34157,
+   "moves": 2,
+   "tdown": 35460,
+   "at": [
+    871,
+    535
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Section planes"
+    },
+    "dialog": {
+     "title": "Section view",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Exclude",
+       "selected": true
+      },
+      {
+       "label": "Include",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Section planes",
+       "kind": "query",
+       "items": [
+        "Section plane 1 (Top)"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Items to exclude",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Section view",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Exclude",
+        "selected": true
+       },
+       {
+        "label": "Include",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Section planes",
+        "kind": "query",
+        "items": [
+         "Section plane 1 (Top)"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Items to exclude",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      72.473,
+      -25.585,
+      44.223
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 38542,
+   "te": 38542
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 38542,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Section planes"
+    },
+    "dialog": {
+     "title": "Section view",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Exclude",
+       "selected": true
+      },
+      {
+       "label": "Include",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Section planes",
+       "kind": "query",
+       "items": [
+        "Section plane 1 (Top)"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Items to exclude",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Section view",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Exclude",
+        "selected": true
+       },
+       {
+        "label": "Include",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Section planes",
+        "kind": "query",
+        "items": [
+         "Section plane 1 (Top)"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Items to exclude",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      72.473,
+      -25.585,
+      44.223
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41716,
+   "te": 41716
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 41716,
+   "pointer": {
+    "at": [
+     871,
+     535
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 41724,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 44085,
+   "te": 44085
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 44085,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 48974,
+   "te": 48974
+  }
+ ],
+ "t0_epoch_ms": 1795809771521
+}

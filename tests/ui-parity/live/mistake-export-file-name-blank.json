@@ -1,0 +1,2259 @@
+{
+ "scenario": "mistake-export-file-name-blank",
+ "recorded": "2026-11-27T20:33:21.803Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "1c1060535e4f6136f46228f9",
+  "start": "block",
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "face": [
+      20,
+      15,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 24912,
+   "tmove": 24967,
+   "moves": 1,
+   "hover": [
+    "JHK"
+   ],
+   "tdown": 26263,
+   "at": [
+    1363,
+    482
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Edit Extrude 1\u2026",
+      "Edit Sketch 1\u2026",
+      "Show dimensions",
+      "Show dependencies of Extrude 1\u2026",
+      "New sketch\u2026",
+      "Offset plane\u2026",
+      "Extrude\u2026",
+      "Revolve\u2026",
+      "Hide Part 1",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Section view\u2026",
+      "Copy Part 1",
+      "Create Drawing of Part 1\u2026",
+      "Export as DXF/DWG\u2026",
+      "Export\u2026",
+      "Where used for Part 1\u2026",
+      "Select",
+      "Select other\u2026",
+      "Add comment",
+      "Zoom to fit",
+      "Zoom to selection",
+      "View normal to",
+      "Delete Part 1\u2026",
+      "Delete Extrude 1",
+      "Assign material for Part 1\u2026",
+      "Edit appearance for Part 1\u2026",
+      "Add appearance to face\u2026"
+     ],
+     "highlighted": 21,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 28332,
+   "te": 28333
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Export\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 28333,
+   "tmove": 28387,
+   "moves": 2,
+   "tdown": 29511,
+   "at": [
+    1476,
+    348
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 31484,
+   "te": 31484
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 31484,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 34777,
+   "te": 34777
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Format",
+     "pick": "STL"
+    }
+   },
+   "ok": true,
+   "ti": 34777,
+   "tmove": 34934,
+   "moves": 1,
+   "at": [
+    961,
+    198
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 36854,
+   "te": 36854
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 36854,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 40151,
+   "te": 40151
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Options",
+     "pick": "Store file in a new tab"
+    }
+   },
+   "ok": true,
+   "ti": 40151,
+   "tmove": 40180,
+   "moves": 1,
+   "at": [
+    961,
+    512
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 42029,
+   "te": 42029
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Resolution",
+     "pick": "Medium"
+    }
+   },
+   "ok": true,
+   "ti": 42029,
+   "tmove": 42060,
+   "moves": 1,
+   "at": [
+    961,
+    441
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 43951,
+   "te": 43951
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Units",
+     "pick": "Millimeter"
+    }
+   },
+   "ok": true,
+   "ti": 43951,
+   "tmove": 43986,
+   "moves": 1,
+   "at": [
+    961,
+    370
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 45841,
+   "te": 45841
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "File name"
+    }
+   },
+   "ok": true,
+   "ti": 45841,
+   "tmove": 45879,
+   "moves": 1,
+   "tdown": 46192,
+   "at": [
+    960,
+    127
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "start block Copy 2 - Part 1",
+     "selection": [
+      27,
+      27
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 48051,
+   "te": 48051
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "key",
+    "key": "mod+a"
+   },
+   "ok": true,
+   "ti": 48051,
+   "pointer": {
+    "at": [
+     959,
+     126
+    ],
+    "hover": [],
+    "element": "input#export-filename-input.form-control.ng-pristine"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "start block Copy 2 - Part 1",
+     "selection": [
+      0,
+      27
+     ],
+     "all": true
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start block Copy 2 - Part 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 49893,
+   "te": 49893
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "key",
+    "key": "Backspace"
+   },
+   "ok": true,
+   "ti": 49893,
+   "pointer": {
+    "at": [
+     959,
+     126
+    ],
+    "hover": [],
+    "element": "input#export-filename-input.form-control.ng-pristine"
+   },
+   "tdown": 49897,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Valid file name is required. Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 51733,
+   "te": 51733
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "ti": 51733,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Valid file name is required. Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 54037,
+   "te": 54037
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "modal-ok"
+    }
+   },
+   "ok": true,
+   "ti": 54037,
+   "tmove": 54067,
+   "moves": 1,
+   "tdown": 54354,
+   "at": [
+    1139,
+    602
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Valid file name is required. Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 68417,
+   "te": 68417
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 3000
+   },
+   "ok": true,
+   "ti": 68417,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Valid file name is required. Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHK"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "1200.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 73210,
+   "te": 73211
+  }
+ ],
+ "t0_epoch_ms": 1795811582348
+}

@@ -1,0 +1,20 @@
+{
+ "name": "mistake-measure-part-in-list",
+ "about": "block: click Part 1 in the parts list: the measure readout (or none)",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

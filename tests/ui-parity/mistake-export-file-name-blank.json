@@ -1,0 +1,93 @@
+{
+ "name": "mistake-export-file-name-blank",
+ "about": "block: STL with the File name cleared, Export",
+ "area": "export",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "STL"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Options",
+    "pick": "Store file in a new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Resolution",
+    "pick": "Medium"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Units",
+    "pick": "Millimeter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "File name"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "key",
+   "key": "Backspace"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  }
+ ]
+}

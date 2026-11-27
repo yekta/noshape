@@ -1,0 +1,1691 @@
+{
+ "scenario": "mass-properties-asm-two-instances",
+ "recorded": "2026-11-27T19:53:39.325Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "70d83ebf9346261b32cc4c33",
+  "start": "spline-fillet-asm",
+  "startElement": "4cc7f5c4bb654fbe3d052189",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start spline-fillet-asm asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 3 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 3 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    41.001,
+    28.927,
+    7.882
+   ],
+   "eye_mm": [
+    71.826,
+    -24.463,
+    43.476
+   ],
+   "width_mm": 125.311,
+   "height_mm": 66.363,
+   "mmPerPixel": 0.074902,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 31007,
+   "tmove": 31367,
+   "moves": 1,
+   "tdown": 31659,
+   "at": [
+    90,
+    209
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MlYs41D043oo6S4jh"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34229,
+   "te": 34229
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "instance": "Part 3 <1>",
+     "mods": "shift"
+    }
+   },
+   "ok": true,
+   "ti": 34229,
+   "tmove": 34577,
+   "moves": 1,
+   "tdown": 34890,
+   "at": [
+    90,
+    261
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MlYs41D043oo6S4jh"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MFnPYnyLTu5hdGc9+"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.606,
+      -24.082,
+      43.222
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37686,
+   "te": 37686
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Mass properties"
+    }
+   },
+   "ok": true,
+   "ti": 37686,
+   "tmove": 37760,
+   "moves": 1,
+   "tdown": 38248,
+   "at": [
+    1899,
+    947
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mass and section properties",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Part",
+       "selected": true
+      },
+      {
+       "label": "Face",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Instances to measure",
+       "kind": "query",
+       "items": [
+        "Part 1 <1>",
+        "Part 3 <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Mate connector for reference frame",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Show calculation variance",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": null,
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Volume",
+       "kind": "number",
+       "text": "29586.249 mm\u00b3",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Surface area",
+       "kind": "number",
+       "text": "6449.537 mm\u00b2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Center of mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass moments of inertia (lb mm\u00b2)",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "Lxx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mass and section properties",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Part",
+        "selected": true
+       },
+       {
+        "label": "Face",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Instances to measure",
+        "kind": "query",
+        "items": [
+         "Part 1 <1>",
+         "Part 3 <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Mate connector for reference frame",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Show calculation variance",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": null,
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Volume",
+        "kind": "number",
+        "text": "29586.249 mm\u00b3",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Surface area",
+        "kind": "number",
+        "text": "6449.537 mm\u00b2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Center of mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass moments of inertia (lb mm\u00b2)",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "Lxx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MlYs41D043oo6S4jh"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MFnPYnyLTu5hdGc9+"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "One or more parts do not have a material defined. \u00d7 Close",
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41162,
+   "te": 41162
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 41162,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mass and section properties",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Part",
+       "selected": true
+      },
+      {
+       "label": "Face",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Instances to measure",
+       "kind": "query",
+       "items": [
+        "Part 1 <1>",
+        "Part 3 <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Mate connector for reference frame",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Show calculation variance",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": null,
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Volume",
+       "kind": "number",
+       "text": "29586.249 mm\u00b3",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Surface area",
+       "kind": "number",
+       "text": "6449.537 mm\u00b2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Center of mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass moments of inertia (lb mm\u00b2)",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "Lxx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mass and section properties",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Part",
+        "selected": true
+       },
+       {
+        "label": "Face",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Instances to measure",
+        "kind": "query",
+        "items": [
+         "Part 1 <1>",
+         "Part 3 <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Mate connector for reference frame",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Show calculation variance",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": null,
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Volume",
+        "kind": "number",
+        "text": "29586.249 mm\u00b3",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Surface area",
+        "kind": "number",
+        "text": "6449.537 mm\u00b2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Center of mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass moments of inertia (lb mm\u00b2)",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "Lxx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MlYs41D043oo6S4jh"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MFnPYnyLTu5hdGc9+"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 46165,
+   "te": 46165
+  }
+ ],
+ "t0_epoch_ms": 1795809194894
+}

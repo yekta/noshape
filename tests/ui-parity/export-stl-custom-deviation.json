@@ -1,0 +1,164 @@
+{
+ "name": "export-stl-custom-deviation",
+ "about": "maker-plate: the plate's Export\u2026, STL, Resolution Custom, Chordal tolerance 0.01, Angular deviation 5, Export; Export\u2026 again: Custom 0.01 / 5 remembered; Medium, Export",
+ "area": "export",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "STL"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Options",
+    "pick": "Store file in a new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Units",
+    "pick": "Millimeter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Resolution",
+    "pick": "Custom"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Chordal tolerance (mm)"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "0.01"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Angular deviation (deg)"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Resolution",
+    "pick": "Medium"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  }
+ ]
+}

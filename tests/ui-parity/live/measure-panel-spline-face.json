@@ -1,0 +1,1135 @@
+{
+ "scenario": "measure-panel-spline-face",
+ "recorded": "2026-11-27T20:19:21.808Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "16c19d511b572c32392730b7",
+  "start": "spline-parts",
+  "startElement": "4cc7f5c4bb654fbe3d052189",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 3"
+  },
+  "parts": [
+   "Part 1",
+   "Part 2",
+   "Part 3"
+  ],
+  "partsHeading": "Parts (3)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    6.094,
+    2.436,
+    -1.624
+   ],
+   "eye_mm": [
+    77.323,
+    -120.936,
+    80.624
+   ],
+   "width_mm": 468.121,
+   "height_mm": 247.911,
+   "mmPerPixel": 0.279809,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      52,
+      15,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 24711,
+   "tmove": 24777,
+   "moves": 1,
+   "hover": [
+    "JJG"
+   ],
+   "tdown": 26076,
+   "at": [
+    1247,
+    505
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JJG"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "710.295",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 28215,
+   "te": 28215
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "ti": 28215,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JJG"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "710.295",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 31140,
+   "te": 31140
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "key",
+    "key": "["
+   },
+   "ok": true,
+   "ti": 31140,
+   "pointer": {
+    "at": [
+     1247,
+     504
+    ],
+    "hover": [
+     "JJG"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 31152,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Select entities to measure"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Measure",
+     "text": [
+      "Select entities to measure",
+      "Face of Extrude 1",
+      "\u00d7",
+      "Measure type:",
+      "Length unit:",
+      "Angle unit:",
+      "[ ] Reference coordinate system",
+      "Reference coordinate system",
+      "Area:",
+      "710.295",
+      "2"
+     ],
+     "fields": [
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Reference coordinate system",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "measure-dialog",
+      "title": "Measure",
+      "text": "Measure / Select entities to measure / Face of Extrude 1 / \u00d7 / Measure type: / Show all / Position / Center position / Min distance / Max distance / Length / Diameter / Radius / Angle / Face tangent angle / Curvature deviation / Surface area / Length unit: / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Angle unit: / Degree / Radian / Reference coordinate system / Area:710.295mm2",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JJG"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [],
+     "panel": {
+      "selection": [],
+      "items": [
+       {
+        "name": "Area",
+        "value": "710.295",
+        "units": "mm2"
+       }
+      ]
+     }
+    }
+   },
+   "t": 33246,
+   "te": 33246
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 33246,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Select entities to measure"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Measure",
+     "text": [
+      "Select entities to measure",
+      "Face of Extrude 1",
+      "\u00d7",
+      "Measure type:",
+      "Length unit:",
+      "Angle unit:",
+      "[ ] Reference coordinate system",
+      "Reference coordinate system",
+      "Area:",
+      "710.295",
+      "2"
+     ],
+     "fields": [
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Reference coordinate system",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "measure-dialog",
+      "title": "Measure",
+      "text": "Measure / Select entities to measure / Face of Extrude 1 / \u00d7 / Measure type: / Show all / Position / Center position / Min distance / Max distance / Length / Diameter / Radius / Angle / Face tangent angle / Curvature deviation / Surface area / Length unit: / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Angle unit: / Degree / Radian / Reference coordinate system / Area:710.295mm2",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JJG"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [],
+     "panel": {
+      "selection": [],
+      "items": [
+       {
+        "name": "Area",
+        "value": "710.295",
+        "units": "mm2"
+       }
+      ]
+     }
+    }
+   },
+   "t": 37615,
+   "te": 37615
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 37615,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Select entities to measure"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Measure",
+     "text": [
+      "Select entities to measure",
+      "Face of Extrude 1",
+      "\u00d7",
+      "Measure type:",
+      "Length unit:",
+      "Angle unit:",
+      "[ ] Reference coordinate system",
+      "Reference coordinate system",
+      "Area:",
+      "710.295",
+      "2"
+     ],
+     "fields": [
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Reference coordinate system",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "measure-dialog",
+      "title": "Measure",
+      "text": "Measure / Select entities to measure / Face of Extrude 1 / \u00d7 / Measure type: / Show all / Position / Center position / Min distance / Max distance / Length / Diameter / Radius / Angle / Face tangent angle / Curvature deviation / Surface area / Length unit: / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Angle unit: / Degree / Radian / Reference coordinate system / Area:710.295mm2",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JJG"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [],
+     "panel": {
+      "selection": [],
+      "items": [
+       {
+        "name": "Area",
+        "value": "710.295",
+        "units": "mm2"
+       }
+      ]
+     }
+    }
+   },
+   "t": 40272,
+   "te": 40272
+  }
+ ],
+ "t0_epoch_ms": 1795810742838
+}

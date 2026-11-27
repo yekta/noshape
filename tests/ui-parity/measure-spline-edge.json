@@ -1,0 +1,24 @@
+{
+ "name": "measure-spline-edge",
+ "about": "spline-parts: click the spline's bottom edge: its length",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     48.25,
+     7.5,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

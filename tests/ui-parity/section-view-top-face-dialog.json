@@ -1,0 +1,30 @@
+{
+ "name": "section-view-top-face-dialog",
+ "about": "block: Section view, pick the top face: the dialog with its section plane",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Section view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

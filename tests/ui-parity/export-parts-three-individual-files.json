@@ -1,0 +1,140 @@
+{
+ "name": "export-parts-three-individual-files",
+ "about": "spline-parts: all three parts selected, Export\u2026, STL, Export unique parts as individual files on, Export; Export\u2026 again (the remembered state), the box off, Export",
+ "area": "export",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 3",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "STL"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Options",
+    "pick": "Store file in a new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Resolution",
+    "pick": "Medium"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Units",
+    "pick": "Millimeter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Export unique parts as individual files"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Export unique parts as individual files"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  }
+ ]
+}

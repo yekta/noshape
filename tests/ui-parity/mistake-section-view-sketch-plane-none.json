@@ -1,0 +1,29 @@
+{
+ "name": "mistake-section-view-sketch-plane-none",
+ "about": "block: Section view and \u2713 (Enter) with no plane picked",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Section view"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

@@ -1,0 +1,39 @@
+{
+ "name": "section-view-asm-instance",
+ "about": "spline-fillet-asm: the assembly: Part 1's top face \u203a Section view\u2026, \u2713",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Section view\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

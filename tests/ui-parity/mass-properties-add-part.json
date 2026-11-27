@@ -1,0 +1,36 @@
+{
+ "name": "mass-properties-add-part",
+ "about": "spline-parts: Part 2's Mass properties, then click Part 3 in the list: added to Parts to measure",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Mass properties"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 3"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

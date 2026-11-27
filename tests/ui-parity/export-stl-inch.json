@@ -1,0 +1,123 @@
+{
+ "name": "export-stl-inch",
+ "about": "maker-plate: the plate's Export\u2026, STL, Units Inch, Export; Export\u2026 again: Inch remembered; Millimeter, Export",
+ "area": "export",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Format",
+    "pick": "STL"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Options",
+    "pick": "Store file in a new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Resolution",
+    "pick": "Medium"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Units",
+    "pick": "Inch"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Units",
+    "pick": "Millimeter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 10000
+  }
+ ]
+}

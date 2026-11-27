@@ -1,0 +1,1751 @@
+{
+ "scenario": "mass-properties-spline-part",
+ "recorded": "2026-11-27T19:51:58.440Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "e756b67c3f64b628a520f512",
+  "start": "spline-parts",
+  "startElement": "4cc7f5c4bb654fbe3d052189",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 3"
+  },
+  "parts": [
+   "Part 1",
+   "Part 2",
+   "Part 3"
+  ],
+  "partsHeading": "Parts (3)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    6.094,
+    2.436,
+    -1.624
+   ],
+   "eye_mm": [
+    77.323,
+    -120.936,
+    80.624
+   ],
+   "width_mm": 468.121,
+   "height_mm": 247.911,
+   "mmPerPixel": 0.279809,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "ti": 27820,
+   "tmove": 28173,
+   "moves": 1,
+   "tdown": 28469,
+   "at": [
+    112,
+    690
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 30404,
+   "te": 30404
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Mass properties"
+    }
+   },
+   "ok": true,
+   "ti": 30404,
+   "tmove": 30453,
+   "moves": 1,
+   "tdown": 30774,
+   "at": [
+    1899,
+    946
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mass and section properties",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Part",
+       "selected": true
+      },
+      {
+       "label": "Face",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Parts to measure",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Mate connector for reference frame",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Show calculation variance",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Volume",
+       "kind": "number",
+       "text": "28329.612 mm\u00b3",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Surface area",
+       "kind": "number",
+       "text": "5720.688 mm\u00b2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Center of mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass moments of inertia (lb mm\u00b2)",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "Lxx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mass and section properties",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Part",
+        "selected": true
+       },
+       {
+        "label": "Face",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Parts to measure",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Mate connector for reference frame",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Show calculation variance",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Volume",
+        "kind": "number",
+        "text": "28329.612 mm\u00b3",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Surface area",
+        "kind": "number",
+        "text": "5720.688 mm\u00b2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Center of mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass moments of inertia (lb mm\u00b2)",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "Lxx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "One or more parts do not have a material defined. \u00d7 Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 32973,
+   "te": 32973
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 32973,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mass and section properties",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Part",
+       "selected": true
+      },
+      {
+       "label": "Face",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Parts to measure",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Mate connector for reference frame",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Show calculation variance",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Volume",
+       "kind": "number",
+       "text": "28329.612 mm\u00b3",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Surface area",
+       "kind": "number",
+       "text": "5720.688 mm\u00b2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Center of mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass moments of inertia (lb mm\u00b2)",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "Lxx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mass and section properties",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Part",
+        "selected": true
+       },
+       {
+        "label": "Face",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Parts to measure",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Mate connector for reference frame",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Show calculation variance",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Volume",
+        "kind": "number",
+        "text": "28329.612 mm\u00b3",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Surface area",
+        "kind": "number",
+        "text": "5720.688 mm\u00b2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Center of mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass moments of inertia (lb mm\u00b2)",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "Lxx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37903,
+   "te": 37903
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1000
+   },
+   "ok": true,
+   "ti": 37903,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mass and section properties",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Part",
+       "selected": true
+      },
+      {
+       "label": "Face",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Parts to measure",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Mate connector for reference frame",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Show calculation variance",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Volume",
+       "kind": "number",
+       "text": "28329.612 mm\u00b3",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Surface area",
+       "kind": "number",
+       "text": "5720.688 mm\u00b2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Center of mass",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mass moments of inertia (lb mm\u00b2)",
+       "kind": "boolean",
+       "checked": false,
+       "state": "disabled"
+      },
+      {
+       "label": "Lxx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lxz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lyz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzx",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzy",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Lzz",
+       "kind": "number",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mass and section properties",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Part",
+        "selected": true
+       },
+       {
+        "label": "Face",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Parts to measure",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Mate connector for reference frame",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Show calculation variance",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Volume",
+        "kind": "number",
+        "text": "28329.612 mm\u00b3",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Surface area",
+        "kind": "number",
+        "text": "5720.688 mm\u00b2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Center of mass",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mass moments of inertia (lb mm\u00b2)",
+        "kind": "boolean",
+        "checked": false,
+        "state": "disabled"
+       },
+       {
+        "label": "Lxx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lxz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lyz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzx",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzy",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Lzz",
+        "kind": "number",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 40892,
+   "te": 40892
+  }
+ ],
+ "t0_epoch_ms": 1795809096293
+}

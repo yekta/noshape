@@ -1,0 +1,44 @@
+{
+ "name": "measure-three-edges",
+ "about": "block: three top edges selected: the readout (total length)",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     12,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     9,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     12,
+     30,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

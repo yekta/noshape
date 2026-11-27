@@ -1,0 +1,51 @@
+{
+ "name": "section-view-drag-offset",
+ "about": "block: the top face's Section view\u2026, drag its arrow (grabbed at z 22, mid-shaft) 20 px down: the plane goes into the part, the offset box",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Section view\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "drag",
+   "from": {
+    "world": [
+     20,
+     15,
+     22
+    ]
+   },
+   "to": {
+    "rel_px": [
+     0,
+     20
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

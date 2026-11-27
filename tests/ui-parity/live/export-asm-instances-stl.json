@@ -1,0 +1,3388 @@
+{
+ "scenario": "export-asm-instances-stl",
+ "recorded": "2026-11-27T20:21:56.557Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "b3596d6051f7ada707b1d76a",
+  "start": "spline-fillet-asm",
+  "startElement": "31d0399087613ead5fb4e013",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start spline-fillet-asm asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 3 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 3 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    41.001,
+    28.927,
+    7.882
+   ],
+   "eye_mm": [
+    71.826,
+    -24.463,
+    43.476
+   ],
+   "width_mm": 104.939,
+   "height_mm": 71.963,
+   "mmPerPixel": 0.081222,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 28137,
+   "tmove": 28489,
+   "moves": 1,
+   "tdown": 28794,
+   "at": [
+    471,
+    209
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 31493,
+   "te": 31493
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "instance": "Part 3 <1>",
+     "mods": "shift"
+    }
+   },
+   "ok": true,
+   "ti": 31493,
+   "tmove": 31835,
+   "moves": 1,
+   "tdown": 32179,
+   "at": [
+    471,
+    261
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34687,
+   "te": 34687
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "instance": "Part 3 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 34687,
+   "tmove": 35018,
+   "moves": 1,
+   "tdown": 35296,
+   "at": [
+    471,
+    261
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Suppress",
+      "Dynamic suppression",
+      "Fix",
+      "Use best available tessellation",
+      "Check interference\u2026",
+      "Replace instances\u2026",
+      "Copy 2 items",
+      "Move to new subassembly",
+      "Change to version\u2026",
+      "Export\u2026",
+      "Create task\u2026",
+      "Zoom to selection",
+      "Add selection to folder\u2026",
+      "Create empty subassembly",
+      "Clear selection",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance  fake-hover context-menu-active"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37744,
+   "te": 37744
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Export\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 37744,
+   "tmove": 37790,
+   "moves": 2,
+   "tdown": 38868,
+   "at": [
+    585,
+    618
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STEP"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Preprocessing",
+       "kind": "select",
+       "value": "None"
+      },
+      {
+       "label": "Version",
+       "kind": "select",
+       "value": "AP242"
+      },
+      {
+       "label": "Use latest version",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Use custom units for export",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up Preprocessing None Automatic Remove small entities only (advanced) Remove small entities only (basic) Remove small entities only (advanced) and convert all surfaces to b-surfaces Version AP242 AP214 AP203 Use latest version Use custom units for export Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41590,
+   "te": 41590
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 41590,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STEP"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Preprocessing",
+       "kind": "select",
+       "value": "None"
+      },
+      {
+       "label": "Version",
+       "kind": "select",
+       "value": "AP242"
+      },
+      {
+       "label": "Use latest version",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Use custom units for export",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up Preprocessing None Automatic Remove small entities only (advanced) Remove small entities only (basic) Remove small entities only (advanced) and convert all surfaces to b-surfaces Version AP242 AP214 AP203 Use latest version Use custom units for export Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 45413,
+   "te": 45413
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Format",
+     "pick": "STL"
+    }
+   },
+   "ok": true,
+   "ti": 45413,
+   "tmove": 45581,
+   "moves": 1,
+   "at": [
+    961,
+    198
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 47917,
+   "te": 47917
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 47917,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 51696,
+   "te": 51696
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Options",
+     "pick": "Store file in a new tab"
+    }
+   },
+   "ok": true,
+   "ti": 51696,
+   "tmove": 51758,
+   "moves": 1,
+   "at": [
+    961,
+    512
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 54222,
+   "te": 54222
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Resolution",
+     "pick": "Medium"
+    }
+   },
+   "ok": true,
+   "ti": 54222,
+   "tmove": 54267,
+   "moves": 1,
+   "at": [
+    961,
+    441
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 56736,
+   "te": 56736
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Units",
+     "pick": "Millimeter"
+    }
+   },
+   "ok": true,
+   "ti": 56736,
+   "tmove": 56792,
+   "moves": 1,
+   "at": [
+    961,
+    370
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 59200,
+   "te": 59200
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 59200,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 62348,
+   "te": 62348
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "modal-ok"
+    }
+   },
+   "ok": true,
+   "ti": 62348,
+   "tmove": 62387,
+   "moves": 1,
+   "tdown": 62712,
+   "at": [
+    1139,
+    659
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "start spline-fillet-asm asm Copy 1 is being prepared for export. You will receive a notification with its status. \u00d7 Close",
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 65564,
+   "te": 65564
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 10000
+   },
+   "ok": true,
+   "ti": 65565,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 1 <1>",
+       "id": "MyrFoUQpGvIq4uS/T"
+      },
+      {
+       "kind": "INSTANCE",
+       "owner": "Part 3 <1>",
+       "id": "MlaGUb6+nzN3Ye2yv"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.575,
+      -24.03,
+      43.186
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 78011,
+   "te": 78011
+  }
+ ],
+ "t0_epoch_ms": 1795810894542
+}

@@ -1,0 +1,24 @@
+{
+ "name": "measure-spline-face",
+ "about": "spline-parts: click the spline side face: the readout",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     52,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

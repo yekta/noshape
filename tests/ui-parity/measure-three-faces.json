@@ -1,0 +1,44 @@
+{
+ "name": "measure-three-faces",
+ "about": "block: three faces of the block selected: the readout (sum of areas)",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     40,
+     15,
+     5
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

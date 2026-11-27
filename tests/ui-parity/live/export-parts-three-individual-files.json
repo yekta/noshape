@@ -1,0 +1,4573 @@
+{
+ "scenario": "export-parts-three-individual-files",
+ "recorded": "2026-11-27T20:29:50.176Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "9d973d6200a29515c73a3f7c",
+  "start": "spline-parts",
+  "startElement": "31d0399087613ead5fb4e013",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 3"
+  },
+  "parts": [
+   "Part 1",
+   "Part 2",
+   "Part 3"
+  ],
+  "partsHeading": "Parts (3)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    6.094,
+    2.436,
+    -1.624
+   ],
+   "eye_mm": [
+    77.323,
+    -120.936,
+    80.624
+   ],
+   "width_mm": 361.514,
+   "height_mm": 247.911,
+   "mmPerPixel": 0.279809,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "ti": 24422,
+   "tmove": 24762,
+   "moves": 1,
+   "tdown": 25062,
+   "at": [
+    493,
+    690
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 26981,
+   "te": 26981
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "part": "Part 2",
+     "mods": "shift"
+    }
+   },
+   "ok": true,
+   "ti": 26981,
+   "tmove": 27316,
+   "moves": 1,
+   "tdown": 27632,
+   "at": [
+    493,
+    716
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 29621,
+   "te": 29621
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "part": "Part 3",
+     "mods": "shift"
+    }
+   },
+   "ok": true,
+   "ti": 29621,
+   "tmove": 29992,
+   "moves": 1,
+   "tdown": 30326,
+   "at": [
+    493,
+    742
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 32410,
+   "te": 32410
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "part": "Part 3"
+    }
+   },
+   "ok": true,
+   "ti": 32410,
+   "tmove": 32766,
+   "moves": 1,
+   "tdown": 33049,
+   "at": [
+    493,
+    742
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties\u2026",
+      "Assign material for 3 parts\u2026",
+      "Edit appearance for 3 parts\u2026",
+      "Check interference for 3 parts\u2026",
+      "Boolean",
+      "Copy 3 items",
+      "Hide",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Create task\u2026",
+      "Export\u2026",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 35081,
+   "te": 35081
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Export\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 35081,
+   "tmove": 35140,
+   "moves": 2,
+   "tdown": 36214,
+   "at": [
+    610,
+    701
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 38177,
+   "te": 38177
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 38177,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41501,
+   "te": 41501
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Format",
+     "pick": "STL"
+    }
+   },
+   "ok": true,
+   "ti": 41502,
+   "tmove": 41694,
+   "moves": 1,
+   "at": [
+    961,
+    198
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 43575,
+   "te": 43576
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 43576,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 46906,
+   "te": 46906
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Options",
+     "pick": "Store file in a new tab"
+    }
+   },
+   "ok": true,
+   "ti": 46907,
+   "tmove": 46944,
+   "moves": 1,
+   "at": [
+    961,
+    512
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 48836,
+   "te": 48836
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Resolution",
+     "pick": "Medium"
+    }
+   },
+   "ok": true,
+   "ti": 48836,
+   "tmove": 48883,
+   "moves": 1,
+   "at": [
+    961,
+    441
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 50767,
+   "te": 50767
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Units",
+     "pick": "Millimeter"
+    }
+   },
+   "ok": true,
+   "ti": 50767,
+   "tmove": 50804,
+   "moves": 1,
+   "at": [
+    961,
+    370
+   ],
+   "via": "native select: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 52714,
+   "te": 52714
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "Export unique parts as individual files"
+    }
+   },
+   "ok": true,
+   "ti": 52714,
+   "tmove": 52748,
+   "moves": 1,
+   "tdown": 53068,
+   "at": [
+    678,
+    553
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "individual",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Apply export rules to contents View export rules",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Apply export rules to contents View export rules Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 54970,
+   "te": 54970
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 54970,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "individual",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Apply export rules to contents View export rules",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Apply export rules to contents View export rules Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 57577,
+   "te": 57577
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "modal-ok"
+    }
+   },
+   "ok": true,
+   "ti": 57578,
+   "tmove": 57615,
+   "moves": 1,
+   "tdown": 57904,
+   "at": [
+    1139,
+    698
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "start spline-fillet-asm Copy 1 is being prepared for export. You will receive a notification with its status. \u00d7 Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 60074,
+   "te": 60074
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 10000
+   },
+   "ok": true,
+   "ti": 60074,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 71894,
+   "te": 71894
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "part": "Part 3"
+    }
+   },
+   "ok": true,
+   "ti": 71894,
+   "tmove": 72219,
+   "moves": 1,
+   "tdown": 72509,
+   "at": [
+    493,
+    742
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties\u2026",
+      "Assign material for 3 parts\u2026",
+      "Edit appearance for 3 parts\u2026",
+      "Check interference for 3 parts\u2026",
+      "Boolean",
+      "Copy 3 items",
+      "Hide",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Create task\u2026",
+      "Export\u2026",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 74424,
+   "te": 74424
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Export\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 74424,
+   "tmove": 74462,
+   "moves": 2,
+   "tdown": 75528,
+   "at": [
+    610,
+    701
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Apply export rules to contents View export rules",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Apply export rules to contents View export rules Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 77415,
+   "te": 77415
+  },
+  {
+   "step": 18,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 77415,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Apply export rules to contents View export rules",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Apply export rules to contents View export rules Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 80713,
+   "te": 80713
+  },
+  {
+   "step": 19,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "Export unique parts as individual files"
+    }
+   },
+   "ok": true,
+   "ti": 80713,
+   "tmove": 80740,
+   "moves": 1,
+   "tdown": 81035,
+   "at": [
+    678,
+    553
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "individual",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 82884,
+   "te": 82884
+  },
+  {
+   "step": 20,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "ti": 82884,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "individual",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Export 3 Parts",
+     "fields": [
+      {
+       "label": "STL Format",
+       "kind": "select",
+       "value": "Binary"
+      },
+      {
+       "label": "Units",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Resolution",
+       "kind": "select",
+       "value": "Medium"
+      },
+      {
+       "label": "File name",
+       "kind": "input",
+       "value": "start spline-fillet-asm Copy 1"
+      },
+      {
+       "label": "Format",
+       "kind": "select",
+       "value": "STL"
+      },
+      {
+       "label": "Export models oriented Y axis up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Options",
+       "kind": "select",
+       "value": "Store file in a new tab"
+      },
+      {
+       "label": "Export unique parts as individual files",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include hidden instances in export",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Export",
+      "Cancel"
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Export models oriented Y axis up STL Format Text Binary Units Centimeter Foot Inch Meter Millimeter Yard Resolution Coarse Medium Fine Custom Options Download Download and store file in a new tab Email with file download link Store file in a new tab Export unique parts as individual files Include hidden instances in export"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 85222,
+   "te": 85222
+  },
+  {
+   "step": 21,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "modal-ok"
+    }
+   },
+   "ok": true,
+   "ti": 85222,
+   "tmove": 85262,
+   "moves": 1,
+   "tdown": 85554,
+   "at": [
+    1139,
+    659
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "start spline-fillet-asm Copy 1 is being prepared for export. You will receive a notification with its status. \u00d7 Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 87749,
+   "te": 87749
+  },
+  {
+   "step": 22,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 10000
+   },
+   "ok": true,
+   "ti": 87749,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 3,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 2",
+       "id": "JMD"
+      },
+      {
+       "kind": "BODY",
+       "owner": "Part 3",
+       "id": "JPD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 361.514,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 99568,
+   "te": 99568
+  }
+ ],
+ "t0_epoch_ms": 1795811371087
+}

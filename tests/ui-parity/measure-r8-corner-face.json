@@ -1,0 +1,24 @@
+{
+ "name": "measure-r8-corner-face",
+ "about": "maker-plate: click an R8 corner face of the plate: the readout (radius, area)",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     2.343,
+     2.343,
+     5
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

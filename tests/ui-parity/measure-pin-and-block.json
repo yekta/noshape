@@ -1,0 +1,34 @@
+{
+ "name": "measure-pin-and-block",
+ "about": "spline-parts: the pin's side and Part 2's top: the distance between parts",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     82.83,
+     37.17,
+     12
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     80,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

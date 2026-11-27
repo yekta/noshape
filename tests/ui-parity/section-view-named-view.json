@@ -1,0 +1,101 @@
+{
+ "name": "section-view-named-view",
+ "about": "block: section on the top face, save a named view Cut top, turn the section off, open Named views again",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Section view\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Named views\u2026"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "New view name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Cut top"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Turn off section view"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Named views\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}

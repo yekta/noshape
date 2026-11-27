@@ -1,0 +1,37 @@
+{
+ "name": "measure-panel-spline-face",
+ "about": "spline-parts: the spline side face, [ : the Measure panel",
+ "area": "part-studio",
+ "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
+ "start": "spline-parts",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     52,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "key",
+   "key": "["
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
