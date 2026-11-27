@@ -1,19 +1,23 @@
 {
  "scenario": "loft-guides-checkbox",
- "recorded": "2026-11-14T02:46:13.630Z",
+ "recorded": "2026-11-27T04:16:21.272Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.3"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "9adfbda0ee066636c14a3a8e",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "93db62001f5d3d901b1b7fbb",
   "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -83,7 +87,7 @@
     -116.913,
     77.942
    ],
-   "width_mm": 460.686,
+   "width_mm": 355.772,
    "height_mm": 243.974,
    "mmPerPixel": 0.275365,
    "orthographic": true
@@ -100,8 +104,12 @@
     }
    },
    "ok": true,
+   "ti": 27176,
+   "tmove": 27229,
+   "moves": 1,
+   "tdown": 27551,
    "at": [
-    321,
+    702,
     58
    ],
    "state": {
@@ -346,14 +354,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 33183
+   "t": 30193,
+   "te": 30193
   },
   {
    "step": 2,
@@ -362,6 +371,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 30193,
    "state": {
     "focus": {
      "kind": "field",
@@ -604,14 +614,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 37873
+   "t": 34556,
+   "te": 34557
   },
   {
    "step": 3,
@@ -622,21 +633,19 @@
     }
    },
    "ok": true,
+   "ti": 34557,
+   "tmove": 34591,
+   "moves": 1,
+   "tdown": 34958,
    "at": [
-    331,
+    712,
     339
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Guides and continuity",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Guides",
      "dialog": "Loft 1"
     },
     "dialog": {
@@ -886,14 +895,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 41260
+   "t": 37006,
+   "te": 37006
   },
   {
    "step": 4,
@@ -902,17 +912,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 37006,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Guides and continuity",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Guides",
      "dialog": "Loft 1"
     },
     "dialog": {
@@ -1162,14 +1167,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 45924
+   "t": 41335,
+   "te": 41335
   },
   {
    "step": 5,
@@ -1180,8 +1186,12 @@
     }
    },
    "ok": true,
+   "ti": 41335,
+   "tmove": 41372,
+   "moves": 1,
+   "tdown": 41765,
    "at": [
-    282,
+    663,
     403
    ],
    "state": {
@@ -1466,14 +1476,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 49072
+   "t": 43682,
+   "te": 43682
   },
   {
    "step": 6,
@@ -1482,6 +1493,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 43682,
    "state": {
     "focus": {
      "kind": "field",
@@ -1764,14 +1776,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 53779
+   "t": 47972,
+   "te": 47972
   },
   {
    "step": 7,
@@ -1780,14 +1793,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 47972,
    "pointer": {
     "at": [
-     281,
+     662,
      402
     ],
     "hover": [],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 47978,
    "state": {
     "focus": {
      "kind": "none"
@@ -1856,14 +1871,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 57462
+   "t": 51417,
+   "te": 51417
   },
   {
    "step": 8,
@@ -1872,6 +1888,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 51417,
    "state": {
     "focus": {
      "kind": "none"
@@ -1940,14 +1957,16 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 61997
+   "t": 55723,
+   "te": 55723
   }
- ]
+ ],
+ "t0_epoch_ms": 1795752960084
 }

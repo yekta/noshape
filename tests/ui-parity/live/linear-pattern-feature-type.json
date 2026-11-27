@@ -1,18 +1,23 @@
 {
  "scenario": "linear-pattern-feature-type",
- "recorded": "2026-11-06T13:06:18.124Z",
+ "recorded": "2026-11-27T04:13:31.191Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.2 7539bca4"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "c74861e24331b8a583cff557",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "468183d0b0eab9680b1fb838",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -59,7 +65,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -71,8 +104,12 @@
     }
    },
    "ok": true,
+   "ti": 26752,
+   "tmove": 26804,
+   "moves": 1,
+   "tdown": 27123,
    "at": [
-    689,
+    1070,
     58
    ],
    "state": {
@@ -254,6 +291,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -302,9 +340,37 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 25968
+   "t": 29971,
+   "te": 29971
   },
   {
    "step": 2,
@@ -316,21 +382,19 @@
     }
    },
    "ok": true,
+   "ti": 29971,
+   "tmove": 30033,
+   "moves": 2,
+   "tdown": 30402,
    "at": [
-    343,
+    724,
     121
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": null,
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Features to pattern",
      "dialog": "Linear pattern 1"
     },
     "dialog": {
@@ -483,6 +547,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -531,9 +596,37 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 30400
+   "t": 33912,
+   "te": 33912
   },
   {
    "step": 3,
@@ -544,8 +637,12 @@
     }
    },
    "ok": true,
+   "ti": 33912,
+   "tmove": 34254,
+   "moves": 1,
+   "tdown": 34649,
    "at": [
-    70,
+    451,
     313
    ],
    "state": {
@@ -709,6 +806,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -763,9 +861,37 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 34031
+   "t": 36651,
+   "te": 36651
   },
   {
    "step": 4,
@@ -774,12 +900,25 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 36651,
+   "pointer": {
+    "at": [
+     451,
+     313
+    ],
+    "hover": [
+     "FOH5BjIXS9aThFr_0"
+    ],
+    "element": "span.os-list-item-name"
+   },
+   "tdown": 36656,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -819,9 +958,38 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 37489
+   "t": 40102,
+   "te": 40102
   }
- ]
+ ],
+ "t0_epoch_ms": 1795752790131
 }
