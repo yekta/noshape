@@ -9904,16 +9904,509 @@ static TopoDS_Shape without_strips(const TopoDS_Shape& s, HHist& hist)
   return joined.empty() ? out : collapse_short_edges(out, hist, joined);
 }
 
+namespace
+{
+// `x` with its cylinder faces going round the axis more than once (a thread's flat crest swept round it 7 times on the
+// exact cylinder, nuts Sweep 1) divided into pieces under a turn by lines along the axis, `hist` its history; `x`
+// itself (`hist` null) where it has none or the division fails. OCCT's Booleans lose same-domain parts of such a face
+// (that cut removed 26 mm3 for live's 8.6) and noshape's takes a cylinder face only between lines along its axis.
+TopoDS_Shape divided_turns(const TopoDS_Shape& x, occ::handle<BRepTools_History>& hist)
+{
+  hist.Nullify();
+  std::vector<std::pair<TopoDS_Face, TopoDS_Edge>> lines;
+  for (TopExp_Explorer fe(x, TopAbs_FACE); fe.More(); fe.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(fe.Current());
+    TopLoc_Location    loc;
+    if (occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, loc)).IsNull())
+      continue;
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    if (u1 - u0 <= 2 * M_PI + 1e-9)
+      continue;
+    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
+    BRepTopAdaptor_FClass2d         inside(f, Precision::PConfusion());
+    const int                       n = static_cast<int>(std::ceil((u1 - u0) / (2 * M_PI))) + 1;
+    for (int k = 1; k < n; ++k)
+    {
+      // (Where the line u crosses the face's boundary: each edge's curve on it sampled, its crossings bisected.)
+      const double        u = u0 + (u1 - u0) * k / n;
+      std::vector<double> vs;
+      for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
+      {
+        const TopoDS_Edge&               e = TopoDS::Edge(ee.Current());
+        double                           a = 0, b = 0;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f, a, b);
+        if (pc.IsNull())
+          return x;
+        const int m  = 64;
+        double    ta = a, da = pc->Value(a).X() - u;
+        for (int j = 1; j <= m; ++j)
+        {
+          // (A point on the line counts as past it: a crossing there found once, at that point.)
+          const double tb = a + (b - a) * j / m, db = pc->Value(tb).X() - u;
+          if ((da < 0) != (db < 0))
+          {
+            double lo = ta, hi = tb, dlo = da;
+            for (int it = 0; it < 60; ++it)
+            {
+              const double mid = 0.5 * (lo + hi), dm = pc->Value(mid).X() - u;
+              ((dm < 0) == (dlo < 0) ? lo : hi) = mid;
+              if ((dm < 0) == (dlo < 0))
+                dlo = dm;
+            }
+            vs.push_back(pc->Value(0.5 * (lo + hi)).Y());
+          }
+          ta = tb;
+          da = db;
+        }
+      }
+      std::sort(vs.begin(), vs.end());
+      if (vs.size() % 2 != 0)
+        return x;
+      for (size_t i = 0; i + 1 < vs.size(); ++i)
+      {
+        if (inside.Perform(gp_Pnt2d(u, 0.5 * (vs[i] + vs[i + 1]))) != TopAbs_IN)
+          continue;
+        // (Its curve on the face the line itself: the face's own parameters, never a projection's other period.)
+        const TopoDS_Edge e = BRepBuilderAPI_MakeEdge(s->Value(u, vs[i]), s->Value(u, vs[i + 1]));
+        BRep_Builder().UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, vs[i]), gp_Dir2d(0, 1)), f, std::max(BRep_Tool::Tolerance(f), Precision::Confusion()));
+        lines.emplace_back(f, e);
+      }
+    }
+  }
+  if (lines.empty())
+    return x;
+  try
+  {
+    BRepFeat_SplitShape split(x);
+    for (const auto& [f, e] : lines)
+      split.Add(e, f);
+    split.Build();
+    if (!split.IsDone())
+      return x;
+    const TopoDS_Shape out = split.Shape();
+    int                before = 0, after = 0;
+    for (TopExp_Explorer e(x, TopAbs_FACE); e.More(); e.Next())
+      ++before;
+    for (TopExp_Explorer e(out, TopAbs_FACE); e.More(); e.Next())
+      ++after;
+    if (after != before + static_cast<int>(lines.size()) || !BRepCheck_Analyzer(out).IsValid())
+      return x;
+    // (Precise integrals: OCCT's plain ones of the face going round 7 times were 1e-6 off.)
+    const GProp_GProps was = volume_props_precise(x), now = volume_props_precise(out);
+    if (std::abs(was.Mass() - now.Mass()) > 1e-9 * std::max(std::abs(was.Mass()), 1e-18))
+      return x;
+    hist = new BRepTools_History();
+    for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap m;
+      TopExp::MapShapes(x, k, m);
+      for (int i = 1; i <= m.Extent(); ++i)
+      {
+        const ShapeList& images = split.Modified(m(i));
+        if (images.IsEmpty() || (images.Extent() == 1 && images.First().IsSame(m(i))))
+          continue;
+        for (const TopoDS_Shape& p : images)
+          hist->AddModified(m(i), p);
+      }
+    }
+    return out;
+  }
+  catch (const Standard_Failure&)
+  {
+    hist.Nullify();
+    return x;
+  }
+}
+
+// A Boolean's inputs with divided_turns' pieces, and its result's records turned back into the inputs'.
+struct TurnsDivided
+{
+  OcShapeList                                 args, tools;
+  std::vector<std::unique_ptr<OcShape>>       own;
+  std::vector<const OcShape*>                 originals;
+  std::vector<occ::handle<BRepTools_History>> hists;
+  bool                                        any = false;
+
+  TurnsDivided(const OcShapeList& a, const OcShapeList& t)
+  {
+    for (const auto& [from, to] : {std::pair<const OcShapeList*, OcShapeList*>{&a, &args}, {&t, &tools}})
+      for (size_t i = 0; i < from->items.size(); ++i)
+      {
+        const TopoDS_Shape&            x   = from->items[i];
+        const OcShape*                 src = i < from->sources.size() ? from->sources[i] : nullptr;
+        occ::handle<BRepTools_History> h;
+        const TopoDS_Shape             d = divided_turns(x, h);
+        hists.push_back(h);
+        if (h.IsNull())
+        {
+          to->items.push_back(x);
+          to->sources.push_back(src);
+          originals.push_back(src);
+          continue;
+        }
+        any = true;
+        own.push_back(std::make_unique<OcShape>(d));
+        to->items.push_back(d);
+        to->sources.push_back(own.back().get());
+        if (src == nullptr || !src->shape.IsEqual(x))
+        {
+          own.push_back(std::make_unique<OcShape>(x));
+          src = own.back().get();
+        }
+        originals.push_back(src);
+      }
+  }
+
+  // A piece's records are its input's (kept: modified); an input in pieces is deleted only where all of them are; the
+  // dividing lines and their ends have none.
+  OpOut back(OpOut r) const
+  {
+    static const TopAbs_ShapeEnum kinds[] = {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX};
+    rust::Vec<HistRec>            recs;
+    for (uint32_t ai = 0; ai < hists.size(); ++ai)
+    {
+      if (hists[ai].IsNull())
+      {
+        for (const HistRec& x : r.history)
+          if (x.arg == ai)
+            recs.push_back(x);
+        continue;
+      }
+      const OcShape& was = *originals[ai];
+      const OcShape& now = *(ai < args.items.size() ? args.sources[ai] : tools.sources[ai - args.items.size()]);
+      // Per kind: each piece's input and whether it is that input unchanged; each input's piece count.
+      std::map<uint8_t, std::vector<std::pair<int, bool>>> owner;
+      std::map<uint8_t, std::vector<int>>                  pieces;
+      for (TopAbs_ShapeEnum k : kinds)
+      {
+        auto& o = owner[static_cast<uint8_t>(k)];
+        auto& n = pieces[static_cast<uint8_t>(k)];
+        o.assign(static_cast<size_t>(now.map(k).Extent()), {-1, false});
+        n.assign(static_cast<size_t>(was.map(k).Extent()), 0);
+        for (int j = 1; j <= was.map(k).Extent(); ++j)
+        {
+          const ShapeList images = images_of(hists[ai], was.map(k)(j));
+          for (const TopoDS_Shape& p : images)
+            if (const int d = now.map(k).FindIndex(p); d > 0)
+            {
+              o[static_cast<size_t>(d - 1)] = {j - 1, images.Extent() == 1 && p.IsSame(was.map(k)(j))};
+              ++n[static_cast<size_t>(j - 1)];
+            }
+        }
+      }
+      std::vector<HistRec>                      mine;
+      std::map<std::pair<uint8_t, uint32_t>, int> deleted;
+      for (const HistRec& x : r.history)
+      {
+        if (x.arg != ai)
+          continue;
+        const auto it = owner.find(x.in_kind);
+        if (it == owner.end() || x.in_index >= it->second.size() || it->second[x.in_index].first < 0)
+          continue;
+        const auto [j, whole] = it->second[x.in_index];
+        HistRec y             = x;
+        y.in_index            = static_cast<uint32_t>(j);
+        if (!whole && x.relation == REL_DELETED)
+        {
+          ++deleted[{x.in_kind, y.in_index}];
+          continue;
+        }
+        if (!whole && x.relation == REL_KEPT)
+          y.relation = REL_MODIFIED;
+        mine.push_back(y);
+      }
+      for (const auto& [key, count] : deleted)
+        if (count == pieces[key.first][key.second])
+          mine.push_back(HistRec{ai, key.first, key.second, REL_DELETED, 8, UINT32_MAX});
+      const auto rank = [](const HistRec& x) {
+        const int kind = static_cast<int>(std::find(std::begin(kinds), std::end(kinds), static_cast<TopAbs_ShapeEnum>(x.in_kind)) - std::begin(kinds));
+        const int rel  = x.relation == REL_DELETED ? 0 : x.relation == REL_MODIFIED ? 1 : x.relation == REL_GENERATED ? 2 : 3;
+        return std::make_tuple(kind, x.in_index, rel, x.out_kind, x.out_index);
+      };
+      std::stable_sort(mine.begin(), mine.end(), [&](const HistRec& x, const HistRec& y) { return rank(x) < rank(y); });
+      mine.erase(std::unique(mine.begin(), mine.end(), [&](const HistRec& x, const HistRec& y) { return rank(x) == rank(y); }), mine.end());
+      for (const HistRec& x : mine)
+        recs.push_back(x);
+    }
+    r.history = std::move(recs);
+    return r;
+  }
+
+  // `r` with the pieces of one divided face it has side by side one face again, the lines between them gone and the
+  // pieces of one edge those leave one edge (nuts Sweep 1's thread root: live's one face, its flanks' edges one each).
+  // `r` itself where it has none or the joined part isn't valid with its volume.
+  OpOut rejoined(OpOut r) const
+  {
+    if (!r.shape || r.shape->shape.IsNull())
+      return r;
+    try
+    {
+      const OcShape&   res = *r.shape;
+      const ShapeIMap& rf  = res.map(TopAbs_FACE);
+      const int        nf  = rf.Extent();
+      // Each result face's divided input face (its arg and index + 1); index 0: none yet, -1: another input's too.
+      std::vector<std::pair<uint32_t, int>> from(static_cast<size_t>(nf), {0, 0});
+      for (const HistRec& x : r.history)
+      {
+        if (x.in_kind != TopAbs_FACE || x.out_kind != TopAbs_FACE || x.out_index >= from.size() || (x.relation != REL_MODIFIED && x.relation != REL_KEPT))
+          continue;
+        const bool split = x.arg < hists.size() && !hists[x.arg].IsNull() && static_cast<int>(x.in_index) < originals[x.arg]->map(TopAbs_FACE).Extent()
+                        && images_of(hists[x.arg], originals[x.arg]->map(TopAbs_FACE)(static_cast<int>(x.in_index) + 1)).Extent() > 1;
+        const std::pair<uint32_t, int> me = split ? std::make_pair(x.arg, static_cast<int>(x.in_index) + 1) : std::make_pair(0u, -1);
+        auto&                          o  = from[x.out_index];
+        o                                 = o.second == 0 || o == me ? me : std::make_pair(0u, -1);
+      }
+      std::vector<int> up(static_cast<size_t>(nf));
+      std::iota(up.begin(), up.end(), 0);
+      const auto root = [&up](int i) {
+        while (up[static_cast<size_t>(i)] != i)
+          i = up[static_cast<size_t>(i)] = up[static_cast<size_t>(up[static_cast<size_t>(i)])];
+        return i;
+      };
+      // The lines: an edge of two pieces of one face, on its surface, along its axis.
+      ShapeAncMap ef;
+      TopExp::MapShapesAndUniqueAncestors(res.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+      ShapeIMap lines;
+      for (int i = 1; i <= ef.Extent(); ++i)
+      {
+        if (ef(i).Extent() != 2)
+          continue;
+        const TopoDS_Face& f1 = TopoDS::Face(ef(i).First());
+        const TopoDS_Face& f2 = TopoDS::Face(ef(i).Last());
+        const int          a = rf.FindIndex(f1) - 1, b = rf.FindIndex(f2) - 1;
+        if (a < 0 || b < 0 || from[static_cast<size_t>(a)].second <= 0 || from[static_cast<size_t>(a)] != from[static_cast<size_t>(b)] || f1.Orientation() != f2.Orientation())
+          continue;
+        TopLoc_Location l1, l2;
+        if (BRep_Tool::Surface(f1, l1) != BRep_Tool::Surface(f2, l2) || !(l1 == l2))
+          continue;
+        const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+        double             t0 = 0, t1 = 0;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, f1, t0, t1);
+        if (pc.IsNull() || BRep_Tool::IsClosed(e, f1))
+          continue;
+        const double u = pc->Value(t0).X();
+        if (std::abs(pc->Value(t1).X() - u) > 1e-9 || std::abs(pc->Value(0.5 * (t0 + t1)).X() - u) > 1e-9)
+          continue;
+        lines.Add(e);
+        up[static_cast<size_t>(root(a))] = root(b);
+      }
+      if (lines.IsEmpty())
+        return r;
+      // Pieces of one edge: two edges of one curve, one after the other, at a line's end with no other edge, along the
+      // same faces (pieces counted as their face) with the same curves on them.
+      ShapeAncMap ve;
+      TopExp::MapShapesAndUniqueAncestors(res.shape, TopAbs_VERTEX, TopAbs_EDGE, ve);
+      const ShapeIMap& re = res.map(TopAbs_EDGE);
+      std::vector<int> eup(static_cast<size_t>(re.Extent()));
+      std::iota(eup.begin(), eup.end(), 0);
+      const auto eroot = [&eup](int i) {
+        while (eup[static_cast<size_t>(i)] != i)
+          i = eup[static_cast<size_t>(i)] = eup[static_cast<size_t>(eup[static_cast<size_t>(i)])];
+        return i;
+      };
+      // An edge's faces as (face or its group, curve on it), in order.
+      const auto along = [&](const TopoDS_Edge& e) {
+        std::vector<std::pair<int, const Geom2d_Curve*>> fs;
+        for (const TopoDS_Shape& f : ef.FindFromKey(e))
+        {
+          double a = 0, b = 0;
+          fs.emplace_back(root(rf.FindIndex(f) - 1), BRep_Tool::CurveOnSurface(e, TopoDS::Face(f), a, b).get());
+        }
+        std::sort(fs.begin(), fs.end());
+        return fs;
+      };
+      for (int i = 1; i <= lines.Extent(); ++i)
+        for (TopExp_Explorer vx(lines(i), TopAbs_VERTEX); vx.More(); vx.Next())
+        {
+          std::vector<TopoDS_Edge> two;
+          for (const TopoDS_Shape& e : ve.FindFromKey(vx.Current()))
+            if (!lines.Contains(e))
+              two.push_back(TopoDS::Edge(e));
+          if (two.size() != 2 || BRep_Tool::Degenerated(two[0]) || BRep_Tool::Degenerated(two[1]))
+            continue;
+          TopLoc_Location                 l1, l2;
+          double                          a = 0, b = 0;
+          const occ::handle<Geom_Curve> c = BRep_Tool::Curve(two[0], l1, a, b);
+          if (c.IsNull() || c != BRep_Tool::Curve(two[1], l2, a, b) || !(l1 == l2))
+            continue;
+          if (along(two[0]) != along(two[1]))
+            continue;
+          eup[static_cast<size_t>(eroot(re.FindIndex(two[0]) - 1))] = eroot(re.FindIndex(two[1]) - 1);
+        }
+      // Each chain of pieces one edge on their curve from the first's start to the last's end.
+      std::map<int, std::vector<int>> chains;
+      for (int i = 0; i < re.Extent(); ++i)
+        chains[eroot(i)].push_back(i);
+      BRep_Builder                                                 B;
+      BRepTools_ReShape                                            rs;
+      NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> joined;
+      for (const auto& [top, chain] : chains)
+      {
+        if (chain.size() < 2)
+          continue;
+        std::vector<std::tuple<double, double, TopoDS_Edge>> ps;
+        for (int i : chain)
+        {
+          const TopoDS_Edge e = TopoDS::Edge(re(i + 1).Oriented(TopAbs_FORWARD));
+          double            a = 0, b = 0;
+          BRep_Tool::Range(e, a, b);
+          ps.emplace_back(a, b, e);
+        }
+        std::sort(ps.begin(), ps.end(), [](const auto& x, const auto& y) { return std::get<0>(x) < std::get<0>(y); });
+        bool ok = true;
+        for (size_t k = 1; k < ps.size() && ok; ++k)
+          ok = std::abs(std::get<0>(ps[k]) - std::get<1>(ps[k - 1])) <= 1e-9 * std::max(1.0, std::abs(std::get<1>(ps[k - 1])))
+            && TopExp::FirstVertex(std::get<2>(ps[k])).IsSame(TopExp::LastVertex(std::get<2>(ps[k - 1])));
+        const TopoDS_Vertex v0 = TopExp::FirstVertex(std::get<2>(ps.front())), v1 = TopExp::LastVertex(std::get<2>(ps.back()));
+        if (!ok || v0.IsSame(v1))
+          continue;
+        TopoDS_Edge e = TopoDS::Edge(std::get<2>(ps.front()).EmptyCopied());
+        e.Orientation(TopAbs_FORWARD);
+        B.Add(e, v0.Oriented(TopAbs_FORWARD));
+        B.Add(e, v1.Oriented(TopAbs_REVERSED));
+        B.Range(e, std::get<0>(ps.front()), std::get<1>(ps.back()));
+        for (size_t k = 0; k < ps.size(); ++k)
+        {
+          joined.Bind(std::get<2>(ps[k]), e);
+          if (k == 0)
+            rs.Replace(std::get<2>(ps[k]), e);
+          else
+            rs.Remove(std::get<2>(ps[k]));
+        }
+      }
+      // Each group's pieces one face on their surface, bounded by their edges but the lines, those chained into wires.
+      std::map<int, std::vector<int>> groups;
+      for (int i = 0; i < nf; ++i)
+        groups[root(i)].push_back(i);
+      for (const auto& [top, group] : groups)
+      {
+        if (group.size() < 2)
+          continue;
+        const TopoDS_Face   p0 = TopoDS::Face(rf(group.front() + 1).Oriented(TopAbs_FORWARD));
+        TopLoc_Location     loc;
+        double              tol = 0;
+        std::vector<TopoDS_Edge> es;
+        ShapeIMap                added;
+        for (int i : group)
+        {
+          tol = std::max(tol, BRep_Tool::Tolerance(TopoDS::Face(rf(i + 1))));
+          for (TopExp_Explorer x(rf(i + 1).Oriented(TopAbs_FORWARD), TopAbs_EDGE); x.More(); x.Next())
+          {
+            if (lines.Contains(x.Current()))
+              continue;
+            const TopoDS_Shape* j = joined.Seek(x.Current());
+            if (j == nullptr)
+              es.push_back(TopoDS::Edge(x.Current()));
+            else if (!added.Contains(*j))
+            {
+              added.Add(*j);
+              es.push_back(TopoDS::Edge(j->Oriented(x.Current().Orientation())));
+            }
+          }
+        }
+        TopoDS_Face f;
+        B.MakeFace(f, BRep_Tool::Surface(p0, loc), loc, tol);
+        std::vector<bool> used(es.size(), false);
+        for (size_t i = 0; i < es.size(); ++i)
+        {
+          if (used[i])
+            continue;
+          TopoDS_Wire w;
+          B.MakeWire(w);
+          const TopoDS_Vertex start = TopExp::FirstVertex(es[i], true);
+          for (size_t cur = i;;)
+          {
+            used[cur] = true;
+            B.Add(w, es[cur]);
+            const TopoDS_Vertex v = TopExp::LastVertex(es[cur], true);
+            if (v.IsSame(start))
+              break;
+            size_t next = es.size(), count = 0;
+            for (size_t k = 0; k < es.size(); ++k)
+              if (!used[k] && TopExp::FirstVertex(es[k], true).IsSame(v))
+                next = k, ++count;
+            if (count != 1)
+              return r;
+            cur = next;
+          }
+          w.Closed(true);
+          B.Add(f, w);
+        }
+        for (int i : group)
+          if (i == group.front())
+            rs.Replace(p0, f);
+          else
+            rs.Remove(rf(i + 1).Oriented(TopAbs_FORWARD));
+        for (int i : group)
+          joined.Bind(rf(i + 1).Oriented(TopAbs_FORWARD), f);
+      }
+      const TopoDS_Shape out = rs.Apply(res.shape);
+      if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+        return r;
+      const GProp_GProps was = volume_props_precise(res.shape), now = volume_props_precise(out);
+      // (The same surfaces and curves: only the integrals differ, over the face going round 6 times 2e-7 of the nut's.)
+      if (std::abs(was.Mass() - now.Mass()) > 1e-6 * std::max(std::abs(was.Mass()), 1e-18))
+        return r;
+      // The records onto the joined part: a piece's onto its face or edge, a line's and its ends' gone.
+      OpOut                                     j{std::make_unique<OcShape>(out), {}};
+      const occ::handle<BRepTools_History>      h = rs.History();
+      std::set<std::tuple<uint32_t, uint8_t, uint32_t, uint8_t, uint8_t, uint32_t>> seen;
+      for (const HistRec& x : r.history)
+      {
+        std::vector<TopoDS_Shape> to;
+        if (x.out_index == UINT32_MAX || x.out_kind > TopAbs_VERTEX || static_cast<int>(x.out_index) >= res.map(static_cast<TopAbs_ShapeEnum>(x.out_kind)).Extent())
+          to.push_back(TopoDS_Shape());
+        else
+        {
+          const TopoDS_Shape& s = res.map(static_cast<TopAbs_ShapeEnum>(x.out_kind))(static_cast<int>(x.out_index) + 1);
+          if (const TopoDS_Shape* p = joined.Seek(s.Oriented(TopAbs_FORWARD)))
+            to.push_back(*p);
+          else if (h->IsRemoved(s))
+            continue;
+          else if (const ShapeList& m = h->Modified(s); !m.IsEmpty())
+            to.insert(to.end(), m.begin(), m.end());
+          else
+            to.push_back(s);
+        }
+        for (const TopoDS_Shape& t : to)
+        {
+          HistRec y = x;
+          if (!t.IsNull())
+          {
+            const int k = j.shape->map(static_cast<TopAbs_ShapeEnum>(x.out_kind)).FindIndex(t);
+            if (k <= 0)
+              continue;
+            y.out_index = static_cast<uint32_t>(k - 1);
+            if (y.relation == REL_KEPT && !t.IsSame(res.map(static_cast<TopAbs_ShapeEnum>(x.out_kind))(static_cast<int>(x.out_index) + 1)))
+              y.relation = REL_MODIFIED;
+          }
+          if (seen.insert({y.arg, y.in_kind, y.in_index, y.relation, y.out_kind, y.out_index}).second)
+            j.history.push_back(y);
+        }
+      }
+      return j;
+    }
+    catch (const Standard_Failure&)
+    {
+      return r;
+    }
+  }
+};
+} // namespace
+
 static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts);
 
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
 {
-  OpOut r = op_boolean_built(op, args, tools, opts);
+  const TurnsDivided turns(args, tools);
+  OpOut r = turns.any ? turns.rejoined(turns.back(op_boolean_built(op, turns.args, turns.tools, opts))) : op_boolean_built(op, args, tools, opts);
   if (r.shape)
   {
     ShapeIMap inputs;
-    for (const OcShapeList* l : {&args, &tools})
+    for (const OcShapeList* l : {&turns.args, &turns.tools})
       for (const TopoDS_Shape& x : l->items)
         TopExp::MapShapes(x, TopAbs_EDGE, inputs);
     circles_on_revolutions(r.shape->shape, inputs);

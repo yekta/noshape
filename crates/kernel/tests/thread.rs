@@ -154,3 +154,34 @@ fn a_helical_tooth_gaps_arcs_sweep_exact_cylinders_and_cut_its_blank_cleanly() {
     let v = volume_properties(&gear).unwrap().mass / MM.powi(3);
     assert!((v - (std::f64::consts::PI * 100.0 * 5.0 - area * 5.0)).abs() < 0.01, "{v}");
 }
+
+/// A nut's thread groove (c2-config-parts-nuts' Sweep 1): its flat crest, a profile line along the axis on the bore,
+/// sweeps one exact cylinder face round 6 turns. OCCT's cut by it removed 3x the groove; the Booleans now take that face
+/// in pieces under a turn, and the cut removes the groove, by Pappus 6 turns of 2π ∫ r dA over the trapezoid (r 1.6 to 2,
+/// 0.6 wide at the bore, 0.2 at r 2), its root one face again (live's).
+#[test]
+fn a_nuts_thread_groove_round_six_turns_on_its_bore_cuts_the_groove_out() {
+    let z = |p: DVec3| Plane::from_normal(p, DVec3::Z);
+    let tau = std::f64::consts::TAU;
+    let tube = cut(&make_cylinder(&z(DVec3::ZERO), 4.0 * MM, 5.4 * MM, tau).unwrap(), &make_cylinder(&z(DVec3::ZERO), 1.6 * MM, 5.4 * MM, tau).unwrap()).unwrap().shape;
+    let frame = Plane::new(DVec3::new(0.0, 0.0, 0.5) * MM, DVec3::Z, DVec3::X);
+    let helix = make_helix(&frame, 1.6 * MM, 0.7 * MM, 4.2 * MM, true, 0.0).unwrap();
+    let pts = [(1.6, 0.8), (1.6, 0.2), (2.0, 0.4), (2.0, 0.6)];
+    let p = |(x, zz): (f64, f64)| DVec3::new(x, 0.0, zz) * MM;
+    let edges: Vec<Shape> = (0..pts.len()).map(|i| make_line(p(pts[i]), p(pts[(i + 1) % pts.len()])).unwrap()).collect();
+    let face = make_face_from_wire(&make_wire(&edges).unwrap(), true).unwrap();
+    let groove = sweep(&face, &helix, &SweepOptions { solid: true, ..Default::default() }).unwrap().shape;
+    assert!(groove.is_valid());
+    let crest = groove.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if (radius / MM - 1.6).abs() < 1e-9)).count();
+    assert_eq!(crest, 1, "the crest one exact cylinder face");
+    let per_turn = tau * (1.1 * (2.0f64.powi(2) - 1.6f64.powi(2)) - (2.0f64.powi(3) - 1.6f64.powi(3)) / 3.0);
+    let vol = |s: &Shape| volume_properties(s).unwrap().mass / MM.powi(3);
+    assert!((vol(&groove) - 6.0 * per_turn).abs() < 1e-3, "{} vs {}", vol(&groove), 6.0 * per_turn);
+    let nut = cut(&tube, &groove).unwrap().shape;
+    assert!(nut.is_valid());
+    assert_eq!(nut.count(ShapeType::Solid), 1);
+    assert!(nut.edge_faces().unwrap().iter().all(|f| f.len() <= 2), "no edge of more than two faces");
+    assert!((vol(&tube) - vol(&nut) - 6.0 * per_turn).abs() < 1e-3, "removes {} of {}", vol(&tube) - vol(&nut), 6.0 * per_turn);
+    let root = nut.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if (radius / MM - 2.0).abs() < 1e-9)).count();
+    assert_eq!(root, 1, "the root one face");
+}

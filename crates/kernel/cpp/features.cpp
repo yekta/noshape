@@ -1901,6 +1901,63 @@ static std::optional<gp_Ax1> helix_path_axis(const TopoDS_Wire& w)
   return std::nullopt;
 }
 
+// Curves on `cyl` for the edges of `face` (one wire, already on it), each from its 3D curve with its angle unwrapped
+// along it, each edge's turn joined to the one before round the wire: a strip round more than a turn (a thread's flat
+// crest, nuts Sweep 1), whose curves projection wraps into one period. False when the face doesn't then check valid.
+static bool unwrapped_cylinder_pcurves(const TopoDS_Face& face, const occ::handle<Geom_CylindricalSurface>& cyl, double tol)
+{
+  int wires = 0;
+  for (TopExp_Explorer w(face, TopAbs_WIRE); w.More(); w.Next())
+    ++wires;
+  if (wires != 1)
+    return false;
+  const gp_Ax3 pos = cyl->Position();
+  BRep_Builder bb;
+  std::vector<TopoDS_Edge> seen;
+  std::optional<gp_Pnt2d>  first, end;
+  for (BRepTools_WireExplorer we(BRepTools::OuterWire(face), face); we.More(); we.Next())
+  {
+    const TopoDS_Edge e = we.Current();
+    if (BRep_Tool::Degenerated(e) || std::any_of(seen.begin(), seen.end(), [&](const TopoDS_Edge& x) { return x.IsSame(e); }))
+      return false;
+    seen.push_back(e);
+    const BRepAdaptor_Curve ac(e);
+    const double            a = ac.FirstParameter(), b = ac.LastParameter();
+    const int               m = 256;
+    occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, m + 1);
+    occ::handle<NCollection_HArray1<double>>   ts  = new NCollection_HArray1<double>(1, m + 1);
+    double                                     prev = 0;
+    for (int j = 0; j <= m; ++j)
+    {
+      const double t = a + (b - a) * j / m;
+      double       u, v;
+      ElSLib::CylinderParameters(pos, cyl->Radius(), ac.Value(t), u, v);
+      if (j > 0)
+        u += 2 * M_PI * std::round((prev - u) / (2 * M_PI));
+      prev = u;
+      ts->SetValue(j + 1, t);
+      pts->SetValue(j + 1, gp_Pnt2d(u, v));
+    }
+    const bool   forward = e.Orientation() != TopAbs_REVERSED;
+    const double start   = (forward ? pts->Value(1) : pts->Value(m + 1)).X();
+    const double shift   = end ? 2 * M_PI * std::round((end->X() - start) / (2 * M_PI)) : 0;
+    for (int j = 1; j <= m + 1; ++j)
+      pts->ChangeValue(j).SetX(pts->Value(j).X() + shift);
+    if (!first)
+      first = forward ? pts->Value(1) : pts->Value(m + 1);
+    end = forward ? pts->Value(m + 1) : pts->Value(1);
+    Geom2dAPI_Interpolate gi(pts, ts, false, 1e-12);
+    gi.Perform();
+    if (!gi.IsDone())
+      return false;
+    bb.UpdateEdge(e, gi.Curve(), cyl, TopLoc_Location(), BRep_Tool::Tolerance(e));
+  }
+  if (!first || std::abs(first->X() - end->X()) * cyl->Radius() > 1e3 * tol || std::abs(first->Y() - end->Y()) > 1e3 * tol)
+    return false;
+  BRepLib::SameParameter(face, tol, true);
+  return BRepCheck_Analyzer(face).IsValid();
+}
+
 // Along a helix, a profile arc round the helix's axis sweeps a piece of that axis's cylinder: OCCT's swept surface is a
 // B-spline within its tolerance of it, and a Boolean with the cylinder itself (a helical gear's addendum on its blank)
 // left nanometre slivers, a non-manifold result (scissor-lift's herringbone gear). Each such face on the exact
@@ -1911,11 +1968,24 @@ static void exact_helical_cylinders(BRepOffsetAPI_MakePipeShell& mk, const std::
   for (const TopoDS_Shape& p : profiles)
     for (TopExp_Explorer pe(p, TopAbs_EDGE); pe.More(); pe.Next())
     {
+      // (A profile line parallel to the axis sweeps one too: a thread's flat crest or root, nuts Sweep 1.)
       const BRepAdaptor_Curve pc(TopoDS::Edge(pe.Current()));
-      if (pc.GetType() != GeomAbs_Circle)
-        continue;
-      const gp_Circ ci = pc.Circle();
-      if (std::abs(std::abs(ci.Axis().Direction().Dot(axis.Direction())) - 1) > 1e-9 || line.Distance(ci.Location()) > tol)
+      double                  radius = 0;
+      if (pc.GetType() == GeomAbs_Circle)
+      {
+        const gp_Circ ci = pc.Circle();
+        if (std::abs(std::abs(ci.Axis().Direction().Dot(axis.Direction())) - 1) > 1e-9 || line.Distance(ci.Location()) > tol)
+          continue;
+        radius = ci.Radius();
+      }
+      else if (pc.GetType() == GeomAbs_Line)
+      {
+        const gp_Lin pl = pc.Line();
+        if (std::abs(std::abs(pl.Direction().Dot(axis.Direction())) - 1) > 1e-9)
+          continue;
+        radius = line.Distance(pl.Location());
+      }
+      if (radius <= tol)
         continue;
       for (const TopoDS_Shape& g : mk.Generated(pe.Current()))
       {
@@ -1935,7 +2005,7 @@ static void exact_helical_cylinders(BRepOffsetAPI_MakePipeShell& mk, const std::
           for (int j = 0; j <= 6 && on; ++j)
           {
             const gp_Pnt q = old->Value(u0 + (u1 - u0) * i / 6, v0 + (v1 - v0) * j / 6).Transformed(ft);
-            on = std::abs(line.Distance(q) - ci.Radius()) <= std::max(tol, 1e-6); // (OCCT's fit: 0.34 um off at r 10 mm)
+            on = std::abs(line.Distance(q) - radius) <= std::max(tol, 1e-6); // (OCCT's fit: 0.34 um off at r 10 mm)
             if (i == 3 && j == 3)
               mid = q.XYZ();
           }
@@ -1952,7 +2022,7 @@ static void exact_helical_cylinders(BRepOffsetAPI_MakePipeShell& mk, const std::
         gp_Ax3 frame(line.Location(), axis.Direction(), gp_Dir(radial.Reversed()));
         if (props.Normal().Transformed(ft).XYZ().Dot(radial) < 0)
           frame.YReverse();
-        const occ::handle<Geom_CylindricalSurface> cyl = new Geom_CylindricalSurface(frame, ci.Radius());
+        const occ::handle<Geom_CylindricalSurface> cyl = new Geom_CylindricalSurface(frame, radius);
         std::vector<std::tuple<TopoDS_Edge, occ::handle<Geom2d_Curve>, double, double>> saved;
         for (TopExp_Explorer fe(face, TopAbs_EDGE); fe.More(); fe.Next())
         {
@@ -1977,6 +2047,8 @@ static void exact_helical_cylinders(BRepOffsetAPI_MakePipeShell& mk, const std::
           BRepLib::SameParameter(face, tol, true);
           done = BRepCheck_Analyzer(face).IsValid();
         }
+        if (!done)
+          done = unwrapped_cylinder_pcurves(face, cyl, tol);
         if (done)
           continue;
         for (const auto& [e, c2, a, b] : saved)
