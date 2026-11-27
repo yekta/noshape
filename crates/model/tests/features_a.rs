@@ -1877,6 +1877,47 @@ fn x_axis_dir() -> Reference {
     Reference::Plane(DatumPlane::Right)
 }
 
+/// A hole's face as a circular pattern's axis: evAxis follows the face's sense, against the hole's surface frame (live
+/// c2-opt-pattern-skip-centred: a hole cut up from Top through all, frame (0, 0, -1), evAxis (0, 0, +1)), so index 1
+/// sits 60° counter-clockwise from the seed seen from above.
+#[test]
+fn a_circular_pattern_about_a_hole_turns_as_live() {
+    let mut t = T::new();
+    let (_, plate) = t.block(0.0, 0.0, 0.1, 0.06, "5 mm");
+    let top = Reference::Plane(DatumPlane::Top);
+    let s = t.sketch(top.clone(), circle(DVec2::new(0.088, 0.015), 0.003));
+    let hole = t.regions(s).pop().unwrap();
+    t.add("extrude", &[("entities", q(vec![hole])), ("operationType", en("REMOVE")), ("defaultScope", b(true)), ("endBound", en("THROUGH_ALL"))]);
+    let s = t.sketch(top, circle(DVec2::new(0.088, 0.024), 0.0015));
+    let pin = t.regions(s).pop().unwrap();
+    let pin = t.extrude(pin, "8 mm", "NEW");
+    let res = t.ok();
+    let body = res.context.bodies.iter().find(|x| x.id.feature == plate).unwrap();
+    let side = body.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).expect("the hole's face");
+    let axis = Reference::Face((*body.faces[side]).clone());
+    let cp = t.add(
+        "circularPattern",
+        &[("entities", q(vec![body_ref(&BodyId { feature: pin, index: 0 })])), ("axis", q(vec![axis])), ("angle", e("60 deg")), ("instanceCount", e("2"))],
+    );
+    let at = |res: &RegenResult| -> Vec<DVec2> {
+        let mut c: Vec<DVec2> = solids(&res.context).iter().filter(|x| x.id.feature == cp).map(|x| x.shape.centroid().unwrap().truncate()).collect();
+        c.sort_by(|p, r| p.x.total_cmp(&r.x));
+        c
+    };
+    let c = at(&t.ok());
+    assert_eq!(c.len(), 1);
+    assert!(c[0].distance(DVec2::new(0.088 - 0.009 * 30f64.to_radians().cos(), 0.0195)) < 1e-7, "{c:?}");
+    // Centred with index 1 skipped: -1 at 30°, nothing at 150°.
+    let mut item = ParamValues::default();
+    item.set("index", e("1"));
+    t.set(cp, "isCentered", b(true));
+    t.set(cp, "skipInstances", b(true));
+    t.set(cp, "skippedInstances", ParamValue::Array(vec![item]));
+    let c = at(&t.ok());
+    assert_eq!(c.len(), 1);
+    assert!(c[0].distance(DVec2::new(0.088 + 0.009 * 30f64.to_radians().cos(), 0.0195)) < 1e-7, "{c:?}");
+}
+
 #[test]
 fn linear_part_pattern_new_add_and_skip() {
     let mut t = T::new();

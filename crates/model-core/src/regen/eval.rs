@@ -878,8 +878,13 @@ impl<'a> EvalCtx<'a> {
             }
             Reference::Face(_) => {
                 let (bi, fi) = *self.resolve_faces(std::slice::from_ref(r)).first()?;
-                match self.face_shape(bi, fi).ok()?.face_surface().ok()? {
-                    k::Surface::Cylinder { origin, axis, .. } => Some((origin, axis.normalize())),
+                let face = self.face_shape(bi, fi).ok()?;
+                match face.face_surface().ok()? {
+                    // evAxis follows the face's sense: a hole's axis points against its surface frame (live cpax-1121).
+                    k::Surface::Cylinder { origin, axis, .. } => {
+                        let axis = axis.normalize();
+                        Some((origin, if faces_axis(&face, origin, axis) { -axis } else { axis }))
+                    }
                     k::Surface::Cone { origin, axis, .. } => Some((origin, axis.normalize())),
                     k::Surface::Revolution { axis_origin, axis_dir } => Some((axis_origin, axis_dir.normalize())),
                     // Revolved circles report as tori or spheres (the kernel recognises them).
@@ -1581,6 +1586,15 @@ impl<'a> EvalCtx<'a> {
             self.ctx.bodies.insert(bi + 1 + j, Arc::new(Body::named(id, name, old.kind, p.shape, p.names, old.color, self.feature)));
         }
     }
+}
+
+/// Whether a cylindrical face's outward normal points toward its axis (a hole's side).
+fn faces_axis(face: &Shape, origin: DVec3, axis: DVec3) -> bool {
+    let Ok([u0, u1, v0, v1]) = face.uv_bounds() else { return false };
+    let (u, v) = ((u0 + u1) / 2.0, (v0 + v1) / 2.0);
+    let (Ok(p), Ok(n)) = (face.point_at_uv(u, v), face.normal_at_uv(u, v)) else { return false };
+    let d = p - origin;
+    n.dot(d - axis * d.dot(axis)) < 0.0
 }
 
 fn overlaps(a: &k::BoundingBox, b: &k::BoundingBox) -> bool {
