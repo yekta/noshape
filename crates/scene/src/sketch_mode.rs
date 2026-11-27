@@ -2873,6 +2873,11 @@ impl SketchEditor {
             return EditOutcome::none();
         }
         if let Some((cid, entity, additive)) = self.pressed_glyph.take() {
+            // A used curve's own use glyph (on its middle) selects the curve (live sketch-used-click-line: SKETCH_ENTITY).
+            if use_glyph_entity(cid) == Some(entity) && self.tool == Tool::Select {
+                self.drag = Some(DragState::Pending { entity, start: p });
+                return EditOutcome::none();
+            }
             let orig = data.glyph_offsets.get(&glyph_key(cid, entity)).map(|o| DVec2::new(o[0], o[1])).unwrap_or(DVec2::ZERO);
             self.drag = Some(DragState::Glyph { constraint: cid, entity, start: p, orig, moved: false, additive });
             return EditOutcome::none();
@@ -11262,6 +11267,14 @@ mod tests {
         assert!(d.sketch.entity(line).unwrap().external);
         ed.hover_constraint = Some(use_glyph_id(line));
         assert!(ed.picked(Some(&d)).contains(&line), "hovering highlights the used entity");
+        // A click on the glyph on its middle selects the used curve, a second one deselects it (live sketch-used-click-line).
+        let mid = v(0.01, 0.0);
+        for want in [vec![line], vec![]] {
+            ed.pressed_glyph = Some((use_glyph_id(line), line, false));
+            ed.tool_down(&mut d, mid, Some(line), false, false);
+            ed.tool_up(&mut d, mid);
+            assert_eq!((ed.selection.clone(), ed.selected_constraints.clone()), (want, vec![]));
+        }
         ed.selected_constraints.push(use_glyph_id(line));
         assert!(ed.delete_selection(&mut d));
         assert!(d.external_refs.is_empty());

@@ -7818,6 +7818,72 @@ fn use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge(cx: &mut TestAppCon
     assert_eq!((first, lit, used(cx)), (1, (true, false), 2), "(lines used by the first click, (its glyph lit, the edge lit) back on its middle, after a second click)");
 }
 
+/// Lead P0 SKETCH-USED-CURVES-NOT-SELECTABLE (qa sketch-used-*, live s80: SKETCH_ENTITY): in a sketch on the block's top
+/// face, the edge used (Use) and the tool off, a click on the used line selects it, also where the GPU picks the model
+/// edge under it; a box round the face selects the used line, not the Part's edges.
+#[gpui::test]
+fn a_used_edges_line_is_clicked_and_boxed_in_its_sketch(cx: &mut TestAppContext) {
+    let (window, view, edge, pick, a, b) = sketch_on_top_face(cx, "used-line-select", Tool::Use);
+    cx.update(|cx| view.update(cx, |v, cx| v.viewport.update(cx, |vp, cx| {
+        vp.camera.set_view(noshape_render::StandardView::Top);
+        vp.request_frame(cx);
+    })));
+    draw(cx, window);
+    let mid = on_screen(cx, &view, (a + b) * 0.5);
+    let event = |cx: &mut TestAppContext, evs: Vec<ViewportEvent>| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            for ev in &evs {
+                if let ViewportEvent::PointerMove { position, .. } = ev {
+                    vp.update(cx, |vp, _| vp.place_pointer(*position));
+                }
+                v.on_viewport_event(&vp, ev, w, cx);
+            }
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    let m = Modifiers::default();
+    let click = |hover: Option<u32>| vec![
+        ViewportEvent::PointerMove { position: mid, modifiers: m },
+        ViewportEvent::Hover(hover),
+        ViewportEvent::ToolDown { position: mid, modifiers: m, click_count: 1 },
+        ViewportEvent::ToolUp { position: mid, modifiers: m },
+    ];
+    event(cx, click(Some(pick)));
+    let used = cx.update(|cx| {
+        let v = view.read(cx);
+        v.sketch_data(cx).and_then(|d| d.sketch.entities().find(|e| e.external && e.kind() == noshape_sketch::EntityKind::Line).map(|e| e.id))
+    });
+    let used = used.expect("the edge used");
+    keys(cx, window, &["escape"]);
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| s.tool)), Some(Tool::Select), "the tool off");
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        (ed.selection.clone(), ed.model_selection.iter().chain(&v.selection).cloned().collect::<Vec<_>>())
+    });
+    // A click takes it, a second click drops it (live toggles).
+    for hover in [Some(pick), None] {
+        event(cx, click(hover));
+        let (sel, model) = state(cx);
+        assert!(sel == vec![used] && !model.contains(&edge), "GPU pick {hover:?}: the used line selected, not the edge: {sel:?} {model:?}");
+        event(cx, click(hover));
+        let (sel, model) = state(cx);
+        assert!(sel.is_empty() && model.is_empty(), "GPU pick {hover:?}: a second click drops it: {sel:?} {model:?}");
+    }
+    // A window box round the used line (left to right), 20 px clear of its ends.
+    let (sa, sb) = (on_screen(cx, &view, a), on_screen(cx, &view, b));
+    let (lo, hi) = (sa.min(sb) - DVec2::splat(20.0), sa.max(sb) + DVec2::splat(20.0));
+    drag(cx, window, &view, (lo.x, lo.y), (hi.x, hi.y), 6);
+    let (sel, model) = state(cx);
+    assert!(sel.contains(&used) && !model.iter().any(|r| matches!(r, Reference::Edge(_))), "the window box takes the used line, no Part edge: {sel:?} {model:?}");
+    // It reads as the sketch's own entity, not the Part's edge (live sketch-used-box-select-window: SKETCH_ENTITY).
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let kinds: Vec<String> = state["selection"]["items"].as_array().unwrap().iter().map(|i| i["kind"].as_str().unwrap_or_default().to_string()).collect();
+    assert!(!kinds.is_empty() && kinds.iter().all(|k| k == "SKETCH_ENTITY"), "the selection reads SKETCH_ENTITY: {kinds:?}");
+}
+
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
 fn sketch_on_top_face(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>, Reference, u32, DVec2, DVec2) {
