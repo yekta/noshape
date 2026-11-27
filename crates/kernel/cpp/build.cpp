@@ -7,7 +7,6 @@
 #include <NCollection_DataMap.hxx>
 #include <ShapeFix_Edge.hxx>
 #include <ShapeFix_Face.hxx>
-#include <NCollection_Array2.hxx>
 // Construction: vertices, edges and wires from 2D sketch data and 3D data,
 // planar faces, primitives.
 #include "internal.hpp"
@@ -1434,50 +1433,6 @@ std::unique_ptr<OcShape> extend_face(const OcShape& on, double len)
   return wrap(out);
 }
 
-// A non-rational B-spline surface carried on straight past a side (0, 1: first / last U; 2, 3: V) by `a` in its
-// parameter: one span linear along the side's cross derivative, joined C1. Null where that side isn't clamped.
-static occ::handle<Geom_BSplineSurface> extended_straight(const occ::handle<Geom_BSplineSurface>& s, int side, double a)
-{
-  const bool in_u = side < 2, after = side % 2 == 1;
-  const int  q = in_u ? s->UDegree() : s->VDegree();
-  const int  n = in_u ? s->NbUPoles() : s->NbVPoles(), m = in_u ? s->NbVPoles() : s->NbUPoles();
-  const int  nk = in_u ? s->NbUKnots() : s->NbVKnots();
-  const NCollection_Array1<double>& k  = in_u ? s->UKnots() : s->VKnots();
-  const NCollection_Array1<int>&    mu = in_u ? s->UMultiplicities() : s->VMultiplicities();
-  const NCollection_Array1<double>& ok = in_u ? s->VKnots() : s->UKnots();
-  const NCollection_Array1<int>&    om = in_u ? s->VMultiplicities() : s->UMultiplicities();
-  if ((in_u ? s->IsUPeriodic() : s->IsVPeriodic()) || mu(after ? nk : 1) != q + 1)
-    return {};
-  NCollection_Array1<double> k2(1, nk + 1);
-  NCollection_Array1<int>    m2(1, nk + 1);
-  for (int i = 1; i <= nk; ++i)
-    k2(i + (after ? 0 : 1)) = k(i), m2(i + (after ? 0 : 1)) = mu(i);
-  const int joint = after ? nk : 2;
-  m2(joint) = q;
-  k2(after ? nk + 1 : 1) = after ? k(nk) + a : k(1) - a;
-  m2(after ? nk + 1 : 1) = q + 1;
-  // (i across the side, j along it.)
-  NCollection_Array2<gp_Pnt> p(1, in_u ? n + q : m, 1, in_u ? m : n + q);
-  const auto set = [&](int i, int j, const gp_Pnt& x) { in_u ? p.SetValue(i, j, x) : p.SetValue(j, i, x); };
-  const auto pole = [&](int i, int j) { return in_u ? s->Pole(i, j) : s->Pole(j, i); };
-  const double h = after ? k(nk) - k(nk - 1) : k(2) - k(1);
-  for (int j = 1; j <= m; ++j)
-  {
-    for (int i = 1; i <= n; ++i)
-      set(i + (after ? 0 : q), j, pole(i, j));
-    const gp_Pnt e = pole(after ? n : 1, j);
-    const gp_Vec t = gp_Vec(pole(after ? n - 1 : 2, j), e) * (q / h);
-    for (int r = 1; r <= q; ++r)
-      set(after ? n + r : q + 1 - r, j, e.Translated(t * (a * r / q)));
-  }
-  occ::handle<Geom_BSplineSurface> out =
-    in_u ? new Geom_BSplineSurface(p, k2, ok, m2, om, q, s->VDegree(), false, s->IsVPeriodic())
-         : new Geom_BSplineSurface(p, ok, k2, om, m2, s->UDegree(), q, s->IsUPeriodic(), false);
-  if (q > 1)
-    in_u ? out->RemoveUKnot(joint, q - 1, 1e-9) : out->RemoveVKnot(joint, q - 1, 1e-9);
-  return out;
-}
-
 std::unique_ptr<OcShape> extend_face_at(const OcShape& on, const OcShapeList& edges, double len)
 {
   const TopoDS_Face& f = as_face(on.shape, "face");
@@ -1573,91 +1528,6 @@ std::unique_ptr<OcShape> extend_face_at(const OcShape& on, const OcShapeList& ed
                                 : !closed[0] && (std::abs(pu - a0) < 1e-6 * (1 + a1 - a0) || std::abs(pu - a1) < 1e-6 * (1 + a1 - a0));
       if (!corner)
         ends.emplace_back(k, p);
-    }
-  }
-  // Live's Move boundary without Maintain curvature: the surface ruled straight on past each moved side along its cross
-  // derivative there, the new side len along each ruling (c2-surf-workshop-knifehandle's Extend handle: 69.1459 mm edges
-  // with their midpoints as live; OCCT's curved extension cut at one parameter made 69.1307).
-  if (!bs->IsURational() && !bs->IsVRational())
-  {
-    // The point len on along the ruling from (u, v) on side k; `step`: the most parameter that takes.
-    const auto ruled = [&](int k, double u, double v, double* step) {
-      gp_Pnt p;
-      gp_Vec du, dv;
-      bs->D1(u, v, p, du, dv);
-      gp_Vec d = k < 2 ? du : dv;
-      if (k % 2 == 0)
-        d.Reverse();
-      const double l = d.Magnitude();
-      if (l < 1e-12)
-        fail_op("the surface has no direction across a moved side");
-      if (step != nullptr)
-        *step = std::max(*step, len / l);
-      return p.Translated(d * (len / l));
-    };
-    occ::handle<Geom_BSplineSurface> e = bs;
-    ShapeList                        tools;
-    std::vector<gp_Pnt>              known;
-    for (int k = 0; k < 4 && !e.IsNull(); ++k)
-    {
-      if (!sides[k])
-        continue;
-      const bool   round = closed[k < 2 ? 1 : 0];
-      const double lo = k < 2 ? b0 : a0, hi = k < 2 ? b1 : a1, at = k == 0 ? a0 : k == 1 ? a1 : k == 2 ? b0 : b1;
-      const int    n = std::clamp(16 * (k < 2 ? bs->NbVKnots() : bs->NbUKnots()), 64, 1024);
-      occ::handle<NCollection_HArray1<gp_Pnt>> pts = new NCollection_HArray1<gp_Pnt>(1, round ? n : n + 1);
-      double                                   step = 0;
-      for (int i = 1; i <= pts->Upper(); ++i)
-      {
-        const double w = lo + (hi - lo) * (i - 1) / n;
-        pts->SetValue(i, k < 2 ? ruled(k, at, w, &step) : ruled(k, w, at, &step));
-      }
-      GeomAPI_Interpolate ip(pts, round, 1e-12);
-      ip.Perform();
-      if (!ip.IsDone())
-        fail_op("could not build a moved side");
-      tools.Append(BRepBuilderAPI_MakeEdge(ip.Curve()).Edge());
-      known.push_back(pts->Value(1));
-      known.push_back(pts->Value(pts->Upper()));
-      e = extended_straight(e, k, 1.05 * step);
-    }
-    if (!e.IsNull())
-    {
-      for (const auto& [k, p] : ends)
-      {
-        GeomAPI_ProjectPointOnSurf pr(p, bs);
-        if (pr.NbPoints() == 0)
-          continue;
-        double u, v;
-        pr.LowerDistanceParameters(u, v);
-        const gp_Pnt q = k < 2 ? ruled(k, k == 0 ? a0 : a1, v, nullptr) : ruled(k, u, k == 2 ? b0 : b1, nullptr);
-        if (std::any_of(known.begin(), known.end(), [&](const gp_Pnt& x) { return x.Distance(q) < 1e-5; }))
-          continue;
-        known.push_back(q);
-        tools.Append(BRepBuilderAPI_MakeVertex(q).Vertex());
-      }
-      BRepBuilderAPI_MakeFace mk(e, 1e-7);
-      if (!mk.IsDone())
-        fail_op("could not build the extended face");
-      ShapeList args;
-      args.Append(mk.Face());
-      BRepAlgoAPI_Splitter sp;
-      sp.SetArguments(args);
-      sp.SetTools(tools);
-      sp.Build();
-      if (sp.HasErrors())
-        fail_op("could not cut the extended face at its moved sides");
-      // The piece over the face's own surface.
-      const gp_Pnt2d mid(0.5 * (a0 + a1), 0.5 * (b0 + b1));
-      TopoDS_Face    out;
-      for (TopExp_Explorer x(sp.Shape(), TopAbs_FACE); x.More() && out.IsNull(); x.Next())
-        if (BRepClass_FaceClassifier(TopoDS::Face(x.Current()), mid, 1e-9).State() == TopAbs_IN)
-          out = TopoDS::Face(x.Current());
-      if (out.IsNull())
-        fail_op("could not cut the extended face at its moved sides");
-      if (f.Orientation() == TopAbs_REVERSED)
-        out.Reverse();
-      return wrap(out);
     }
   }
   occ::handle<Geom_BoundedSurface> b = bs;
