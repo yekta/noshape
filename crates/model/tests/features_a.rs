@@ -2504,6 +2504,26 @@ fn move_face_offset_keeps_references_by_occts_offset_names() {
     assert_eq!((&f.status, f.message.as_deref()), (&FeatureStatus::Ok, None));
 }
 
+/// A sketch on a face saved before a Move face that offsets it was added or worked (c2-impeller-loft saved by v0.4.72:
+/// Sketch Bohrung Flansch on Extrude 6's end, Move face 1 then Error, now Ok and naming the end the Offset of the one
+/// it was) still finds the face where the Move face left it.
+#[test]
+fn a_sketch_on_a_face_a_move_face_before_it_offsets_follows_the_face() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    let res = t.ok();
+    let Reference::Face(top) = face_with_normal(&res.context.bodies[0], DVec3::Z) else { panic!("the top") };
+    t.add("moveFace", &[("moveFaces", q(vec![Reference::Face(top.clone())])), ("offsetDistance", e("5 mm"))]);
+    let res = t.ok();
+    assert!(!res.context.bodies[0].faces.iter().any(|n| **n == top), "the top keeps its name: nothing to test");
+    let s = t.sketch(Reference::Face(top), circle(DVec2::new(0.01, 0.01), 0.002));
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "3 mm", "ADD");
+    let res = t.ok();
+    let z = res.context.bodies[0].shape.bounding_box(false).unwrap().max.z;
+    assert!((z - 0.018).abs() < 1e-6, "{z}");
+}
+
 /// References saved when OCCT's offset made a Move face Offset of planes facing two ways (v0.4.71: every face the
 /// Offset of the one it was) still find their vertices (c2-sm-hem-plus's Transform 1 by two vertices failed once those
 /// planes were moved one way at a time, their neighbours keeping their names).

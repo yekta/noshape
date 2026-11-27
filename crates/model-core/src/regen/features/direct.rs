@@ -5,7 +5,7 @@ use super::helpers_a::*;
 use crate::display::BodyKind;
 use crate::naming::{Name, ShapeNames};
 use crate::reference::{Reference, Role, TopoName};
-use crate::regen::context::Body;
+use crate::regen::context::{Body, LookupKind};
 use crate::regen::eval::{EvalCtx, FResult, err};
 use glam::{DMat4, DVec3};
 use noshape_kernel as k;
@@ -616,7 +616,40 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     if moved.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.kind == BodyKind::Solid && nothing(&b.shape))) {
         return err(failed_msg);
     }
+    alias_offset_faces(ev, &moved);
     Ok(())
+}
+
+/// A face this Move face changed (moved, or a neighbour OCCT's offset re-trimmed and named the Offset of the one it
+/// was) still found by the name it had: a reference saved where the Move face failed (c2-impeller-loft saved by
+/// v0.4.72: Sketch Bohrung Flansch on Extrude 6's end, Move face 1 then Error).
+fn alias_offset_faces(ev: &mut EvalCtx, bodies: &[usize]) {
+    let feature = ev.feature;
+    let mut was: Vec<Name> = Vec::new();
+    for &bi in bodies {
+        let Some(b) = ev.ctx.bodies.get(bi) else { continue };
+        for f in &b.faces {
+            let mut cur: &TopoName = f;
+            while let TopoName::Split { parent, .. } = cur {
+                cur = parent;
+            }
+            if let TopoName::Face { feature: by, role: Role::Offset(k) } = cur
+                && *by == feature
+                && !was.contains(k)
+            {
+                was.push(k.clone());
+            }
+        }
+    }
+    let lost: Vec<(Name, Name)> = was
+        .into_iter()
+        .filter(|k| ev.ctx.bodies.find_untracked(LookupKind::Face, k).is_empty())
+        .map(|k| {
+            let now = Arc::new(TopoName::face(feature, Role::Offset(k.clone())));
+            (k, now)
+        })
+        .collect();
+    ev.ctx.bodies.add_aliases(lost);
 }
 
 /// Whether a round cylinder face offset by `d` along its outward normal reaches its axis: a hole closing, a boss going
