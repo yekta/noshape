@@ -87,10 +87,18 @@ impl Pointer {
     }
 
     /// Clicks there and lets the click's pick come back (a hover just changed is picked again first; a loaded
-    /// software GPU can take a while).
+    /// software GPU can take a while). The press and release go in one update, as a quick click's: `simulate_click`
+    /// runs the background work between them, which on a slow runner held the press past the long press that selects
+    /// nothing (Windows release CI v0.4.73 lost one of three clicks).
     pub(super) fn click(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>, at: DVec2) {
-        let win = self.window_point(cx, at);
-        gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_click(win, Modifiers::default());
+        let position = self.window_point(cx, at);
+        let (button, modifiers) = (gpui_kit::MouseButton::Left, Modifiers::default());
+        cx.update_window(self.window, |_, w, cx| {
+            w.dispatch_event(gpui_kit::PlatformInput::MouseDown(gpui_kit::MouseDownEvent { button, position, modifiers, click_count: 1, first_mouse: false }), cx);
+            w.dispatch_event(gpui_kit::PlatformInput::MouseUp(gpui_kit::MouseUpEvent { button, position, modifiers, click_count: 1 }), cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
         self.settle(cx, view);
     }
 
