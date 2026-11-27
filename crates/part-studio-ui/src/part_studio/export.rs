@@ -58,7 +58,8 @@ impl PartStudioView {
         // One row's own dialog; several rows get the tab's (live dx/maker-io-1125: the tab's file name, no Inspection
         // list, "Export unique parts as individual files"), exporting those parts.
         let parts_only = bodies.len() == 1;
-        open_export_modal_with(base, false, parts_only, Rc::new(move |s, name, window, cx| {
+        let title = export_title(bodies.len());
+        open_modal(base, title, false, parts_only, false, Rc::new(move |s, name, window, cx| {
             let bodies = bodies.clone();
             view.update(cx, |this, cx| this.run_part_export(s, name, bodies, window, cx));
         }), window, cx);
@@ -225,13 +226,13 @@ fn open_no_geometry_modal(window: &mut Window, cx: &mut App) {
 }
 
 pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
-    open_modal(base, assembly, parts_only, false, run, window, cx);
+    open_modal(base, "Export".into(), assembly, parts_only, false, run, window, cx);
 }
 
 /// A CAD file tab's Export modal (live document/94): File name, Format (its [`FILE_FORMATS`]), Options and Export
 /// unique parts as individual files; no format's own options.
 pub fn open_file_export_modal(base: String, run: RunExport, window: &mut Window, cx: &mut App) {
-    open_modal(base, false, false, true, run, window, cx);
+    open_modal(base, "Export".into(), false, false, true, run, window, cx);
 }
 
 /// The formats a CAD file's Export lists, those this build writes.
@@ -246,7 +247,13 @@ fn set_file_format(s: &mut ExportSettings, i: usize) {
     }
 }
 
-fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, run: RunExport, window: &mut Window, cx: &mut App) {
+/// Several parts' Export is "Export 2 Parts" (live export-parts-two-selected); a part's, a tab's and an assembly's
+/// instances' are "Export" (live export-asm-instances-stl).
+fn export_title(parts: usize) -> SharedString {
+    if parts > 1 { format!("Export {parts} Parts").into() } else { "Export".into() }
+}
+
+fn open_modal(base: String, title: SharedString, assembly: bool, parts_only: bool, cad_file: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
     // The last export's format and options (live: exportSolidOptions); a CAD file's, Parasolid unless it was one of its.
     // A part row's list ends with Inspection list (live inspection-list-1118), the tab's doesn't.
@@ -448,7 +455,7 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                 Row::Number { label, input, .. } => serde_json::json!({ "label": label, "kind": "input", "value": input.read(cx).value().to_string() }),
                 Row::Note(text) => serde_json::json!({ "kind": "note", "value": text }),
             }));
-            serde_json::json!({ "kind": "modal", "title": "Export", "fields": fields, "buttons": ["Export", "Cancel"] })
+            serde_json::json!({ "kind": "modal", "title": title.as_ref(), "fields": fields, "buttons": ["Export", "Cancel"] })
         });
         // Live (dom g39-export-*): an empty name is an error under the field;
         // OBJ adds a note on spaces in names.
@@ -538,7 +545,7 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
             };
         }
         let (st2, file2, run2, invalid2, mbd_bad2) = (st.clone(), file.clone(), run.clone(), invalid.clone(), mbd_bad.clone());
-        crate::os_ui::modal(dialog, "Export", 600.)
+        crate::os_ui::modal(dialog, title.clone(), 600.)
             .child(body)
             .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export").disabled(invalid.get() || (mbd_height_shown(&s, assembly) && mbd_bad.get())))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
@@ -635,8 +642,15 @@ fn checkbox_row(id: &'static str, label: &'static str, on: bool, disabled: bool)
 
 #[cfg(test)]
 mod tests {
-    use super::{CUSTOM_FIELDS, custom_text};
+    use super::{CUSTOM_FIELDS, custom_text, export_title};
     use noshape_ops::export::{CustomResolution, ExportSettings, PartFormat, UNITS, unit_abbreviation};
+
+    /// Live depth batch 8: two selected parts' Export is "Export 2 Parts", three parts' "Export 3 Parts"; one part's
+    /// and the tab's "Export".
+    #[test]
+    fn several_parts_export_titles_their_count() {
+        assert_eq!([0, 1, 2, 3].map(|n| export_title(n).to_string()), ["Export", "Export", "Export 2 Parts", "Export 3 Parts"]);
+    }
 
     /// Live maker-io-1125: STL's Custom fields show their lengths in the chosen Units (Fine at Inch: 0.002362 in, 2.5,
     /// 0.001 in; at Millimeter 0.06 / 2.5 / 0.0254); 3MF's three fields from Coarse read 0.00024 / 12.5 / 10.

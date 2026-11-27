@@ -194,13 +194,13 @@ impl Default for CustomResolution {
 /// `exportSolidOptions`, one for part, Part Studio and Assembly exports,
 /// saved on Export only): the format, the options every format shares, and
 /// each format's own. glTF, GLB, OBJ, 3MF and URDF share one resolution;
-/// STL keeps its own, with its units and encoding.
+/// STL keeps its own, with its units and encoding. "Export unique parts as
+/// individual files" starts unchecked every time (live depth batch 8).
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct SolidExportPrefs {
     pub format: String,
     pub y_up: bool,
-    pub individual: bool,
     pub hidden: bool,
     pub options: usize,
     pub step: StepPrefs,
@@ -257,7 +257,6 @@ impl Default for SolidExportPrefs {
         Self {
             format: PartFormat::Parasolid.label().into(),
             y_up: false,
-            individual: false,
             hidden: false,
             options: 0,
             step: StepPrefs::default(),
@@ -318,7 +317,7 @@ impl SolidExportPrefs {
     /// Keeps `s`'s values: the shared ones and its format's own.
     pub fn keep(&mut self, s: &ExportSettings) {
         self.format = s.format.label().into();
-        (self.y_up, self.individual, self.hidden, self.options) = (s.y_up, s.individual, s.hidden, s.options);
+        (self.y_up, self.hidden, self.options) = (s.y_up, s.hidden, s.options);
         self.custom = s.custom;
         let v = VersionPrefs { version: s.version, latest: s.latest };
         match s.format {
@@ -345,7 +344,7 @@ impl SolidExportPrefs {
 
     /// Gives `s` the remembered shared values and those of `s.format`.
     pub fn give(&self, s: &mut ExportSettings) {
-        (s.y_up, s.individual, s.hidden, s.options) = (self.y_up, self.individual, self.hidden, self.options.min(OPTIONS.len() - 1));
+        (s.y_up, s.hidden, s.options) = (self.y_up, self.hidden, self.options.min(OPTIONS.len() - 1));
         s.custom = self.custom;
         let v = self.version(s.format);
         (s.version, s.latest) = (v.version, v.latest);
@@ -1745,6 +1744,17 @@ mod tests {
         }
         let bad: Vec<_> = directed.iter().filter(|((a, b), n)| **n != 1 || directed.get(&(*b, *a)) != Some(&1)).collect();
         assert!(bad.is_empty(), "{} of {} directed edges unmatched", bad.len(), directed.len());
+    }
+
+    /// Live depth batch 8 (export-stl-y-up, export-parts-three-individual-files): the next Export opens on the last
+    /// one's Format, Options, Units and Y axis up, but "Export unique parts as individual files" unchecked.
+    #[test]
+    fn export_remembers_its_choices_but_not_individual_files() {
+        let s = super::ExportSettings { format: super::PartFormat::Stl, y_up: true, individual: true, options: 2, units: 4, ..Default::default() };
+        let mut prefs = super::SolidExportPrefs::default();
+        prefs.keep(&s);
+        let again = prefs.settings(false);
+        assert_eq!((again.format, again.y_up, again.options, again.units, again.individual), (super::PartFormat::Stl, true, 2, 4, false));
     }
 
     /// Live (exchange batch 3, 11-20): unique parts as individual files are a zip even of one part, its entries

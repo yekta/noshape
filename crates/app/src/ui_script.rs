@@ -896,7 +896,11 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 "drag" => {
                     let to = step.get("to").cloned().unwrap_or(Value::Null);
                     let from = cx.update(|_, cx| locate(&target, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string()));
-                    let to = cx.update(|_, cx| locate(&to, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string()));
+                    // `{"rel_px": [dx, dy]}`: that many pixels from the start (live section-view-drag-offset).
+                    let to = match (rel_px(&to), &from) {
+                        (Some(d), Ok(a)) => Ok(*a + d),
+                        _ => cx.update(|_, cx| locate(&to, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())),
+                    };
                     match (from, to) {
                         (Ok(a), Ok(b)) => {
                             // (As live's runner: three moves to the start, fifteen to the end.)
@@ -1633,6 +1637,12 @@ impl CurrentWorkspace {
 }
 
 
+/// A drag's `"to": {"rel_px": [dx, dy]}`: an offset in window pixels from where the drag starts.
+fn rel_px(to: &Value) -> Option<Point<Pixels>> {
+    let d = to.get("rel_px")?;
+    Some(point(px(d.get(0)?.as_f64()? as f32), px(d.get(1)?.as_f64()? as f32)))
+}
+
 /// How a document "drag" step moves: its button (`"button"`: "left", "right" or "middle"), `"moves"` (15) and
 /// `"interval_ms"` (30) between them. A left drag waits the interval after its last move too (live's runner); a right or
 /// middle one lets go at once, a flick (qa FEEL-NAV-INERTIA). `"hold": true` keeps the button down for the shot; a
@@ -1678,6 +1688,14 @@ mod tests {
         let m = super::menu_row_matches;
         assert!(m("switch to", "switch to \"large\"") && m("coincident", "coincident (i)") && m("company settings", "loopelf company settings"));
         assert!(!m("open", "open in new browser tab") && !m("delete", "rename"));
+    }
+
+    /// Live section-view-drag-offset drags a section plane's arrow 20 px down: `"to": {"rel_px": [0, 20]}`.
+    #[test]
+    fn a_drag_can_end_some_pixels_from_its_start() {
+        use gpui_kit::{point, px};
+        assert_eq!(super::rel_px(&json!({ "rel_px": [0, 20] })), Some(point(px(0.), px(20.))));
+        assert_eq!(super::rel_px(&json!({ "world": [20, 15, 22] })), None);
     }
 
     /// A drag step's button, moves and interval: the left drag as live's runner's unless said; a right one a flick.
