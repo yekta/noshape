@@ -3777,3 +3777,18 @@ fn a_boss_lofted_from_a_slots_top_fuses_to_it() {
     assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-7 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
     assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
 }
+
+/// c2-impeller-loft's Fillet 3 cut (recorded): an edge of a tool runs past a free-form face of the impeller 1 mm from
+/// that face's edges, the vertex it leaves by 1.6 mm tolerant, near two others: noshape's Boolean declines. The edges
+/// lying in other faces come first, so it declines before asking OCCT's sections (one pair's took 9.7 s).
+#[test]
+fn impeller_cut_declines_before_the_sections() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "a7c0bb71d1230b3b").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let (why, ahead) = (k::last_rust_decline(), k::last_ahead());
+    k::set_rust_boolean_only(false);
+    assert!(r.is_err(), "noshape's Boolean took it");
+    assert_eq!((why.as_str(), ahead), ("a point near two vertices", 0));
+}

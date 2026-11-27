@@ -23,6 +23,13 @@ thread_local! {
     static MARCH: Cell<Option<bool>> = const { Cell::new(None) };
     /// The pairs of faces this thread's last Boolean took noshape's own sections of ([`last_marched`]).
     static MARCHED: Cell<usize> = const { Cell::new(0) };
+    /// The pairs of faces this thread's last Boolean asked the sections of ahead ([`last_ahead`]).
+    static AHEAD: Cell<usize> = const { Cell::new(0) };
+}
+
+/// How many pairs of faces this thread's last Boolean of noshape's asked the sections of ahead.
+pub fn last_ahead() -> usize {
+    AHEAD.with(|a| a.get())
 }
 
 /// Turns noshape's own sections of free-form faces (`march::own`'s pairs) on or off for this thread's Booleans
@@ -436,6 +443,7 @@ impl SectionSource for Occt<'_> {
     }
 
     fn ahead(&self, pairs: &[FacePair]) {
+        AHEAD.with(|a| a.set(a.get() + pairs.len()));
         let mut rest: Vec<FacePair> = pairs.to_vec();
         if self.march {
             let mut own = self.own.lock().expect("own sections");
@@ -508,6 +516,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], shared: &[u32], tol: f64, 
     let (touching_only, scaled_inputs, one_band, or_plain) = (flags & 1 != 0, flags & 2 != 0, flags & 4 != 0, flags & 8 != 0);
     noshape_brep::set_stop_hook(kernel_should_break);
     noshape_brep::set_thread_hooks(noshape_brep::ThreadHooks { capture: pool_capture, enter: pool_enter, leave: pool_leave });
+    AHEAD.with(|a| a.set(0));
     let op = match op {
         0 => Op::Fuse,
         1 => Op::Cut,

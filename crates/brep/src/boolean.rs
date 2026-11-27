@@ -655,6 +655,7 @@ struct GSolid {
 }
 
 /// Every vertex, input and new, by position.
+#[derive(Clone)]
 struct Pool {
     p: Vec<DVec3>,
     /// The input vertices (arg, index) that are this one.
@@ -3872,11 +3873,71 @@ impl Ctx<'_> {
     }
 
     fn face_pair(&mut self, fs: usize, ft: usize) -> R<()> {
-        let band = self.band(fs, ft);
         // (Clearly apart: no section, and no edge of one in the other.)
         if self.faces_apart(fs, ft) {
             return Ok(());
         }
+        self.edges_in_pair(fs, ft)?;
+        match (&self.faces[fs].s, &self.faces[ft].s) {
+            (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. }) => self.nurbs_pair(fs, ft),
+            (Surf::Plane { .. }, Surf::Plane { .. }) => self.plane_plane(fs, ft),
+            (Surf::Plane { .. }, Surf::Cyl { .. }) => self.plane_cyl(fs, ft),
+            (Surf::Cyl { .. }, Surf::Plane { .. }) => self.plane_cyl(ft, fs),
+            (Surf::Cyl { .. }, Surf::Cyl { .. }) => self.cyl_cyl(fs, ft),
+        }
+    }
+
+    /// Every pair of faces' edges lying in the other face (the pairs of [`boolean_in`]'s loop, in its order), tried and
+    /// put back: its decline, if any.
+    fn edges_trial(&mut self, ns: usize, tol: f64) -> R<()> {
+        let pool = self.pool.clone();
+        let regroup = self.pool.regroup.lock().expect("a group").len();
+        let (side_cache, in_face_done) = (self.side_cache.clone(), self.in_face_done.clone());
+        let pending = self.pending.len();
+        let pcurves: Vec<PCurves> = self.faces.iter().map(|f| f.pcurves.clone()).collect();
+        let segs: Vec<[usize; 3]> = (0..self.face_segs.len()).map(|f| [self.face_segs[f].len(), self.seg_section[f].len(), self.seg_edge_tol[f].len()]).collect();
+        let out = self.edges_of_pairs(ns, tol);
+        self.pool = pool;
+        self.pool.regroup.lock().expect("a group").truncate(regroup);
+        (self.side_cache, self.in_face_done) = (side_cache, in_face_done);
+        self.pending.truncate(pending);
+        for (f, p) in self.faces.iter_mut().zip(pcurves) {
+            f.pcurves = p;
+        }
+        for (f, [a, b, c]) in segs.into_iter().enumerate() {
+            self.face_segs[f].truncate(a);
+            self.seg_section[f].truncate(b);
+            self.seg_edge_tol[f].truncate(c);
+        }
+        out
+    }
+
+    fn edges_of_pairs(&mut self, ns: usize, tol: f64) -> R<()> {
+        for s in 0..ns {
+            for t in s + 1..ns {
+                let (a, b) = (&self.solids[s], &self.solids[t]);
+                if a.arg == b.arg || !boxes_meet(a.lo, a.hi, b.lo, b.hi, GREY * tol) {
+                    continue;
+                }
+                for i in 0..self.solids[s].faces.len() {
+                    let fs = self.solids[s].faces[i];
+                    for j in 0..self.solids[t].faces.len() {
+                        let ft = self.solids[t].faces[j];
+                        let (x, y) = (&self.faces[fs], &self.faces[ft]);
+                        if boxes_meet(x.lo, x.hi, y.lo, y.hi, GREY * tol) && !self.faces_apart(fs, ft) {
+                            self.edges_in_pair(fs, ft)?;
+                        }
+                    }
+                }
+            }
+            crate::check_cancel()?;
+        }
+        Ok(())
+    }
+
+    /// Each face's edges lying in the other face (`fs` and `ft` not apart).
+    fn edges_in_pair(&mut self, fs: usize, ft: usize) -> R<()> {
+        let band = self.band(fs, ft);
         for (f, g) in [(fs, ft), (ft, fs)] {
             let (lo, hi) = (self.faces[g].lo, self.faces[g].hi);
             for k in 0..self.faces[f].edges.len() {
@@ -3895,13 +3956,7 @@ impl Ctx<'_> {
                 }
             }
         }
-        match (&self.faces[fs].s, &self.faces[ft].s) {
-            (Surf::Nurbs { .. }, _) | (_, Surf::Nurbs { .. }) => self.nurbs_pair(fs, ft),
-            (Surf::Plane { .. }, Surf::Plane { .. }) => self.plane_plane(fs, ft),
-            (Surf::Plane { .. }, Surf::Cyl { .. }) => self.plane_cyl(fs, ft),
-            (Surf::Cyl { .. }, Surf::Plane { .. }) => self.plane_cyl(ft, fs),
-            (Surf::Cyl { .. }, Surf::Cyl { .. }) => self.cyl_cyl(fs, ft),
-        }
+        Ok(())
     }
 
     fn plane_plane(&mut self, fs: usize, ft: usize) -> R<()> {
@@ -5815,6 +5870,12 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching: Touching, src: Option<
             if seen.insert(pair) {
                 ahead.push(pair);
             }
+        }
+        // (Every pair's edges lying in the other face tried first, then put back: a decline there comes before OCCT's
+        // sections (c2-impeller-loft's Fillet 3 cut: 9.3 s of them), the vertices made in each pair's turn as before
+        // (in another order a knurl's cut came out non-manifold).)
+        if !ahead.is_empty() {
+            cx.edges_trial(ns, tol)?;
         }
         src.ahead(&ahead);
     }
