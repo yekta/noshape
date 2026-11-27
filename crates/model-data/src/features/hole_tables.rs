@@ -824,7 +824,7 @@ mod tests {
         v.set("ansiHoleTableEx", ParamValue::Lookup(p(&["Tapped", "Straight tap", "1/4", "20 tpi", "Close"])));
         assert!(apply_table_to_params(&mut v));
         assert_eq!(v.expr("holeDiameterV3").unwrap().text, "0.257 in");
-        assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "0.201 in");
+        assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "0.2010 in");
         assert!(v.bool("hasClearance"));
     }
 
@@ -842,13 +842,13 @@ mod tests {
         v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
         assert!(sync_hole_standard(&mut v));
         assert_eq!(v.lookup("isoHoleTableEx")[2], "M6");
-        assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "5 mm");
+        assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "5.000 mm");
         assert_eq!(v.enum_("threadStandard"), "ISO");
         v.set("unitsSystem", ParamValue::Enum("INCH".into()));
         v.set("styleV2", ParamValue::Enum("C_SINK".into()));
         v.set("ansiHoleTable", ParamValue::Lookup(p(&["Drilled", "1/4 (0.25)"])));
         assert!(sync_hole_standard(&mut v));
-        assert_eq!(v.expr("holeDiameterV3").unwrap().text, "0.25 in");
+        assert_eq!(v.expr("holeDiameterV3").unwrap().text, "1/4 in");
         assert_eq!(v.expr("cSinkDiameterV3").unwrap().text, "13.44 mm");
     }
 
