@@ -17,19 +17,13 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **SCISSOR FILLETS FIX-FORWARD: QUEUED dc73ccf7** (ec47e4e4 FAILED: kernel_robustness::a_concave_arcs_round_stops_at_
   the_convex_rounds_and_runs_them_on; fixed by 6ce108cc4: the short-chain check runs on over folds; model tests 654 ok,
   scissor F5/F2/F4/F25/F18 still Ok).
-- **IMPELLER FILLET 3 (IN PROGRESS)**. Chain: Fillet 3's run-on end -> "Fillet Stevenrohr zum Halter" (r 2, 4 picks:
-  per side Fillet-3 face x chamfer face, Fillet-3 face x x=5 plane) fails (live OK: r2 rounds to x 7) -> Move face 1.
-  Found: (a) only 3 of its 4 picks resolve on the OLD corpus copy (~/qa/corpus: refs = Split{Generated(CapEnd x
-  Side19) chamfer face, ordinal 0 / 3}; ours renumbers). Fresh translation running (.pmi2.sh c2-impeller-loft, saves to
-  vibex7 ~/tmp/core/imp/fresh; output task bszabbg98, result ~/tmp/core/pmi.txt): redo .zp.sh on the fresh doc.
-  rim_chamfer_cut names chamfer faces Generated (on_chamfer contains_point at 20 nm misses) -> look at that too.
-  (b) Fillet 3's end: ours round x chamfer meets the rib at x 0.957, live 0.097 (live chamfer face extended to x 0.097,
-  12.68 vs 12.49 mm2; live also has a valence-2 vertex on the chamfer x plane edge: 0.1885+0.5599 vs ours 0.7458).
-  Chamfer itself: rim_chamfer_cut (OCCT fails), 6.0969 vs live 6.1849: set by the run-on extension (ZZ_RC_ALONG 0.5
-  -> 6.1425, 0 -> breaks); edge extrapolation = side surface section within 6 um (probe diff /root/core-scratch/
-  rim-chamfer-zz.diff). UNCOMMITTED ZZ_PICKS probes in detail.rs fillet_in: strip before landing.
-  Scripts (core-rf, untracked): .zp.sh <feature> (picks + faces), .f3n.sh/.f3n2.sh (edges vs live near the tube),
-  .f3cmp.sh (faces), .rc.sh (chamfer variants), .imp2.sh (debug log).
+- **IMPELLER FILLET 3 (PARKED 11-27 00:17, fresh translation vibex7 ~/tmp/core/imp/fresh)**: on it all 4 picks of
+  "Fillet Stevenrohr zum Halter" resolve and it is Ok; first error Move face 1 ("Could not offset"). Fillet 3 93/60 vs
+  live 95/62 = one more valence-2 vertex per side on live's chamfer x x=5-plane edge (5, +-0.5284, -43.6212; both have
+  the one at +-0.6138). Run-on end x 0.957, live 0.097. Sweep of rim_chamfer's run-on (ZZ_RC_ALONG x (d+e), probe
+  /root/core-scratch/rim-chamfer-zz.diff, .sw.sh / .fl2.sh): 0.2669 (= e) gives live's chamfer vertex exactly and end
+  0.049, 0.28 -> 0.102, but Fillet 3 fails at 0.25/0.4/0.5, counts never change, and "Stevenrohr zum Halter" then
+  fails: grazing, not a law to land. Needs live's chamfer surface (not in live.jsonl). ZZ_PICKS probe: /root/core-scratch/zz-picks.diff.
 - THEN screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
 - THEN psui's two TICKETS items: Extrude "Up to part" overlap; Remove pattern of the only part.
 - PATTERN-AFTER-INSERTED-CHAMFER: taken by skasm (lead 11-26).
