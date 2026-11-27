@@ -60,5 +60,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "hole": {
+   "length:Millimeter": {
+    "cBoreDiameterV3": "9.75 mm"
+   }
+  }
+ }
 }

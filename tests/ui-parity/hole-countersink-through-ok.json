@@ -60,5 +60,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "hole": {
+   "length:Millimeter": {
+    "cSinkDiameterV3": "11.2 mm"
+   }
+  }
+ }
 }

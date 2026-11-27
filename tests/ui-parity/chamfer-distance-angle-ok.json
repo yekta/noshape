@@ -50,5 +50,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "chamfer": {
+   "length:Millimeter": {
+    "width": "16 mm"
+   }
+  }
+ }
 }

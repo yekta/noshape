@@ -92,5 +92,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "hole": {
+   "length:Millimeter": {
+    "tappedDepthV3": "5.6 mm"
+   }
+  }
+ }
 }

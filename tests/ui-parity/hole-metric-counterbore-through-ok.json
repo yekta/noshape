@@ -70,5 +70,21 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "hole": {
+   "": {
+    "isoHoleTableEx": [
+     "Tapped",
+     "Straight tap",
+     "M5",
+     "0.80 mm (Coarse)",
+     "None"
+    ]
+   },
+   "length:Millimeter": {
+    "tappedDepthV3": "5.6 mm"
+   }
+  }
+ }
 }

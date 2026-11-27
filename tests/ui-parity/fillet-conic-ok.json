@@ -50,5 +50,12 @@
    "do": "wait",
    "until": "regenerated"
   }
- ]
+ ],
+ "remembered": {
+  "fillet": {
+   "length:Millimeter": {
+    "radius": "2 mm"
+   }
+  }
+ }
 }
