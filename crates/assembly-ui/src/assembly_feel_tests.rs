@@ -1639,9 +1639,10 @@ fn a_re_hovered_second_pick_shows_plain(cx: &mut TestAppContext) {
     hover_from_away(cx, bare);
     assert_eq!(picked_faces(cx, &view), 0, "re-hovered, the second pick plain (live (2) d2b)");
     assert!(edge_lit(cx) >= 4, "its boundary lit ({})", edge_lit(cx));
-    // Live (4) d4a: the moved part's face, beside Part 1 or coplanar with its top, changes nothing (0 px).
+    // Live (4) d4a: the moved part's face, beside Part 1 or coplanar with its top, changes nothing (0 px). Previewed, Part 2
+    // spans x -40..20, y 10..30: it lies on Part 1's top over x 0..20, y 10..20.
     let states = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).viewport.read(cx).scene().states.clone());
-    for mm in [[-20., 15., 10.], [5., 3., 10.]] {
+    for mm in [[-20., 15., 10.], [10., 15., 10.]] {
         let p = screen(cx, &view, mm);
         move_to(cx, window, &view, p + DVec2::new(300.0, 300.0));
         settle(cx, window, &view);
@@ -1649,7 +1650,7 @@ fn a_re_hovered_second_pick_shows_plain(cx: &mut TestAppContext) {
         move_to(cx, window, &view, p);
         settle(cx, window, &view);
         let on = hovered_face(cx, &view);
-        assert!(cx.update(|cx| view.read(cx).hover.is_some()), "the pointer over the moved part at {mm:?}");
+        assert_eq!(on.as_deref(), Some("Part 2 <1>"), "the pointer over the moved part's face at {mm:?}");
         assert_eq!(states(cx), away, "the moved part at {mm:?} ({on:?}) lights nothing");
     }
 }
