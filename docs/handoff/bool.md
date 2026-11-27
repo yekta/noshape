@@ -28,7 +28,13 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
   face (1247/10 draft), no point inside a face piece (1234/79), no clean ray (1256/53). Fallback on (fon.sh): same
   state, OCCT gives Ok (1846, 1247): users unaffected, only coverage. Declined cases aren't recorded (decline() throws
   before the recorder): probe NOSHAPE_PROBE_DECLINE_DUMP in to_body (uncommitted, bool-fb) -> CLI vibex8
-  ~/tmp/bool/cmp/cli-nf; NEXT: dump 1247's input, see where the INTERNAL face comes from (draft).
+  ~/tmp/bool/cmp/cli-nf (probe removed again). 1247 = draft_sloped_plane's BRepAlgoAPI_Defeaturing leaves 2
+  INTERNAL faces, its common with the half-space box declines; OCCT's keeps them and the draft is Ok: leave to OCCT.
+  1846 FIXED 8eae4ef17c (brep cyl_cyl: coaxial cones' common apex outside either face's box = no section; T1
+  bool_patterns::coaxial_cones_whose_common_apex_lies_off_both_faces fails without; brep 68, bool_patterns 178 ok;
+  seed 1846 ours Ok, OCCT's volume, 0.4 s vs 1.5). GATING 8eae4ef17c on vibex7 (unit bool-gate-8eae4ef17c, from
+  22:58; ~00:35); knurls after its build (kn-run.sh vibex7 kn4: k-main = bool-gate-base's, k-br = bool-tube-gate's
+  all-96c035059fc28abb). NEXT: 1256 "no clean ray", 1234 "no point inside a face piece".
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
   uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
   dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
