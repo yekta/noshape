@@ -203,6 +203,36 @@ fn a_region_picked_twice_extrudes_once() {
     assert!(near(total_volume(&res.context), 0.02 * 0.01 * 0.005, 1e-9));
 }
 
+/// A whole sketch (its feature-list row) extrudes its outer regions around their holes: a plate with a circle in it
+/// becomes a plate with a hole, not a solid plate (qa EXTRUDE-PRESELECTED-SKETCH-FILLS-HOLE; live qSketchRegion(…, true)).
+/// A disc in that hole holding a smaller circle is left out too.
+#[test]
+fn a_whole_sketch_extrudes_around_its_holes() {
+    let mut t = T::new();
+    let mut sk = rect(0.0, 0.0, 0.04, 0.03);
+    sk.add_circle(DVec2::new(0.02, 0.015), 0.006);
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    assert_eq!(t.regions(s).len(), 2);
+    t.extrude(Reference::Sketch(s), "10 mm", "NEW");
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    let plate = (0.04 * 0.03 - std::f64::consts::PI * 0.006 * 0.006) * 0.01;
+    assert!(near(total_volume(&res.context), plate, 1e-9), "{} vs {plate}", total_volume(&res.context));
+    assert_eq!(res.context.bodies[0].shape.faces().len(), 7);
+
+    let mut t = T::new();
+    let mut sk = rect(0.0, 0.0, 0.04, 0.03);
+    sk.add_circle(DVec2::new(0.02, 0.015), 0.008);
+    sk.add_circle(DVec2::new(0.02, 0.015), 0.004);
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    assert_eq!(t.regions(s).len(), 3);
+    t.extrude(Reference::Sketch(s), "10 mm", "NEW");
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    let plate = (0.04 * 0.03 - std::f64::consts::PI * 0.008 * 0.008) * 0.01;
+    assert!(near(total_volume(&res.context), plate, 1e-9), "{} vs {plate}", total_volume(&res.context));
+}
+
 /// A drafted Through all cut patterned with Reapply (c2-valve-config's Circular pattern 1): each hole is the cone's
 /// frustum through the block (its cutters reach just past the part, not 2 m on, where they flared into each other).
 #[test]

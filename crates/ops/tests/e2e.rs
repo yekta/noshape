@@ -10189,6 +10189,28 @@ fn surface_extrude_of_a_whole_sketch() {
     assert!((area - 2.0 * std::f64::consts::PI * 200.0).abs() < 1e-6, "{area}");
 }
 
+/// qa EXTRUDE-PRESELECTED-SKETCH-FILLS-HOLE: an Extrude of a whole sketch (its feature-list row, a `sketch:`
+/// reference) takes the outline's region around the circle in it, as live's qSketchRegion(…, true): the part keeps its
+/// hole (a 40 × 30 plate with a Ø12 hole, 10 deep), and its top face is the ring alone.
+#[test]
+fn an_extrude_of_a_whole_sketch_keeps_its_holes() {
+    let mut ctx = Ctx::new();
+    let path = scratch("whole-sketch-hole.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap(), "length_unit": "mm" }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "circle", "points": [[20, 15], [26, 15]] }));
+    let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [format!("sketch:{sketch}")], "depth": "10 mm" } }));
+    assert_eq!(ex["feature_status"]["status"], "Ok", "{ex}");
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    let bodies = parts["parts"].as_array().unwrap();
+    assert_eq!(bodies.len(), 1, "{parts}");
+    let plate = (40.0 * 30.0 - std::f64::consts::PI * 36.0) * 10.0;
+    assert!((num(&bodies[0]["volume"]) - plate).abs() < 1e-3, "{parts}");
+    assert_eq!(bodies[0]["faces"], 7, "{parts}");
+}
+
 /// The title block's DWG NO. / REV / TITLE / DRAWN date as live maps them
 /// (behaviours "dx title block mappings"): the drawing's own Part number
 /// and Revision, the reference part's Title 1–3, the day it was made.

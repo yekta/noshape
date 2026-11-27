@@ -329,6 +329,40 @@ pub fn is_imprint_entity(id: u32) -> bool {
     (IMPRINT_ENTITY..noshape_sketch::text::glyph_id_base(1)).contains(&id)
 }
 
+/// Which of a sketch's regions are inner loops, which live's qSketchRegion(…, filterInnerLoops = true) and a sketch row's
+/// preselection leave out: a region whose own outline curves are all holes of another region (a piece of an inner
+/// region too), or a disc a line joins to another region's outline, inside it (asm-isaac-ball a04711). A piece of a
+/// ring the face's edge split off is none (motor-mount-jack). Imprinted regions are never inner nor compared.
+pub fn inner_regions(s: &SketchResult) -> Vec<bool> {
+    use std::collections::BTreeSet;
+    let n = s.regions.len();
+    let imprinted = |i: usize| s.imprinted.get(i).copied().unwrap_or(false);
+    let ents = |l: &noshape_sketch::regions::ProfileLoop| l.sources.iter().map(|x| x.entity.0).collect::<BTreeSet<u32>>();
+    let outer: Vec<BTreeSet<u32>> = s.regions.iter().map(|r| ents(&r.outer)).collect();
+    let all: Vec<BTreeSet<u32>> = s.regions.iter().zip(&outer).map(|(r, o)| r.holes.iter().flat_map(&ents).chain(o.iter().copied()).collect()).collect();
+    let holes: Vec<BTreeSet<u32>> = all.iter().zip(&outer).map(|(a, o)| a - o).collect();
+    let bbox: Vec<_> = s.regions.iter().map(|r| r.outer.bbox()).collect();
+    let own = |e: &u32| !is_imprint_entity(*e);
+    let others = |r: usize| (0..n).filter(move |&o| o != r && !imprinted(o));
+    let in_hole_of = |o: usize, mine: &BTreeSet<u32>| !mine.is_empty() && mine.is_subset(&holes[o]);
+    let inner_by_own = |r: usize| {
+        let mine: BTreeSet<u32> = outer[r].iter().copied().filter(own).collect();
+        others(r).any(|o| in_hole_of(o, &mine))
+    };
+    let within = |r: usize, o: usize| (0..2).all(|i| bbox[r].min[i] > bbox[o].min[i] + 1e-9 && bbox[r].max[i] < bbox[o].max[i] - 1e-9);
+    let enclosed = |r: usize| all[r].len() == 1 && all[r].iter().all(own) && others(r).any(|o| all[o].is_superset(&all[r]) && within(r, o));
+    let inner = |r: usize| {
+        if enclosed(r) {
+            return true;
+        }
+        if outer[r].iter().any(own) {
+            return inner_by_own(r);
+        }
+        others(r).any(|o| inner_by_own(o) && in_hole_of(o, &outer[r]))
+    };
+    (0..n).map(|r| !imprinted(r) && inner(r)).collect()
+}
+
 /// The sketch's regions with its plane's face imprinted, as live unless Disable imprinting: the face's edges split the
 /// sketch's own regions, and the face's pieces outside them are regions too (sketch faces that qSketchRegion leaves
 /// out). The regions, which of them are such pieces, and the sketch's own regions that were split.
