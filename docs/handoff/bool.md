@@ -12,26 +12,20 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## P0 SPEED vs 0.4.73 (state 11-27 18:57 UTC; qa: the 05:00 cut held unless fixes are green by ~03:30)
-- QUEUED 1f87662a (17:58): 210544940b turn split + volumes along the axis (gated clean, knurls ok).
-- GATING caf7a2dbc1 on vibex7 (unit bool-gate-caf7a2dbc1, /root/bool-hat-scratch/chain-caf7a2dbc1.out; built 19:29,
-  running), 3 commits on 1f87662a (all in bool-fb, detached; nothing uncommitted but this handoff):
-  1a8d67bd81 marcher opt-in NOSHAPE_BOOL_MARCH=1 (valve-config 0.78 s 0.4.73 / 1.49 marcher / 0.81 off);
-  34a904bece one unify pass (input vertices between two edges kept from the start; the old two passes only where one
-  of them stays in the result freed) + slit fill checks only changed faces (changed_faces_valid, renamed from
-  boolean.cpp's anonymous valid_changed): gamma 4.2 -> 2.7 s (0.4.73 2.45), wire-clip 4.0 -> 2.6 (2.42);
-  caf7a2dbc1 rejoined() joins pieces with several input faces (sorted origin sets, one divided): standoffs unify
-  0.46 -> 0.30 s, doc 1.23-1.42 s vs 0.4.73 1.46-1.59. userdocs-b SAME on all 7 qa docs; GCC 13 ok; kernel 621/621.
-- KNURLS running on vibex7 ~/tmp/bool/kn2 (k-main = 210544940's k-br, k-br = caf7a2dbc1): k10-25, k10-25-12, k25-15
-  both "exit 0, 3 diff/decl/fail lines"; k25-25 / k25-71-12 running; compare per corpus with kn-run.sh's diff step
-  (n() filter) when kn.out has "k25-71-12 br". NEXT: gate verdict clean + knurls 0 diff-lines -> commit handoff,
-  steps 1-3 of landing, report land time to lead (<=5 lines); green needed by ~03:30 for the 05:00 cut.
-- Left over 0.4.73: gamma/wire-clip ~+0.2 s = the slit fill's own fuse (120 ms, live's topology, 6917f0c3b9).
-  Pulleys' +63 ms is core's 39141bac63 (min_distance in a Face pattern), not bool's.
-- A/B scripts: /root/bool-scratch/m2.sh (valve/standoffs), g3.sh (gamma), u3.sh (standoffs); binaries vibex8
-  ~/tmp/bool/cmp/cli-{0473,base,fix,u,m,p,g} (delete after the land).
+## P0 SPEED vs 0.4.73 (state 11-27 20:30 UTC; green needed by ~03:30 for the 05:00 cut)
+- QUEUED 4fb00f61 (20:28, reported): marcher opt-in NOSHAPE_BOOL_MARCH=1; one unify pass (input vertices between two
+  edges kept from the start) + slit fill checks only changed faces (changed_faces_valid); rejoined() joins pieces with
+  several input faces. Gate caf7a2dbc1 clean (replay +0 -0, suite 138->138, shells 7=7, crates pass), knurls 5/5 0
+  diff-lines. vibex8 vs 0.4.73: valve 0.81 (0.78), standoffs 1.23-1.42 (1.46-1.59), gamma 2.70 (2.45), wire-clip
+  2.62 (2.42). Left: gamma/wire-clip ~+0.2 s = the slit fill's own fuse (live's topology): inherent. Pulleys' +63 ms
+  is core's 39141bac63.
+- A/B scripts: /root/bool-scratch/m2.sh, g3.sh, u3.sh; binaries vibex8 ~/tmp/bool/cmp/cli-{0473,fix,m,g} (delete
+  after the lands), kt-fb; vibex7 ~/tmp/bool/kn, kn2.
 
 ## GAMMA (next)
+- 20:29 GATING 6efdffdcaf = 394c39327e cherry-picked onto 4fb00f61 (bool-fb, detached) on vibex7, unit
+  bool-gate-6efdffdcaf, /root/bool-hat-scratch/chain-6efdffdcaf.out; GCC 13 ok. NEXT: knurls (kn-run.sh, k-main =
+  caf7a2dbc1's all- binary, kept in vibex7 ~/tmp/bool/kn2/k-br), land, report.
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
   uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
   dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
