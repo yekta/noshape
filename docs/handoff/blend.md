@@ -9,6 +9,8 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 
 ## Now (11-23 02:12 UTC)
 
+- NOTE from core (11-27, while blend parked, 21f359d02): blend_direct.cpp lies_on's normal limit 0.02 -> 0.05 rad (knifehandle
+  Fillet 2's tip-round ball side 0.0014 mm / 0.04 rad off after Chamfer 1's curved run-on); build.cpp reface_on keeps pcurves.
 - ORDER: land 6ee607290 (pair) -> land ERR-FILLET-FAIL-PREVIEW (blend-fp) -> knifehandle Fillet 1 -> Face blend 2
   (c2-surfaces-lofts-projected feature 9 "Failed to blend faces", live OK) -> Suspension's cusp end -> scissor 2d82a0
   F13 -> Fillet 2 speed (~6 s: split only the tool's tip end, or cut the two tools in parallel).
