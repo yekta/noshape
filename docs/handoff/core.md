@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 08:44 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 08:55 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 ## P0s (lead 11-26; block v0.4.72)
@@ -43,9 +43,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **RIB-FLIPPED-MESSAGE: COMMITTED f4b54ff9c (core-uip3, lands with the P0 fix)**: solid_a.rs rib one-piece branch: RIB_MISS unless
   the user's "Extend profiles to part" extension misses the part (L22 -> RIB_FAILED); tests features_a::rib_in_l_bracket
   (flipped -> miss), kernel_robustness hole_and_rib R3 no longer OPEN. Rib tests 14/14 ok (.rb1.sh,
-  08:1x). FACE-PATTERN-BOSS-LIVE-FAILS checked 08:2x (probe core-scratch/p0imp/probe-fp.rs, not committed): ours
-  one solid, OCCT-valid, +502.65 mm3 (the copy whole), but the two bosses' cylinders TOUCH along a line (y -4) with no
-  edge: non-manifold contact (Parasolid's reason to fail). Told the lead; a fix = a touching-faces check after the pattern.
+  08:1x). FACE-PATTERN-BOSS-LIVE-FAILS (lead 08:4x: match live's error):
+  pattern.rs copies_touch after a face pattern (copies vs the part's faces: no common vertex closer than 1e-7, or two
+  common vertices, no edge, their midpoint on both); T1 features_a::a_face_pattern_whose_copy_touches_the_part_along_
+  a_line_fails (8 along Error, 10 along Ok); model 662 ok; corpus A/B .ab13.sh vibex8 (core-scratch/p0imp/ab13.out),
+  then land.
 - **ZUM HALTER CORNER: PARKED (lead 11-27 07:4x; Error as in 0.4.72 and main): native-blend-faces candidate.** WIP
   core-scratch/imp/crease-turn-wip3.patch (notes core-scratch/imp/corner-notes.md; the full STATE text in the archive):
   crease junctions, both crease edges untrimmed, >= 32 stations at creases (0.06 um on the bevel), fuzzy Fuse retry
