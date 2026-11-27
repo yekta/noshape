@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-27 15:30 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-27 18:57 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -12,19 +12,24 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## P0 SPEED vs 0.4.73 (state 11-27 18:10 UTC; qa: the 05:00 cut held unless fixes are green by ~03:30)
-- LANDING 210544940b (bool-fb): ec60ab700 turn split built directly + cylinder/cone volumes along the axis (inner_v);
-  73c26f0c2 closes the boundary's small uv gaps along v; 210544940 along v only where every gap closes within a quarter
-  turn (whole turns off), else the old integral (c2-cov2-sm-hem-jog's open half-turn face read 0 for -30.6 mm3: the
-  73c26f0c2 gate's one changed document). Gate on 210544940 clean (replay 0, parity56 0, suite unchanged, shells 6/6,
-  crates pass); knurls same verdicts (2 equivalent knurls' volume vs OCCT +-6e-17 m3); kernel 620/620; GCC 13 ok.
-- NEXT 1, valve-config (qa P0 BOOL-FREEFORM-SECTIONS-SLOWER, 2a4ab01fd): the marcher's sections slow its Booleans and
-  unify (0.75 s 0.4.73, 1.20 s fix, 0.74 s NOSHAPE_BOOL_MARCH=0). Fix: marcher opt-in (=1), diff
-  /root/bool-scratch/march-off.diff (brep_bridge.rs); kernel tests + A/B running (m1.log); then gate + land.
-- NEXT 2, standoffs unify (~+45 ms over 0.4.73 left after 210544940): rejoined() leaves Revolve 2's 51 turn pieces
-  (each face's history from two inputs -> "amb", lines 0) for op_unify (usd.check 127 ms); probes
-  /root/bool-scratch/rejoin-probes.diff (never commit). unify_keeping_inputs' second pass is not it (tried).
-- Pulleys' +63 ms is core's 39141bac63 (min_distance in a Face pattern), not bool's. Gamma/wire-clip: not yet looked.
+## P0 SPEED vs 0.4.73 (state 11-27 18:57 UTC; qa: the 05:00 cut held unless fixes are green by ~03:30)
+- QUEUED 1f87662a (17:58): 210544940b turn split + volumes along the axis (gated clean, knurls ok).
+- GATING caf7a2dbc1 on vibex7 (unit bool-gate-caf7a2dbc1, /root/bool-hat-scratch/chain-caf7a2dbc1.out; built 19:29,
+  running), 3 commits on 1f87662a (all in bool-fb, detached; nothing uncommitted but this handoff):
+  1a8d67bd81 marcher opt-in NOSHAPE_BOOL_MARCH=1 (valve-config 0.78 s 0.4.73 / 1.49 marcher / 0.81 off);
+  34a904bece one unify pass (input vertices between two edges kept from the start; the old two passes only where one
+  of them stays in the result freed) + slit fill checks only changed faces (changed_faces_valid, renamed from
+  boolean.cpp's anonymous valid_changed): gamma 4.2 -> 2.7 s (0.4.73 2.45), wire-clip 4.0 -> 2.6 (2.42);
+  caf7a2dbc1 rejoined() joins pieces with several input faces (sorted origin sets, one divided): standoffs unify
+  0.46 -> 0.30 s, doc 1.23-1.42 s vs 0.4.73 1.46-1.59. userdocs-b SAME on all 7 qa docs; GCC 13 ok; kernel 621/621.
+- KNURLS running on vibex7 ~/tmp/bool/kn2 (k-main = 210544940's k-br, k-br = caf7a2dbc1): k10-25, k10-25-12, k25-15
+  both "exit 0, 3 diff/decl/fail lines"; k25-25 / k25-71-12 running; compare per corpus with kn-run.sh's diff step
+  (n() filter) when kn.out has "k25-71-12 br". NEXT: gate verdict clean + knurls 0 diff-lines -> commit handoff,
+  steps 1-3 of landing, report land time to lead (<=5 lines); green needed by ~03:30 for the 05:00 cut.
+- Left over 0.4.73: gamma/wire-clip ~+0.2 s = the slit fill's own fuse (120 ms, live's topology, 6917f0c3b9).
+  Pulleys' +63 ms is core's 39141bac63 (min_distance in a Face pattern), not bool's.
+- A/B scripts: /root/bool-scratch/m2.sh (valve/standoffs), g3.sh (gamma), u3.sh (standoffs); binaries vibex8
+  ~/tmp/bool/cmp/cli-{0473,base,fix,u,m,p,g} (delete after the land).
 
 ## GAMMA (next)
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
