@@ -33,36 +33,36 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## IN FLIGHT 20:5x (after compaction: start here)
-- 21:3x: ps40 green (readout, export prefs/title, runner rel_px, drawing-ui check); ps39 full psui lib run with two
-  arenas: peak 3703 MB (was 6.76 GB), 670 passed, 1563 s. LANDED via land.sh 21:3x (wait for the lead's word; never
-  poll --status). After it: report (<=5 lines: maker 7/13 + filed rows, memory 6.76 -> 3.7 GB, reach + export landed),
-  cc skasm on its two rows, rerun maker + sketch-used sets on main.
-- NEXT (live 21:2x, batch 9 0865c00b, not on main yet): ui_script state pieces per tests/ui-parity/README.md (Part
-  Studio panels section): (1) "part_data" when the scenario sets "part_data": true: per part name, part_number,
-  description, material, appearance {hex, opacity 0..255, default}, hidden; (2) Appearance editor as dialog kind
-  "appearance" (A, #, R, G, B, Tessellation quality; tabs Palette/Mixer; Enter applies and closes, no ✓); (3) the
-  Appearances panel in panels (id "appearances", rows). Live facts: behaviours.md "Depth batch 9".
-- Branch rebased on origin/main 20:5x, commits (not landed yet): 704e0a91d4 edge reach 5 px over another part's face;
-  b3d560e6f1 maker flow fixes (used outline counterclockwise, Intersection angle, Perp lines angle, Use quick click,
-  N centre, related sketch, glyph inert, dump); 8f17e5e730 two malloc arenas in UI test binaries; a209af82f9 Export
-  "Export N Parts" + unique parts not remembered (DECISIONS 11-27) + runner drag `"to": {"rel_px": [dx, dy]}`
-  (the `{"world": [x, y, z]}` target already existed in part_studio/ui_script.rs); f2d903b869 TICKETS.
-- 01daa2e25e (qa 21:xx, P3 UIP-DIALOG-TEXT-NATIVE-SELECT): Insert view's chosen source dumped as a select value, so
-  run.py's panel_text_form drops it with the options for live2 >= 11-17.3 takes. After the rebase mark qa's row fixed
-  (not on my base yet). qa's world-drag note: done (world existed; rel_px added in a209af82f9).
-- ps40 (resp/ps40.sh, vibe2 after ps39's memory run): scene selection_readout (the compile fix), ops
-  export_remembers + prefs::, psui --lib export, app ui_script::. Green -> land.
-- ps39 results: maker 6/13 (7/13 with live's retake 8d0f42b8f on main: tangent-connected-used matches); sketch-used
-  0/19 all at s13 constraints 6/5 = skasm's spline Horizontal, fixed on main b73df15bec: rerun both sets after the land.
-  Full psui lib run with 2 arenas: see ~/tmp/psui/mem3/hwm.txt on vibe2 / ps39.log T-MEM-DONE (ps38 base 6.76 GB).
-- Filed 20:5x: TICKETS "psui 11-27 20:5x: the maker flow" (skasm SKETCH-COINCIDENT-FREE-LINE-SLIDES,
-  SKETCH-TANGENT-ARC-SPAN; mine SKETCH-DIM-CIRCLE-RIM-TOP waits for REQUESTS "psui 11-27 20:4x"; lead
-  UIP-COMPARE-ITEM-ORDER, UIP-COMPARE-FREE-CLICK-DERIVED). After the land: cc skasm on its two rows + REQUESTS
-  "psui 11-27 16:26"; report to the lead (<=5 lines).
-- Export open: "Include hidden instances in export" is still remembered (no live take checks it; DECISIONS lists only
-  Format, Options, Resolution, Units, Y axis up). Batch 8's export-* and section-view-* takes are on 78dc566b3e, not
-  main yet: replay them when live lands them.
+## IN FLIGHT 23:2x (after compaction: start here)
+- QUEUED ec4c4387 21:4x (edge reach, maker fixes incl. used-curve clicks, arenas, export title/prefs, rel_px,
+  Insert view text, TICKETS). Wait for the lead's word; never poll --status. Then: report (<=5 lines: maker 7/13 +
+  filed rows, memory 6.76 -> 3.7 GB, reach + export landed), cc skasm on SKETCH-COINCIDENT-FREE-LINE-SLIDES /
+  SKETCH-TANGENT-ARC-SPAN + REQUESTS "psui 11-27 16:26".
+- Committed 7ca0f099cc + this change (landing next): batch-9 state (part_data, Appearance editor kind "appearance",
+  Appearances panel); part_data reads props from before an open colour editor's change; Hide drops hidden parts from
+  the selection; Material "- None -" + OK removes it; field marks (Properties Name/Material, Material panel custom);
+  face menu: Curve/surface analysis… on a curved face, Section view… on a planar face or a face+edge selection;
+  `features::sketch::inner_regions` (port of parity.rs qSketchRegion(…, true)) -> SketchRegionDisplay.inner, left
+  out of a sketch row's preselection / region pick (qa EXTRUDE-PRESELECTED-SKETCH-FILLS-HOLE). core uses
+  inner_regions for eval.rs Reference::Sketch and lands after mine: TELL CORE when mine is QUEUED (and the name).
+- ps43 batch 9: 27/49, 479/538. Left: .focus.selection caret on click in the editor's #/A fields (live 3/2, ours 0);
+  colour hex before Enter (appearance-part-hex-enter etc: live keeps 9DCFED in part_data while editing, check step
+  6 = after Enter?); mass 2.319 vs 2.32 digits; material-library-dropdown (dropdown:Library not shown);
+  mistake-rename-blank message "Name is required."; Material panel Tab order / focus.kind field; Properties Escape;
+  mistake-surface-assign-material (surface menu: Hide other surfaces/Hide all surfaces, New sketch… rows);
+  PS-MENU-CYLINDER-FACE: live's cylinder (fillet) face menu has View normal to + Section view… + Curve/surface
+  analysis… (appearance-maker-plate-r8-face); ours lacks the first two.
+- sketch-used 0/19: skasm's (lead: SKETCH-USED-CURVES-NOT-SELECTABLE is skasm's P0; don't duplicate).
+- Then (lead 11-27 23:0x): ASM-INSERT-CANCEL (P2: Insert panel ✕ closes, inserts nothing, toast "Assembly insertion
+  has been cancelled. Restore") and ASM-INSERT-ROW-ADDS-INSTANCE (P3: row click must not add; only ✓) (TICKETS
+  4927fa0759).
+- Then qa batch 8 (TICKETS 2d235a33de "qa 11-27 23:2x", scored on green 5128614a4, before ec4c4387): rescore on main
+  first; P2 EXPORT-CUSTOM-FIELDS-NO-FOCUS, EXPORT-N-PARTS-DIALOG ("Export 2/3 Parts" + 2 checkboxes),
+  SECTION-VIEW-ARROW-FLIP (+ {"world"} drag target), SECTION-VIEW-NEXT-FIELD (focus to Items to exclude; edge pick
+  doesn't clear the plane), MEASURE-BRACKET-KEY ("[" opens Measure); P3 PART-MENU-CURVE-ANALYSIS,
+  MASS-PROPERTIES-ADD-PART-FOCUS, EXPORT-TOAST-DOCUMENT-NAME (run.py drops live's " Copy N");
+  ASM-MASS-PROPERTIES-BUTTON (lead's/asm; mine if only the button name).
+- Export open: "Include hidden instances in export" still remembered.
 - Hosts: vibe2 = builds/app runs (one at a time, land queue shares it); vibex8 for shards via ~/bin/slot.
 
 ## EARLIER
