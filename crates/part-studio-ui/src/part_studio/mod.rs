@@ -3331,6 +3331,12 @@ impl PartStudioView {
         if self.sketch.is_none() && self.edit.as_ref().is_some_and(|e| !e.dialog.read(cx).can_submit()) {
             return;
         }
+        // Nor does a Remove or Intersect whose tool misses every part: its note stays up (live remove-ok-1127, Through all
+        // or Blind 10 flipped; 11-14's runtime committed it as an info).
+        let removes = self.edit.as_ref().is_some_and(|e| matches!(e.dialog.read(cx).feature.params.enum_("operationType"), "REMOVE" | "INTERSECT"));
+        if removes && self.tool_missed() {
+            return;
+        }
         self.close_create_selection_of_dialog(cx);
         // Onshape (live): a feature with an error can be committed (Enter;
         // the ✓ button is disabled); the model falls back to the state

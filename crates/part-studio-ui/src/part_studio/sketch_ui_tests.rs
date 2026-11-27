@@ -8381,8 +8381,15 @@ fn remove_extrude_result(cx: &mut TestAppContext, name: &str, settle: bool, pick
     let flipped = cx.update(|cx| view.read(cx).edit.as_ref().expect("editing").dialog.read(cx).feature.params.bool("oppositeDirection"));
     let failed = cx.update(|cx| view.read(cx).tool_failed());
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    draw(cx, window);
+    let faces = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the block").face_refs.len());
+    // A tool that misses keeps the dialog open with its note (live remove-ok-1127).
+    if cx.update(|cx| view.read(cx).edit.is_some()) {
+        let note = cx.update(|cx| view.read(cx).message.clone()).map(|(s, m)| (s, Some(m)));
+        return (flipped, faces(cx), note);
+    }
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
-    let faces = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the block").face_refs.len());
+    let faces = faces(cx);
     let state = cx.update(|cx| {
         let v = view.read(cx);
         let last = v.studio(cx).unwrap().features.last().map(|f| f.id)?;
@@ -8417,10 +8424,10 @@ fn a_flipped_remove_extrude_points_away_from_the_block(cx: &mut TestAppContext) 
     assert!(!remove_extrude_faces(cx, "rm-flip", true, &[remove, flip]).0, "the user's flip after Remove's");
 }
 
-/// Live (REQUESTS 2979): Remove, Through all or Blind 10 mm, then one flip: the tool stands above the block, cuts
-/// nothing, and the extrude commits as an info, "Selected tools and targets do not intersect.".
+/// Live (REQUESTS 2979, remove-ok-1127): Remove, Through all or Blind 10 mm, then one flip: the tool stands above the
+/// block and cuts nothing; ✓ keeps the dialog open with the note "Selected tools and targets do not intersect.".
 #[gpui::test]
-fn a_flipped_remove_extrude_missing_the_block_is_an_info(cx: &mut TestAppContext) {
+fn a_flipped_remove_extrude_missing_the_block_stays_open_on_its_note(cx: &mut TestAppContext) {
     use noshape_model::display::FeatureStatus;
     use noshape_model::params::ParamValue;
     let remove = ("operationType", ParamValue::Enum("REMOVE".into()));
@@ -8428,7 +8435,7 @@ fn a_flipped_remove_extrude_missing_the_block_is_an_info(cx: &mut TestAppContext
     let info = Some((FeatureStatus::Info, Some("Selected tools and targets do not intersect.".to_string())));
     for (name, bound) in [("rm-flip-through", ("endBound", ParamValue::Enum("THROUGH_ALL".into()))), ("rm-flip-blind", ("depth", ParamValue::Expr(noshape_units::ExprValue::new("10 mm"))))] {
         let (flipped, faces, state) = remove_extrude_result(cx, name, true, &[remove.clone(), bound, flip.clone()]);
-        assert_eq!((flipped, faces, state), (false, 6, info.clone()), "{name}: (flipped, the block's faces, the extrude's status)");
+        assert_eq!((flipped, faces, state), (false, 6, info.clone()), "{name}: (flipped, the block's faces, the open dialog's note)");
     }
 }
 
