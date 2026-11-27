@@ -302,7 +302,8 @@ impl PartStudioView {
     /// `part_data` (README "part_data", live 11-27): each part, surface and composite in the parts list's order, with
     /// what the document holds for it; the colour is sRGB hex, the opacity 0..255, `default` while no colour is set.
     fn ui_part_data(&self, cx: &App) -> Value {
-        let props = self.studio(cx).map(|s| &s.part_properties);
+        // (An open colour editor's preview isn't in live's document yet.)
+        let props = self.ui.appearance_edit.as_ref().and_then(|e| e.committed_props()).or(self.studio(cx).map(|s| &s.part_properties));
         let text = |t: Option<&String>| t.filter(|t| !t.is_empty()).cloned();
         let rows: Vec<Value> = ["parts", "composites", "surfaces"]
             .iter()

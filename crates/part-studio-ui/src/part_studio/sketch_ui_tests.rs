@@ -4829,6 +4829,33 @@ fn face_appearances_sit_under_their_parts(cx: &mut TestAppContext) {
     assert!(order.iter().all(Option::is_some) && order.windows(2).all(|w| w[0] < w[1]), "Part 1, its face appearance, Part 2, Extrude 2's: {order:?}");
 }
 
+/// Live sketch-used-* (qa EXTRUDE-PRESELECTED-SKETCH-FILLS-HOLE): a plate's sketch with a Ø12 hole selected as its row
+/// preselects one region, the plate: the disc in its hole is left out (Onshape's filterInnerLoops), so Extrude cuts
+/// the hole.
+#[gpui::test]
+fn a_sketch_row_preselects_its_regions_but_not_those_in_holes(cx: &mut TestAppContext) {
+    use noshape_model::params::QueryFilter;
+    // The Ø12 disc in the plate's hole; then joined to the plate's edge by a line from its centre (live asm-isaac-ball
+    // a04711's Extrude 1: no hole, yet an inner loop).
+    let line = serde_json::json!({ "line": [[20, 20], [40, 20]] });
+    for (name, extra) in [("row-inner-loops", None), ("row-inner-joined", Some(line))] {
+        let mut shapes = vec![serde_json::json!({ "corner_rectangle": [[0, 0], [40, 40]] }), serde_json::json!({ "circle": [[20, 20], [26, 20]] })];
+        shapes.extend(extra);
+        let start = serde_json::json!({ "units": "mm", "features": [{ "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": shapes }] });
+        let (window, view) = part_studio_from(cx, name, Some(start));
+        wait_until(cx, window, |cx| view.read(cx).display.sketches.first().is_some_and(|s| s.regions.len() == 2));
+        let (inner, picked) = cx.update(|cx| {
+            view.update(cx, |v, _| {
+                v.selected_features = vec![v.display.sketches[0].feature];
+                let sk = &v.display.sketches[0];
+                let inner: Vec<f64> = sk.regions.iter().filter(|r| r.inner).map(|r| (r.area * 1e6).round()).collect();
+                (inner, v.feature_preselection(&[QueryFilter::SKETCH_REGION]).len())
+            })
+        });
+        assert_eq!((inner, picked), (vec![113.0], 1), "{name}: the Ø12 disc is inner; the row preselects the plate alone");
+    }
+}
+
 /// Live depth batch 9 (ui-parity README "part_data", "The Appearance editor", the Appearances panel): a ui-parity state
 /// reads each part's data from the document, the Appearances panel's rows and the colour editor's fields.
 #[gpui::test]

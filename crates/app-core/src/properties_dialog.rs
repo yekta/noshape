@@ -950,7 +950,11 @@ impl MetaForm {
             return gray_box(st.read(cx).value().to_string(), false).into_any_element();
         }
         // The scenario runner's `{"field": "<label>"}`.
-        edited_corner(text_field(st), self.is_edited(name)).map(|d| crate::ui_script::mark(d, || format!("field:{name}"))).into_any_element()
+        // (Live's takes name the required Name by its label, "Name *": properties-name-save-renames.)
+        edited_corner(text_field(st), self.is_edited(name))
+            .map(|d| crate::ui_script::mark(d, || format!("field:{name}")))
+            .map(|d| if name == "Name" { crate::ui_script::mark(d, || "field:Name *".into()) } else { d })
+            .into_any_element()
     }
 }
 
@@ -1116,7 +1120,8 @@ impl Render for MetaForm {
                 .child(group(label("Product line", false), self.field("Product line", &self.product_line, cx)));
         }
         if let Some(m) = self.material.clone() {
-            form = form.child(group(label("Material", false), gray_box(m, false).into_any_element()));
+            // (A click on it does nothing: live properties-material-field-click.)
+            form = form.child(group(label("Material", false), crate::ui_script::mark(gray_box(m, false), || "field:Material".into()).into_any_element()));
         }
         if titled {
             form = form

@@ -2473,7 +2473,7 @@ impl PartStudioView {
         let refs: Vec<Reference> = if filter.intersects(QueryFilter::FEATURE) {
             vec![Reference::Feature(id)]
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_REGION)) {
-            sk.regions.iter().filter(|r| !r.imprinted).map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }).collect()
+            sk.regions.iter().filter(|r| !r.imprinted && !r.inner).map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }).collect()
         } else if sketch.is_some() && filter.intersects(QueryFilter::SKETCH) {
             vec![Reference::Sketch(id)]
         } else if let Some(sk) = sketch.filter(|_| filter.intersects(QueryFilter::SKETCH_POINT)) {
@@ -3280,7 +3280,7 @@ impl PartStudioView {
             }
         };
         let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
-        let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.iter().filter(|r| !r.imprinted).count())).collect();
+        let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.iter().filter(|r| !r.imprinted && !r.inner).count())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
         let studio_view = cx.entity().downgrade();
         let whole_sketches = std::mem::take(&mut self.ui.row_sketches);

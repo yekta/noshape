@@ -334,6 +334,11 @@ pub struct SketchRegionDisplay {
     /// A piece of the sketch plane's face outside the sketch's own loops (a sketch face, not one of the sketch's
     /// regions when the whole sketch is picked).
     pub imprinted: bool,
+    /// An inner loop ([`crate::regen::features::sketch::inner_regions`]; the Ø12 disc in a plate's hole): the whole
+    /// sketch picked leaves it out, as Onshape's qSketchRegion with filterInnerLoops (live sketch-used-*: Extrude of
+    /// the Sketch 1 row, 1 face).
+    #[serde(default)]
+    pub inner: bool,
 }
 
 /// Coordinate frame of a sketch plane (world space).

@@ -198,7 +198,28 @@ impl PartStudioView {
         } else {
             match &m.picked {
                 Some(e) => (e.name.clone(), e.density),
-                None => return,
+                // "- None -": the parts' material goes (live material-remove-none); with none to remove, OK leaves the
+                // panel open (mistake-material-ok-nothing-picked).
+                None => {
+                    let had = self.studio(cx).is_some_and(|s| m.bodies.iter().any(|b| s.part_properties.get(b).is_some_and(|p| p.material.is_some())));
+                    if !had || m.cp_cell.is_some() {
+                        self.ui.material_panel = Some(m);
+                        cx.notify();
+                        return;
+                    }
+                    let bodies = m.bodies.clone();
+                    self.doc.update(cx, |doc, cx| {
+                        doc.edit_studio(self.tab, "Assign material", cx, |ps| {
+                            for b in &bodies {
+                                if let Some(p) = ps.part_properties.get_mut(b) {
+                                    (p.material, p.density) = (None, None);
+                                }
+                            }
+                        });
+                    });
+                    cx.notify();
+                    return;
+                }
             }
         };
         if name.is_empty() {
@@ -305,7 +326,9 @@ impl PartStudioView {
         let mut body = v_flex();
         if custom {
             for (i, f) in FIELDS.iter().enumerate() {
-                body = body.child(h_flex().pr(px(5.)).child(label(f)).child(gpui_kit::base::input::input_frame(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(Input::new(&custom_fields[i]).text_size(px(13.33)).appearance(false)))));
+                // (`{"field": "Name"}`, `{"field": "Density (lb/in³)"}`: live material-custom-name-density.)
+                let input = crate::ui_script::mark(div().flex_1().border_b_1().border_color(gpui_kit::rgb(0xd7d7d7)), move || format!("field:{f}"));
+                body = body.child(h_flex().pr(px(5.)).child(label(f)).child(gpui_kit::base::input::input_frame(input.child(Input::new(&custom_fields[i]).text_size(px(13.33)).appearance(false)))));
             }
         } else {
             // Library select and "+" (Add material library…).

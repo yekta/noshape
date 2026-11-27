@@ -127,6 +127,7 @@ impl PartStudioView {
             && self.selection.iter().any(|r| matches!(r, Reference::Face(_)))
             && self.selection.iter().any(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_)));
         let kind = if mixed && matches!(kind, Some(PickKind::Edge | PickKind::Vertex)) { Some(PickKind::Face) } else { kind };
+        let planar_target = planar;
         let (planar, linear_edge) = (planar && !mixed, linear_edge && !mixed);
         // A face's own rows (New sketch… … Revolve…, Export as DXF/DWG…) only while nothing else is selected (live
         // ctx-menus-1117 part-selected-graphics: Part 1's row selected, its face right-clicked, has neither).
@@ -664,7 +665,11 @@ impl PartStudioView {
                             let bm = b.clone();
                             m = m.item(icon_item(if com_shown { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", Box::new(move |this, _, cx| this.toggle_center_of_mass(&bm, cx))));
                         }
-                        if k == PickKind::Edge {
+                        // A curved face too; a planar one has Section view… instead (live appearance-spline-face, its
+                        // spline face: Curve/surface analysis… after Hide all parts, no Section view…), as has a
+                        // selection of faces and edges (live ctx-menus-1117 face-and-edge).
+                        let sectioned = k == PickKind::Face && (planar_target || mixed);
+                        if k == PickKind::Edge || (k == PickKind::Face && !sectioned) {
                             let re = r.clone();
                             m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
                                 this.selection = vec![re.clone()];
@@ -692,7 +697,7 @@ impl PartStudioView {
                             m = m
                                 .item(item("Edit section view…", Box::new(|this, w, cx| this.edit_section(w, cx))))
                                 .item(item("Turn off section view", Box::new(|this, w, cx| this.turn_off_section(w, cx))));
-                        } else if k == PickKind::Face {
+                        } else if sectioned {
                             let rs = r.clone();
                             m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
                                 if this.frame_of_ref(&rs).is_some() {

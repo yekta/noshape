@@ -685,6 +685,7 @@ pub fn sketch_display(s: &super::context::SketchResult) -> SketchDisplay {
         }
     }
     let mut regions = Vec::new();
+    let inner = super::features::sketch::inner_regions(s);
     for (i, r) in s.regions.iter().enumerate().filter(|_| s.holds_sheet()) {
         let outer = r.outer.tessellate(tol);
         let mut flat: Vec<f64> = Vec::new();
@@ -708,6 +709,7 @@ pub fn sketch_display(s: &super::context::SketchResult) -> SketchDisplay {
             indices: tris.into_iter().map(|i| i as u32).collect(),
             area: r.area(),
             imprinted: s.imprinted.get(i).copied().unwrap_or(false),
+            inner: inner.get(i).copied().unwrap_or(false),
         });
     }
     let dof = s.report.dof.unwrap_or(0);

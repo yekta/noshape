@@ -1939,7 +1939,8 @@ impl PartStudioView {
         for &id in &self.selected_features {
             if let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) {
                 if wants(QueryFilter::SKETCH_REGION) && !sk.regions.is_empty() {
-                    out.extend(sk.regions.iter().filter(|r| !r.imprinted).map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }));
+                    // Not the regions in other regions' holes (live sketch-used-*: a plate with a hole, 1 face).
+                    out.extend(sk.regions.iter().filter(|r| !r.imprinted && !r.inner).map(|r| Reference::SketchRegion { sketch: id, key: r.key.clone() }));
                 } else if wants(QueryFilter::SKETCH) {
                     out.push(Reference::Sketch(id));
                 } else if wants(QueryFilter::SKETCH_EDGE) {
@@ -2791,6 +2792,12 @@ impl PartStudioView {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::studio::visibility_description(hidden), cx, |ps| noshape_ops::studio::set_visibility(ps, &t, hidden));
         });
+        // Hidden parts leave the selection (live hide-two-parts-selected: none selected after Hide).
+        if hidden {
+            let kept: Vec<bool> = self.selection.iter().map(|r| self.body_of(r).is_none_or(|b| !t.bodies.contains(&b))).collect();
+            let mut keep = kept.into_iter();
+            self.selection.retain(|_| keep.next().unwrap_or(true));
+        }
         let (feats, defaults, bodies) = (&t.features, &t.defaults, &t.bodies);
         // Default geometry is shown from the regeneration's display, which a
         // visibility change doesn't regenerate: update it here (it stayed

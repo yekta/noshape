@@ -85,6 +85,12 @@ pub struct AppearanceEdit {
 }
 
 impl AppearanceEdit {
+    /// The parts' properties as the document held them before the editor's first change (live's document keeps them
+    /// until Enter or a click away commits the colour).
+    pub(super) fn committed_props(&self) -> Option<&std::collections::BTreeMap<BodyId, noshape_model::partstudio::PartProperties>> {
+        self.before.as_ref().map(|(_, props)| props)
+    }
+
     /// ✓ is on: something changed, or it adds a face appearance.
     /// ✓ on: something changed or added; never a face appearance on no faces (live appearance-1123 q1: ✓ off).
     pub(super) fn acceptable(&self) -> bool {
