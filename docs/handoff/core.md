@@ -36,7 +36,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   LINEARLY in u and v (bevel.json) - try a linear extension for ruled walls. DEBUG prints RODBG/RCDBG are in
   blend_section.rs (remove before commit). Scripts: .rc4.sh (build cli-rd + bd.sh + RODBG grep), .kt5.sh (T1).
   After: Fillet 3 vs live (93/60 vs 95/62), corpus A/B (.ab8.sh, swap the 3 files), clippy, g++-13 (boolean.cpp), land.
-  rb.sh keeps mtimes: touch -c swapped files (stale cli-rd 01:41 showed old bevel).
 - FILLET-R12-BLOCK-OVERFLOW: qa verified (3/3 scenarios, 46/46 states).
 - psui's two TICKETS items (Up to part overlap, Remove pattern of only part): skasm's (lead 11-27).
 - PATTERN-AFTER-INSERTED-CHAMFER: fixed by 6a8e411db, skasm added the e2e and closed it.
