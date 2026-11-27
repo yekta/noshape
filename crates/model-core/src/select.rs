@@ -85,6 +85,10 @@ fn edge_ref(b: &Body, i: usize) -> Option<Reference> {
     b.edges.get(i).map(|n| Reference::Edge((**n).clone()))
 }
 
+fn degenerated(b: &Body, e: usize) -> bool {
+    b.shape.sub_shape(ShapeType::Edge, e).and_then(|s| s.edge_info()).is_ok_and(|i| i.degenerated)
+}
+
 fn edge_mid(b: &Body, e: usize) -> Option<DVec3> {
     let s = b.shape.sub_shape(ShapeType::Edge, e).ok()?;
     let info = s.edge_info().ok()?;
@@ -301,7 +305,9 @@ pub fn select_related(ctx: &Context, seed: &Reference, criterion: Criterion) -> 
     let edge_faces = b.shape.edge_faces().unwrap_or_default();
     let mut out: BTreeSet<usize> = BTreeSet::new();
     let faces = |set: BTreeSet<usize>| set.into_iter().filter_map(|f| face_ref(b, f)).collect::<Vec<_>>();
-    let edges = |set: BTreeSet<usize>| set.into_iter().filter_map(|e| edge_ref(b, e)).collect::<Vec<_>>();
+    // (Not a degenerated edge: an imported B-spline's collapsed side has no curve, isn't drawn and isn't an edge in
+    // live, whose kernel has none.)
+    let edges = |set: BTreeSet<usize>| set.into_iter().filter(|e| !degenerated(b, *e)).filter_map(|e| edge_ref(b, e)).collect::<Vec<_>>();
     match (criterion, kind) {
         (Criterion::TangentFaces, ShapeType::Face) => {
             let mut queue = VecDeque::from([i]);

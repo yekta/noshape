@@ -7518,6 +7518,8 @@ fn every_kind_of_plane_right_clicked_in_the_graphics_opens_its_menu(cx: &mut Tes
 
 #[path = "feel_tests.rs"]
 mod feel;
+#[path = "bspline_pick_tests.rs"]
+mod bspline;
 #[path = "hover_matrix_tests.rs"]
 mod hover_matrix;
 #[path = "snap_matrix_tests.rs"]
