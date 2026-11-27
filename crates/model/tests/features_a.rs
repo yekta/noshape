@@ -4403,6 +4403,29 @@ fn subtract_with_offset_moves_a_tools_spline_face() {
     assert!(((plain - moved) - want).abs() < 0.05 * want, "{} mm3 more cut, about {}", (plain - moved) * 1e9, want * 1e9);
 }
 
+/// Subtract with Offset on and no faces picked fails as boolean.fs BOOLEAN_OFFSET_NO_FACES (live
+/// boolean-subtract-offset-ok s8); Offset all offsets every face instead.
+#[test]
+fn subtract_offset_with_no_faces_fails() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.04, "10 mm");
+    t.block(0.01, 0.01, 0.03, 0.03, "20 mm");
+    let r = t.ok();
+    let (block, tool) = (r.context.bodies[0].id.clone(), r.context.bodies[1].id.clone());
+    let cut = t.add("booleanBodies", &[
+        ("operationType", en("SUBTRACTION")),
+        ("targets", q(vec![Reference::Body(block)])),
+        ("tools", q(vec![Reference::Body(tool)])),
+        ("offset", b(true)),
+        ("offsetDistance", e("1 mm")),
+    ]);
+    let res = t.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Select faces to offset.")));
+    t.set(cut, "offsetAll", b(true));
+    t.ok();
+}
+
 /// A loft along a path runs through its sections like a loft through three or more profiles: sides meeting smoothly
 /// are one face (live c2-loft-paths-guides' Loft 3: two slots along an arc, one side face; ours 4), and its side stays
 /// on the path's side of the first profile (spaced by section, it ran 0.96 mm back past Loft 3's start and the fuse

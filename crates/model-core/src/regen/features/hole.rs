@@ -401,6 +401,7 @@ fn entry_contacts(ev: &EvalCtx, bodies: &[usize], p: DVec3, dir: DVec3, r: f64, 
 /// Live L51: a fastener fit on a hole through one part.
 const FIT_INFO: &str = "Fastener fit will not be applied if there are fewer than two parts per hole.";
 /// hole.fs HOLE_TAP_TOO_DEEP (its help link kept as text).
+const TAP_INCONSISTENT: &str = "Depth, tapped depth, tap clearance, and pitch are inconsistent.";
 const TAP_TOO_DEEP: &str = "Tapped depth readjusted. Tapped depth input is greater than minimum computed Hole depth. Learn more";
 /// hole.fs HOLE_CBORE_CSINK_VALUES_NON_STD.
 const PIPE_TAP_HEADS: &str = "Counterbore and countersink values are non standard for tapered holes.";
@@ -770,6 +771,17 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     }
     if tap_too_deep {
         ev.infos.push(TAP_TOO_DEEP.into());
+    }
+    // hole.fs HOLE_INCONSISTENT_TAP_INFO: Depth isn't Tapped depth + Tap clearance × pitch (live
+    // mistake-hole-tapped-blind-5-inconsistent: Depth 5 mm under a 5.6 mm tapped depth).
+    if end == "BLIND" && !ev.bool("blindInLast") && let Some(tapped) = tapped_input {
+        let (pid, table) = ht::hole_table_param(ev.params);
+        let pitch = ht::table_values(table, &ht::complete_path(table, ev.params.lookup(pid))).and_then(|s| s.pitch).filter(|p| *p > 0.0);
+        if let (Some(pitch), Ok(depth), Ok(clear)) = (pitch, ev.length("holeDepthV3"), ev.real("tapClearance"))
+            && (depth - (tapped + clear * pitch)).abs() > 1e-8
+        {
+            ev.warnings.push(TAP_INCONSISTENT.into());
+        }
     }
     // A counterbore / countersink on a pipe tap.
     let (pid, _) = ht::hole_table_param(ev.params);
