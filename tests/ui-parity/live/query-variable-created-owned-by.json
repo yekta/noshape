@@ -1,19 +1,23 @@
 {
  "scenario": "query-variable-created-owned-by",
- "recorded": "2026-11-14T06:29:40.979Z",
+ "recorded": "2026-11-27T17:56:43.069Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.5"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "38e54affc51d506498f8ecd2",
-  "workspace": "24db5f467e1ccbd8d405a2a9",
-  "element": "ebb30bbe21c9319df77aa5c3",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "ba02b1b0ad500d5353cd2e43",
   "start": "block",
-  "startElement": "ff2245ce846878221ff975e1",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -101,6 +105,10 @@
     }
    },
    "ok": true,
+   "ti": 22007,
+   "tmove": 22056,
+   "moves": 3,
+   "tdown": 23162,
    "at": [
     1305,
     58
@@ -308,7 +316,8 @@
     },
     "measure": null
    },
-   "t": 36469
+   "t": 27804,
+   "te": 27805
   },
   {
    "step": 2,
@@ -317,6 +326,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 27805,
    "state": {
     "focus": {
      "kind": "field",
@@ -520,7 +530,8 @@
     },
     "measure": null
    },
-   "t": 41243
+   "t": 32127,
+   "te": 32127
   },
   {
    "step": 3,
@@ -532,6 +543,10 @@
     }
    },
    "ok": true,
+   "ti": 32127,
+   "tmove": 32170,
+   "moves": 2,
+   "tdown": 32489,
    "at": [
     343,
     173
@@ -539,14 +554,8 @@
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": null,
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Created by features",
      "dialog": "#?"
     },
     "dialog": {
@@ -775,7 +784,8 @@
     },
     "measure": null
    },
-   "t": 46235
+   "t": 35914,
+   "te": 35914
   },
   {
    "step": 4,
@@ -784,17 +794,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 35914,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": null,
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Created by features",
      "dialog": "#?"
     },
     "dialog": {
@@ -1023,7 +1028,8 @@
     },
     "measure": null
    },
-   "t": 51174
+   "t": 40220,
+   "te": 40220
   },
   {
    "step": 5,
@@ -1035,6 +1041,10 @@
     }
    },
    "ok": true,
+   "ti": 40220,
+   "tmove": 40265,
+   "moves": 2,
+   "tdown": 40655,
    "at": [
     343,
     173
@@ -1248,7 +1258,8 @@
     },
     "measure": null
    },
-   "t": 56599
+   "t": 44057,
+   "te": 44057
   },
   {
    "step": 6,
@@ -1257,6 +1268,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 44057,
    "state": {
     "focus": {
      "kind": "field",
@@ -1466,7 +1478,8 @@
     },
     "measure": null
    },
-   "t": 61186
+   "t": 48349,
+   "te": 48349
   },
   {
    "step": 7,
@@ -1475,6 +1488,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 48349,
    "pointer": {
     "at": [
      335,
@@ -1483,6 +1497,7 @@
     "hover": [],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 48355,
    "state": {
     "focus": {
      "kind": "none"
@@ -1558,7 +1573,8 @@
     },
     "measure": null
    },
-   "t": 65118
+   "t": 51743,
+   "te": 51743
   },
   {
    "step": 8,
@@ -1567,6 +1583,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 51743,
    "state": {
     "focus": {
      "kind": "none"
@@ -1642,7 +1659,9 @@
     },
     "measure": null
    },
-   "t": 69715
+   "t": 55999,
+   "te": 55999
   }
- ]
+ ],
+ "t0_epoch_ms": 1795802186307
 }

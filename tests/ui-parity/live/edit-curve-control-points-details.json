@@ -1,19 +1,23 @@
 {
  "scenario": "edit-curve-control-points-details",
- "recorded": "2026-11-14T05:04:53.515Z",
+ "recorded": "2026-11-27T17:55:32.004Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.5"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "35922b63544afa11423bf664",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "9477d6e5fef7d2e3fe3c899b",
   "start": "curves",
-  "startElement": "8997bf30f92f9b9c815331be",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "caaadf1688d673a38c427800",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -119,6 +123,10 @@
     }
    },
    "ok": true,
+   "ti": 21651,
+   "tmove": 21707,
+   "moves": 3,
+   "tdown": 22806,
    "at": [
     1185,
     58
@@ -376,7 +384,8 @@
     },
     "measure": null
    },
-   "t": 44407
+   "t": 27090,
+   "te": 27090
   },
   {
    "step": 2,
@@ -385,6 +394,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 27090,
    "state": {
     "focus": {
      "kind": "field",
@@ -638,7 +648,8 @@
     },
     "measure": null
    },
-   "t": 49433
+   "t": 31451,
+   "te": 31451
   },
   {
    "step": 3,
@@ -653,9 +664,13 @@
     }
    },
    "ok": true,
+   "ti": 31451,
+   "tmove": 31490,
+   "moves": 1,
    "hover": [
     "JJB"
    ],
+   "tdown": 32792,
    "at": [
     1098,
     461
@@ -921,7 +936,8 @@
     },
     "measure": null
    },
-   "t": 54792
+   "t": 34756,
+   "te": 34756
   },
   {
    "step": 4,
@@ -930,6 +946,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 34756,
    "state": {
     "focus": {
      "kind": "none"
@@ -1191,7 +1208,8 @@
     },
     "measure": null
    },
-   "t": 59456
+   "t": 39081,
+   "te": 39081
   },
   {
    "step": 5,
@@ -1202,6 +1220,10 @@
     }
    },
    "ok": true,
+   "ti": 39081,
+   "tmove": 39113,
+   "moves": 1,
+   "tdown": 39474,
    "at": [
     342,
     256
@@ -1209,14 +1231,8 @@
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Edit control points",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Control point indices",
      "dialog": "Edit curve 1"
     },
     "dialog": {
@@ -1506,7 +1522,8 @@
     },
     "measure": null
    },
-   "t": 63160
+   "t": 41318,
+   "te": 41318
   },
   {
    "step": 6,
@@ -1515,17 +1532,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 41318,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Edit control points",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Control point indices",
      "dialog": "Edit curve 1"
     },
     "dialog": {
@@ -1815,7 +1827,8 @@
     },
     "measure": null
    },
-   "t": 67734
+   "t": 45628,
+   "te": 45628
   },
   {
    "step": 7,
@@ -1826,6 +1839,10 @@
     }
    },
    "ok": true,
+   "ti": 45628,
+   "tmove": 45661,
+   "moves": 1,
+   "tdown": 46042,
    "at": [
     326,
     411
@@ -2088,7 +2105,8 @@
     },
     "measure": null
    },
-   "t": 71553
+   "t": 47963,
+   "te": 47963
   },
   {
    "step": 8,
@@ -2097,6 +2115,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 47963,
    "state": {
     "focus": {
      "kind": "field",
@@ -2355,7 +2374,8 @@
     },
     "measure": null
    },
-   "t": 76135
+   "t": 52268,
+   "te": 52268
   },
   {
    "step": 9,
@@ -2366,6 +2386,10 @@
     }
    },
    "ok": true,
+   "ti": 52268,
+   "tmove": 52297,
+   "moves": 1,
+   "tdown": 52636,
    "at": [
     332,
     438
@@ -2642,7 +2666,8 @@
     },
     "measure": null
    },
-   "t": 79529
+   "t": 54516,
+   "te": 54516
   },
   {
    "step": 10,
@@ -2651,6 +2676,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 54516,
    "state": {
     "focus": {
      "kind": "field",
@@ -2923,7 +2949,8 @@
     },
     "measure": null
    },
-   "t": 84118
+   "t": 58838,
+   "te": 58838
   },
   {
    "step": 11,
@@ -2932,6 +2959,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 58839,
    "pointer": {
     "at": [
      332,
@@ -2940,6 +2968,7 @@
     "hover": [],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 58844,
    "state": {
     "focus": {
      "kind": "none"
@@ -3033,7 +3062,8 @@
     },
     "measure": null
    },
-   "t": 87765
+   "t": 62258,
+   "te": 62258
   },
   {
    "step": 12,
@@ -3042,6 +3072,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 62258,
    "state": {
     "focus": {
      "kind": "none"
@@ -3135,7 +3166,9 @@
     },
     "measure": null
    },
-   "t": 92317
+   "t": 66538,
+   "te": 66538
   }
- ]
+ ],
+ "t0_epoch_ms": 1795802115349
 }
