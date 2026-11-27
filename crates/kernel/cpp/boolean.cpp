@@ -10614,18 +10614,25 @@ struct TurnsDivided
       const OcShape&   res = *r.shape;
       const ShapeIMap& rf  = res.map(TopAbs_FACE);
       const int        nf  = rf.Extent();
-      // Each result face's divided input face (its arg and index + 1); index 0: none yet, -1: another input's too.
-      std::vector<std::pair<uint32_t, int>> from(static_cast<size_t>(nf), {0, 0});
+      // Each result face's input faces (arg, index + 1; negative where that face wasn't divided), sorted: pieces of
+      // one divided face side by side have the same ones (a cylinder of both inputs, its pieces each from both:
+      // c2-config-parts-standoffs' Revolve 2).
+      std::vector<std::vector<std::pair<uint32_t, int>>> from(static_cast<size_t>(nf));
       for (const HistRec& x : r.history)
       {
         if (x.in_kind != TopAbs_FACE || x.out_kind != TopAbs_FACE || x.out_index >= from.size() || (x.relation != REL_MODIFIED && x.relation != REL_KEPT))
           continue;
         const bool split = x.arg < hists.size() && !hists[x.arg].IsNull() && static_cast<int>(x.in_index) < originals[x.arg]->map(TopAbs_FACE).Extent()
                         && images_of(hists[x.arg], originals[x.arg]->map(TopAbs_FACE)(static_cast<int>(x.in_index) + 1)).Extent() > 1;
-        const std::pair<uint32_t, int> me = split ? std::make_pair(x.arg, static_cast<int>(x.in_index) + 1) : std::make_pair(0u, -1);
-        auto&                          o  = from[x.out_index];
-        o                                 = o.second == 0 || o == me ? me : std::make_pair(0u, -1);
+        const std::pair<uint32_t, int> me{x.arg, (static_cast<int>(x.in_index) + 1) * (split ? 1 : -1)};
+        auto&                          o = from[x.out_index];
+        if (std::find(o.begin(), o.end(), me) == o.end())
+          o.insert(std::upper_bound(o.begin(), o.end(), me), me);
       }
+      const auto divided = [&from](int i) {
+        const auto& o = from[static_cast<size_t>(i)];
+        return std::any_of(o.begin(), o.end(), [](const std::pair<uint32_t, int>& p) { return p.second > 0; });
+      };
       std::vector<int> up(static_cast<size_t>(nf));
       std::iota(up.begin(), up.end(), 0);
       const auto root = [&up](int i) {
@@ -10644,7 +10651,7 @@ struct TurnsDivided
         const TopoDS_Face& f1 = TopoDS::Face(ef(i).First());
         const TopoDS_Face& f2 = TopoDS::Face(ef(i).Last());
         const int          a = rf.FindIndex(f1) - 1, b = rf.FindIndex(f2) - 1;
-        if (a < 0 || b < 0 || from[static_cast<size_t>(a)].second <= 0 || from[static_cast<size_t>(a)] != from[static_cast<size_t>(b)] || f1.Orientation() != f2.Orientation())
+        if (a < 0 || b < 0 || !divided(a) || from[static_cast<size_t>(a)] != from[static_cast<size_t>(b)] || f1.Orientation() != f2.Orientation())
           continue;
         TopLoc_Location l1, l2;
         if (BRep_Tool::Surface(f1, l1) != BRep_Tool::Surface(f2, l2) || !(l1 == l2))
