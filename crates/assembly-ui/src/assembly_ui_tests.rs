@@ -1253,7 +1253,7 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
                 super::AssemblyViewEvent::ShowPart(_, body) => format!("show {body:?}"),
                 super::AssemblyViewEvent::WhereUsed(_, body) => format!("where used {body:?}"),
                 super::AssemblyViewEvent::ActivateTab(_) => "activate".into(),
-                super::AssemblyViewEvent::WhereUsedAssembly(t) => format!("where used {t:?}"),
+                super::AssemblyViewEvent::WhereUsedTab(t) => format!("where used {t:?}"),
                 super::AssemblyViewEvent::EditInContext(..) | super::AssemblyViewEvent::EditInContextOther(..) => "context".into(),
             })
         })
@@ -1287,7 +1287,12 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
     })
     .unwrap();
     cx.run_until_parked();
-    assert_eq!(*got.borrow(), [format!("show {body:?}"), format!("where used {body:?}")]);
+    // Live asm-instance-menu-where-used: the list's Where used… opens the rail's panel on the Part Studio, in place.
+    let studio = cx.update(|cx| match &view.read(cx).assembly(cx).unwrap().instance(instance(view.read(cx), "Part 2 <1>", cx)).unwrap().source {
+        noshape_model::assembly::InstanceSource::Part { studio, .. } => *studio,
+        s => panic!("{s:?}"),
+    });
+    assert_eq!(*got.borrow(), [format!("show {body:?}"), format!("where used {studio:?}")]);
     // A subassembly of this document: its list menu's Where used… after Export…, on the subassembly (live Pro
     // asm-menu-unlock 11-26).
     got.borrow_mut().clear();

@@ -1615,15 +1615,15 @@ impl AssemblyView {
         if !suppressed {
             m.push(export);
         }
-        if let Some((studio, body)) = part.clone() {
-            where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(studio, body.clone()))));
+        if let Some((studio, _)) = part.clone() {
+            where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsedTab(studio))));
         }
         // A subassembly of this document's too (live Pro asm-menu-unlock 11-26).
         if let InstanceSource::Assembly { assembly, .. } = &inst.source
             && !multi
         {
             let a = *assembly;
-            where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsedAssembly(a))));
+            where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsedTab(a))));
         }
         m.extend(where_used);
         if let Some((studio, body)) = part.filter(|_| noshape_ops::release_settings::managed_workflows()) {
@@ -2413,7 +2413,7 @@ impl AssemblyView {
         m.push(MenuEntry::Sep);
         m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
         // Live revtools-1121: Where used… after Export…; with managed workflows Release… and Revision history… after it.
-        m.push(item("Where used…", |t, _, cx| cx.emit(AssemblyViewEvent::WhereUsedAssembly(t.tab))));
+        m.push(item("Where used…", |t, _, cx| cx.emit(AssemblyViewEvent::WhereUsedTab(t.tab))));
         if noshape_ops::release_settings::managed_workflows() {
             m.push(item("Release…", |t, w, cx| {
                 let items = crate::assembly_hooks::release_tab_items(t.doc.read(cx), t.tab);
@@ -2742,8 +2742,8 @@ impl AssemblyView {
         m.push(item("Export…", move |t, w, cx| t.open_occurrence_export(Some(vec![p.clone()]), w, cx)));
         // Live Pro (asm-pro-menus-1119 b): a part's Where used… and Revision history… (managed workflows), no Release….
         if let InstanceSource::Part { studio, body, .. } = &inst.source {
-            let (studio, b) = (*studio, body.clone());
-            m.push(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(studio, b.clone()))));
+            let studio = *studio;
+            m.push(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsedTab(studio))));
             if noshape_ops::release_settings::managed_workflows() {
                 let b = body.clone();
                 m.push(item("Revision history…", move |t, w, cx| crate::assembly_hooks::open_part_revision_history(t.doc.clone(), studio, b.clone(), w, cx)));

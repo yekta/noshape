@@ -640,9 +640,10 @@ pub enum AssemblyViewEvent {
     /// Instance menu › Where used for <part>… (live, Professional: asm-triad-move-to-origin-free): the part's Part
     /// Studio with its Where used panel open.
     WhereUsed(TabId, noshape_model::reference::BodyId),
-    /// The top-level row's Where used…: the rail's Where used panel, on this assembly; a subassembly instance's, on
-    /// its assembly (live Pro asm-menu-unlock 11-26).
-    WhereUsedAssembly(TabId),
+    /// The list's Where used…: the rail's Where used panel, in place: the top-level row's on this assembly, a
+    /// subassembly instance's on its assembly (live Pro asm-menu-unlock 11-26), a part instance's on its Part Studio
+    /// (live asm-instance-menu-where-used: the assembly stays, nothing selected).
+    WhereUsedTab(TabId),
     /// Instance menu › Edit in context: open the Part Studio with the
     /// assembly as context graphics.
     EditInContext(TabId, Box<crate::assembly_context::AssemblyContext>),

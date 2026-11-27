@@ -354,7 +354,7 @@ impl Workspace {
                             v.update(cx, |v, cx| v.show_where_used(body.clone(), cx));
                         }
                     }
-                    crate::assembly_view::AssemblyViewEvent::WhereUsedAssembly(t) => this.open_where_used(*t, window, cx),
+                    crate::assembly_view::AssemblyViewEvent::WhereUsedTab(t) => this.open_where_used(*t, window, cx),
                     crate::assembly_view::AssemblyViewEvent::EditInContext(t, ctx) => {
                         this.activate(*t, window, cx);
                         if let Some(TabView::PartStudio(v)) = this.views.get(t) {
