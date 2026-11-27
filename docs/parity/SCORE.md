@@ -155,6 +155,7 @@ mirror-face-type (a live DOM detail).
 | 2026-11-24 | b8b27ec6 (00:22 run; models 131/188 documents; 1123-2005-b8b27ec6) | 90.4 | 78.5 | 96.8 | 88.9 | 98.5 | 87.9 | 97.6 | 91.0 | 84.3 | 100.0 | 100.0 | 99.7 | 99.9 |
 | 2026-11-25 | b93ec1e8 (08:03 run; models 131/188 documents; 1124-2341-b93ec1e8) | 90.1 | 78.5 | 96.8 | 88.9 | 98.2 | 87.9 | 97.6 | 91.0 | 81.7 | 100.0 | 100.0 | 100.0 | 99.9 |
 | 2026-11-26 | 111a6633 (20:43 run on live's refilled corpus; models 131/189 documents; 1126-1417-111a6633; speed LOADED (peak 19)) | 91.0 | 80.4 | 95.8 | 89.7 | 98.0 | 87.9 | 97.6 | 92.3 | 86.0 | 100.0 | 100.0 | 100.0 | 99.9 |
+| 2026-11-27 | 70ab1b23 (17:47 run; models 135/189 documents; 1127-1056-70ab1b23) | 78.9 | 82.0 | 94.8 | 0.0 | 90.2 | 96.2 | 97.6 | 0.0 | 81.4 | 100.0 | 100.0 | 100.0 | 99.9 |
 
 ## Speed window (qa, 02:00–04:00 UTC; vibe7 from 2026-11-13, a new baseline; docs/parity/INDEX.md "Scoring changes")
 
