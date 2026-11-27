@@ -869,28 +869,28 @@ impl AssemblyView {
                     .h(px(28.))
                     .child(cfg(
                         "mcd-cfg-flip",
-                        icon_tool("mcd-flip", "flip-direction-opposite", "Flip primary axis", flip, cx)
+                        crate::ui_script::mark(icon_tool("mcd-flip", "flip-direction-opposite", "Flip primary axis", flip, cx)
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                 if let Some(m) = &mut this.mc {
                                     m.flip = !m.flip;
                                 }
                                 this.schedule_eval(window, cx);
                                 cx.notify();
-                            }))
+                            })), || "button:Opposite direction".into())
                             .into_any_element(),
                         cp::FLIP,
                         None,
                     ))
                     .child(cfg(
                         "mcd-cfg-reorient",
-                        icon_tool("mcd-reorient", "realign-mate-dialog", "Reorient secondary axis", !reorient.is_multiple_of(4), cx)
+                        crate::ui_script::mark(icon_tool("mcd-reorient", "realign-mate-dialog", "Reorient secondary axis", !reorient.is_multiple_of(4), cx)
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                 if let Some(m) = &mut this.mc {
                                     m.reorient = (m.reorient + 1) % 4;
                                 }
                                 this.schedule_eval(window, cx);
                                 cx.notify();
-                            }))
+                            })), || "button:Reorient secondary axis".into())
                             .into_any_element(),
                         cp::REORIENT,
                         None,
@@ -1841,7 +1841,8 @@ impl AssemblyView {
         let flip_focus = self.pattern_flip_focus.clone();
         let toggle = |id: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut Self)| {
             let blue: Hsla = gpui_kit::rgb(0x1651b0).into();
-            div()
+            // Live's runner names each flip by its tooltip, "Opposite direction" (the first drawn: asm-linear-pattern-opposite-ok).
+            let el = div()
                 .id(id)
                 // Tabbed to from Instance count: a 2 px #1651b0 underline (live wf23 04 s9 / 05 s18), as Part Studio's flips.
                 .when_some(["pat-opp", "pat-opp2", "pat-opp3"].iter().position(|f| *f == id), |d, n| {
@@ -1860,7 +1861,8 @@ impl AssemblyView {
                     f(this);
                     this.update_pattern_preview(cx);
                     cx.notify();
-                }))
+                }));
+            crate::ui_script::mark_first(el, || "button:Opposite direction".into())
         };
         let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>, n: usize| crate::ui_script::mark(os::param_row_plain(label, st.clone()), move || field_mark(label, n));
         // A distance or angle of 0 (or less) is marked like a Part Studio's faulty field: pink, a red underline, no

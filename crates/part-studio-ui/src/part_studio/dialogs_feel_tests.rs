@@ -1951,6 +1951,43 @@ fn a_skip_ring_lights_and_a_click_skips_its_instance_then_keeps_it(cx: &mut Test
     assert_eq!(skipped(cx), vec![], "a click on the seed's dot skips nothing");
 }
 
+/// Live mistake-sweep-add-no-change: the part's front face swept along its edge at x = 40 mm runs through the part, so
+/// std's editing logic turns New to Add with the part as the merge scope.
+#[gpui::test]
+fn a_part_face_swept_along_its_edge_adds_into_the_part(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-sweep-face");
+    let (part, front, edge) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let at_y0 = |i: usize| {
+            let Some(&(first, count)) = b.mesh.face_ranges.get(i) else { return false };
+            b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| b.mesh.positions[k as usize][1].abs() < 1e-6)
+        };
+        let front = b.face_refs.iter().enumerate().find(|(i, _)| at_y0(*i)).map(|(_, r)| r.clone()).expect("the face at y = 0");
+        let along = |i: usize| b.mesh.edges.get(i).is_some_and(|ps| ps.iter().all(|p| (p[0] - 0.04).abs() < 1e-6 && (p[2] - 0.01).abs() < 1e-6));
+        let edge = b.edge_refs.iter().enumerate().find(|(i, _)| along(*i)).map(|(_, r)| r.clone()).expect("the edge at x = 40, z = 10 mm");
+        (Reference::Body(b.id.clone()), front, edge)
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sweep", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Sweep dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("profiles");
+        d.add_pick(front, cx);
+    }));
+    // The path picked at once, before the profile's run is in (the replay's pace).
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("path");
+        d.add_pick(edge, cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let state = cx.update(|cx| {
+        let p = &dialog.read(cx).feature.params;
+        (p.enum_("operationType").to_string(), p.bool("defaultScope"), p.query("booleanScope").to_vec())
+    });
+    assert_eq!(state, ("ADD".to_string(), false, vec![part]), "(operation, Merge with all, merge scope)");
+}
+
 /// Live2 pattern-hole-1118 (P0): Mirror of the part across one of its side faces: the plane box reads "Face of
 /// Extrude 1", the preview comes, and the mirror touching its seed turns the operation to Add with the part as the merge
 /// scope (one part after ✓).

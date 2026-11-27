@@ -1134,8 +1134,9 @@ impl Render for MateDialog {
                     .w(px(194.))
                     .h(px(26.))
                     .child(div().w(px(86.)).h_full().pl(px(5.)).pt(px(7.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Rotation angle"))
-                    .child(div().w(px(108.)).h(px(26.)).child(self.offsets[3].clone()));
-                offset_rows = offset_rows.child(div().py(px(1.5)).child(select)).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, angle, cx));
+                    .child(crate::ui_script::mark(div().w(px(108.)).h(px(26.)).child(self.offsets[3].clone()), || "field:Rotation angle".into()));
+                // The runner names the unlabelled select by the axis it shows (live asm-fastened-rotate-z-90-ok).
+                offset_rows = offset_rows.child(crate::ui_script::mark(div().py(px(1.5)).child(select), move || format!("dropdown:{label}"))).child(self.cfg_param(noshape_model::assembly::config::param::ROTATION, angle, cx));
             }
         }
         let mut limit_rows = v_flex();
@@ -1186,13 +1187,20 @@ impl Render for MateDialog {
                             .child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)),
                     )), move || target)
             };
+            // Unlabelled too: the runner's "field:#n" after the offset boxes (live asm-planar-limits-z-ok: #4 is Z's minimum).
+            let mut n = if self.use_offset { [ox, oy, oz].into_iter().filter(|on| *on).count() } else { 0 };
+            let indexed = |el, n: &mut usize| {
+                let i = *n;
+                *n += 1;
+                crate::ui_script::mark(el, move || format!("field:#{i}"))
+            };
             for key in lkeys {
                 let (lo, hi) = &self.limits[key];
                 if *key != "cone" {
-                    limit_rows = limit_rows.child(limit_field(key, false, lo, cx));
+                    limit_rows = limit_rows.child(indexed(limit_field(key, false, lo, cx), &mut n));
                 }
                 // Ball: a single maximum angle from the Z axis.
-                limit_rows = limit_rows.child(limit_field(key, true, hi, cx));
+                limit_rows = limit_rows.child(indexed(limit_field(key, true, hi, cx), &mut n));
             }
         }
         let regen_error = self.regen_error(cx);
@@ -1347,11 +1355,11 @@ impl Render for MateDialog {
                                     || "button:Opposite direction".into(),
                                 ))
                             })
-                            .when(full_row, |d| d.child(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .when(full_row, |d| d.child(crate::ui_script::mark(small_tool("mate-reorient", reorient_icon, "Reorient secondary axis", !self.reorient.is_multiple_of(4)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.reorient = (this.reorient + 1) % 4;
                                 cx.emit(MateDialogEvent::Changed);
                                 cx.notify();
-                            }))))
+                            })), || "button:Reorient secondary axis".into())))
                             // Animate: preview the mate's motion (mates with degrees of freedom).
                             .when(full_row, |d| {
                                 let can = !noshape_model::assembly::eval::mate_dofs(t).is_empty();
