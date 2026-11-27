@@ -1,18 +1,23 @@
 {
  "scenario": "sketch-tool-insert-image",
- "recorded": "2026-11-07T01:01:45.381Z",
+ "recorded": "2026-11-27T18:03:38.711Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.1"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "d3166d6da467308f0146fabc",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "4915a8475332a47b42acff3f",
   "start": "empty",
-  "startElement": "81fdc27e2aba0b3a105a0788"
+  "startElement": "2490137255f656eeab93562a",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -38,7 +44,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -50,6 +83,10 @@
     }
    },
    "ok": true,
+   "ti": 22435,
+   "tmove": 22479,
+   "moves": 2,
+   "tdown": 22770,
    "at": [
     155,
     58
@@ -106,6 +143,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -131,7 +169,7 @@
      "undo": false,
      "redo": false
     },
-    "message": "Select a sketch plane × Close",
+    "message": "Select a sketch plane \u00d7 Close",
     "tooltip": null,
     "sketch": {
      "tool": null,
@@ -140,9 +178,37 @@
      "dimensions": null,
      "error": "sketch model not reached"
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 104324
+   "t": 25686,
+   "te": 25686
   },
   {
    "step": 2,
@@ -153,6 +219,10 @@
     }
    },
    "ok": true,
+   "ti": 25687,
+   "tmove": 25724,
+   "moves": 3,
+   "tdown": 26437,
    "at": [
     1083,
     568
@@ -213,6 +283,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -247,9 +318,37 @@
      "dimensions": null,
      "error": "sketch model not reached"
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 119952
+   "t": 28828,
+   "te": 28828
   },
   {
    "step": 3,
@@ -261,6 +360,10 @@
     }
    },
    "ok": true,
+   "ti": 28828,
+   "tmove": 28867,
+   "moves": 4,
+   "tdown": 29944,
    "at": [
     936,
     58
@@ -270,29 +373,32 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 1",
-     "titleState": "ok",
-     "kind": "sketch",
-     "tabs": [],
-     "fields": [
+     "title": "Insert an image",
+     "kind": "feature",
+     "tabs": [
       {
-       "label": "Sketch plane",
-       "kind": "query",
-       "items": [
-        "Top plane"
-       ],
-       "active": false,
-       "state": "ok"
+       "label": "Current document",
+       "selected": false
       },
       {
-       "label": "Disable imprinting",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
+       "label": "Other documents",
+       "selected": false
+      },
+      {
+       "label": "Libraries",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search by name, folder, or configuration",
+       "kind": "string",
+       "text": ""
       }
      ],
      "error": null,
-     "ok": "enabled"
+     "ok": null,
+     "titleState": "ok"
     },
     "dialogs": [
      {
@@ -319,6 +425,35 @@
       ],
       "error": null,
       "ok": "enabled"
+     }
+    ],
+    "panels": [
+     {
+      "id": "sketch-image-dialog",
+      "title": "Insert an image",
+      "text": "Insert an image / Current document / Other documents / Libraries / Library / Onshape images / Type / Environment maps / Image / Blue sky / Done",
+      "inputs": [
+       {
+        "placeholder": "Search by name, folder, or configuration",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
      }
     ],
     "list": null,
@@ -352,11 +487,40 @@
      "tool": "Insert image",
      "entities": [],
      "constraints": [],
-     "dimensions": []
+     "dimensions": [],
+     "geometry": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 125314
+   "t": 34171,
+   "te": 34171
   },
   {
    "step": 4,
@@ -365,6 +529,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 34171,
+   "pointer": {
+    "at": [
+     1889,
+     932
+    ],
+    "hover": [],
+    "element": "button.btn.btn-secondary"
+   },
+   "tdown": 34178,
    "state": {
     "focus": {
      "kind": "none"
@@ -421,6 +595,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -452,11 +627,41 @@
      "tool": null,
      "entities": [],
      "constraints": [],
-     "dimensions": []
+     "dimensions": [],
+     "geometry": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 129442
+   "t": 37619,
+   "te": 37619
   }
- ]
+ ],
+ "t0_epoch_ms": 1795802601758
 }
