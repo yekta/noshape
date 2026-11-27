@@ -1678,6 +1678,11 @@ fn a_part_with_a_material_offers_edit_material_and_its_center_of_mass(cx: &mut T
     let at = |n: &str| menu.iter().position(|m| m == n).unwrap_or_else(|| panic!("{n} in {menu:?}"));
     assert_eq!(at("Show center of mass"), at("Isolate…") - 1, "after the Hide items, before Isolate…: {menu:?}");
     assert!(at("Hide") < at("Show center of mass"));
+    // Live part-menu-edit-material s14: Edit material… opens on the part's own material.
+    let item = l.bounds(cx, "menu:Edit material…").expect("Edit material… in the menu").center();
+    l.press(cx, item, MouseButton::Left, NONE, 1);
+    let picked = cx.update(|cx| l.view.read(cx).ui.material_panel.as_ref().and_then(|m| m.picked_name()));
+    assert_eq!(picked.as_deref(), Some("ABS"));
 }
 
 #[gpui::test]

@@ -179,7 +179,12 @@ impl PartStudioView {
                 }
             }));
         }
-        self.ui.material_panel = Some(MaterialPanel { bodies, cp_cell: None, custom: false, library: 0, picked: None, list_open: false, active: 0, lib_open: false, search, custom_fields, _subs: subs });
+        // Edit material…: the parts' own material is picked, in the library that has it (live part-menu-edit-material).
+        let materials: Vec<Option<String>> = bodies.iter().map(|b| self.studio(cx).and_then(|s| s.part_properties.get(b)).and_then(|p| p.material.clone())).collect();
+        let shared = materials.first().cloned().flatten().filter(|n| materials.iter().all(|m| m.as_ref() == Some(n)));
+        let found = shared.and_then(|n| (0..self.material_sources(cx).len()).find_map(|l| self.material_entries(l, cx).into_iter().find(|e| e.name == n).map(|e| (l, e))));
+        let (library, picked) = found.map_or((0, None), |(l, e)| (l, Some(e)));
+        self.ui.material_panel = Some(MaterialPanel { bodies, cp_cell: None, custom: false, library, picked, list_open: false, active: 0, lib_open: false, search, custom_fields, _subs: subs });
         cx.notify();
     }
 
