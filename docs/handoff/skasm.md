@@ -1,12 +1,12 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
+Updated 2026-11-26 23:58 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (lead 11-26 23:5x): PATTERN-AFTER-INSERTED-CHAMFER (P1 maker flow, interaction-feel row 1900, taken from core)
-Roll back to Extrude 2, insert a 1 mm Chamfer on the hole's top edge, roll to the end: live rebuilds all; ours fails
-Linear pattern 1 (feature pattern of Extrude 2, 3 x 20 mm) "Could not create all instances as entered...". Fix with
-a T1 and an ops e2e (crates/ops/tests/e2e.rs). Find the row: grep -n PATTERN-AFTER-INSERTED-CHAMFER docs/.
+## PATTERN-AFTER-INSERTED-CHAMFER (lead 11-26 23:5x): already fixed by core 6a8e411db (11-19)
+The flow replayed through ops on green f186b320 rebuilds everything (29505.03 mm3 / 30273.90 mm2 as live). Added the
+ops e2e e2e::a_chamfer_inserted_before_a_feature_pattern_rebuilds_it (T1 was core's engine.rs test); ticket and
+interaction-feel row closed.
 
 ## NOW (11-26 23:35 UTC)
 - 09cb32fd's failure was the land slot's link (mold undefined hashbrown symbol in noshape-ops), not ours; the Split 4

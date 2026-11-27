@@ -1861,7 +1861,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   two regions identical). Live picks the region (its active field filters out sketch points and curves). Repro: vibe2
   ~/agents/qa-keep/session-1118/region (doc-s1 = the plate after Extrude 1; session-s2.json via qa-scratch/session/session.sh,
   START=<doc> SEGS=s2); step 34 is the region click.
-- [ ] **P1 PATTERN-AFTER-INSERTED-CHAMFER [core]** (core 11-26 20:1x: FIXED by 6a8e411db, 11-19, in v0.4.60+: the repro's 9 features Ok, 29505.03 mm³ = live, on main + core-rf; qa to verify and close, and the interaction-feel row 1900): live's session (live/qa/session-1118 step 11): a 100 × 50 × 10 plate, a Ø10 hole
+- [x] (closed skasm 11-26 23:58: fixed by core 6a8e411db (11-19); the flow replayed through ops on green f186b320 rebuilds everything, 29505.03 mm³ / 30273.90 mm² as live; T1 engine::feature_pattern_of_a_chamfered_hole_in_a_tray_cuts_the_floor, ops e2e::a_chamfer_inserted_before_a_feature_pattern_rebuilds_it) **P1 PATTERN-AFTER-INSERTED-CHAMFER [core]** (core 11-26 20:1x: FIXED by 6a8e411db, 11-19, in v0.4.60+: the repro's 9 features Ok, 29505.03 mm³ = live, on main + core-rf; qa to verify and close, and the interaction-feel row 1900): live's session (live/qa/session-1118 step 11): a 100 × 50 × 10 plate, a Ø10 hole
   (Extrude 2, Remove, Through all), Fillet 1 (3 vertical edges R5), Shell 1 (top face, 2 mm), Linear pattern 1 (Feature pattern of
   Extrude 2, edge along X, 20 mm × 3), Mirror 1 (Right). Roll back to Extrude 2, add Chamfer 1 (the hole's top edge, 1 mm), roll to the
   end: ours Linear pattern 1 Error "Could not create all instances as entered. Try selecting "Reapply features" option." (Tray 30133.35

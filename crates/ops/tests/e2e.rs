@@ -12642,3 +12642,38 @@ fn feature_get_blames_a_failed_fillets_edge_on_request() {
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1", "blame": true }));
     assert!(g.get("red_selections").is_none(), "{g}");
 }
+
+/// qa PATTERN-AFTER-INSERTED-CHAMFER (live session-1118 step 11): a 100 × 50 × 10 plate, a Ø10 hole through it, three
+/// corners R5, the top shelled 2 mm, a Feature pattern of the hole 3 × 20 mm along X, mirrored on Right. Rolled back to
+/// the hole, a 1 mm chamfer inserted on its top edge, rolled to the end: everything rebuilds as live (29505.03 mm³ /
+/// 30273.90 mm²); ours failed the pattern ("Could not create all instances as entered…").
+#[test]
+fn a_chamfer_inserted_before_a_feature_pattern_rebuilds_it() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "pattern-after-chamfer.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [100, 50]] }));
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": "10 mm" } }));
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "circle", "points": [[20, 25], [25, 25]] }));
+    let r = call(&mut ctx, "sketch_get", json!({ "sketch": s2 }))["regions"][0]["id"].clone();
+    let hole = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "operationType": "REMOVE", "endBound": "THROUGH_ALL", "symmetric": true } }));
+    assert_eq!(hole["feature_status"]["status"], "Ok", "{hole}");
+    let corners = call(&mut ctx, "query_entities", json!({ "kind": "edges", "at": [[100, 0, 5], [0, 0, 5], [100, 50, 5]] }))["edges"].as_array().unwrap().iter().map(|e| e["id"].clone()).collect::<Vec<_>>();
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": corners, "radius": "5 mm" } }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[50, 10, 10]] }))["faces"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "shell", "params": { "entities": [top], "thickness": "2 mm" } }));
+    let x = call(&mut ctx, "query_entities", json!({ "kind": "edges", "at": [[50, 0, 0]] }))["edges"][0]["id"].clone();
+    let ex = hole["feature"].as_str().map(str::to_string).unwrap_or_else(|| panic!("{hole}"));
+    call(&mut ctx, "feature_add", json!({ "type": "linearPattern", "params": { "patternType": "FEATURE", "instanceFunction": [format!("feature:{ex}")], "directionOne": [x], "distance": "20 mm", "instanceCount": 3 } }));
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].clone();
+    let m = call(&mut ctx, "feature_add", json!({ "type": "mirror", "params": { "patternType": "PART", "entities": [part], "mirrorPlane": ["plane:right"] } }));
+    assert_eq!(m["regeneration"]["failed"], json!([]), "{m}");
+    call(&mut ctx, "feature_rollback", json!({ "after": "Extrude 2" }));
+    let c = call(&mut ctx, "feature_add", json!({ "type": "chamfer", "params": { "entities": { "query": { "kind": "edges", "curve": "circle", "at": [[25, 25, 10]] } }, "width": "1 mm" } }));
+    assert_eq!(c["feature_status"]["status"], "Ok", "{c}");
+    let end = call(&mut ctx, "feature_rollback", json!({}));
+    assert_eq!(end["regeneration"]["failed"], json!([]), "{end}");
+    let mass = call(&mut ctx, "query_mass_properties", json!({}));
+    assert!((num(&mass["volume"]) - 29505.03).abs() < 0.01 && (num(&mass["surface_area"]) - 30273.90).abs() < 0.01, "{mass}");
+}
