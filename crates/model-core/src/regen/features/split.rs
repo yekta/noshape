@@ -321,6 +321,10 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
             })
             .collect();
         if pieces.len() < 2 {
+            // A tool that reaches part way in only cuts a slit (left inside as an internal face or edge): live's error.
+            if res.shape.faces().iter().chain(&res.shape.edges()).any(|s| s.orientation() == k::Orientation::Internal) {
+                return err("Tool entity cannot split the selected part/face.");
+            }
             // One side kept: a part the tool doesn't cut stays or goes by the side it lies on (live ui-parity
             // split-new-edit-reedit: Part 1 wholly behind Part 2's top face is gone once Keep both sides is off).
             if !both {

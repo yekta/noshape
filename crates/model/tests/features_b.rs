@@ -1814,6 +1814,35 @@ fn a_split_by_its_own_top_face_leaves_the_box_whole() {
     assert!((parts[0].2 - 1000.0).abs() < 1e-3 && (parts[1].2 - 12000.0).abs() < 1e-3, "{parts:?}");
 }
 
+/// Split part by a trimmed face that reaches only part way through the part (psui's ui-parity
+/// mistake-split-trim-to-face-partial): nothing splits, only a slit could be cut, so the feature fails as live's ("Tool
+/// entity cannot split the selected part/face."); a face that misses the part is live's info.
+#[test]
+fn a_trimmed_face_part_way_through_a_part_cannot_split_it() {
+    for (y0, want) in [(-0.005, "Tool entity cannot split the selected part/face."), (0.04, "Selected entity does not split selected parts.")] {
+        let block = noshape_kernel::make_box_corners(DVec3::new(0.0, 0.0, 0.0), DVec3::new(0.04, 0.03, 0.01)).unwrap();
+        let tool = noshape_kernel::make_box_corners(DVec3::new(0.02, y0, -0.005), DVec3::new(0.03, y0 + 0.02, 0.015)).unwrap();
+        let mut s = Studio::new();
+        for b in [block, tool] {
+            let brep = String::from_utf8(b.to_brep_bytes().unwrap()).unwrap();
+            s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+        }
+        let r = s.ok();
+        let (part, t) = (&r.context.bodies[0], &r.context.bodies[1]);
+        let fi = t.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|pl| pl.normal.x.abs() > 0.5 && (pl.origin.x - 0.02).abs() < 1e-9)).expect("the tool's face at x 20 mm");
+        let (id, face) = (part.id.clone(), Reference::Face((*t.faces[fi]).clone()));
+        s.add("splitPart", move |p| {
+            p.set("targets", ParamValue::Query(vec![Reference::Body(id)]));
+            p.set("tool", ParamValue::Query(vec![face]));
+            p.set("useTrimmed", ParamValue::Bool(true));
+        });
+        let r = s.regen();
+        let st = r.display.features.last().unwrap();
+        assert_eq!(st.message.as_deref(), Some(want), "{:?}", st.status);
+        assert_eq!(st.status == FeatureStatus::Error, y0 < 0.0, "{:?}", st.status);
+    }
+}
+
 /// Mesh parts in booleans and splits (live G35/G35-retry): a split by a plane
 /// Split part by a cylinder face, Use trimmed off: the cylinder's whole surface splits (c2-rib-wrap's Split 1 by
 /// the part's own round lobe): the disc it closes off is a part of 3 faces (live 3/2/0), the rest the other.
