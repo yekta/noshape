@@ -33,6 +33,9 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
   k-br = the gate tree's all-* copied), GCC 13 on common.cpp, then git diff --stat merge-base, touch -c,
   NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh; report (<=5 lines). Clean vibex8 ~/tmp/bool/ops-turns, cmp/,
   tp/, rec-stand/, kt-gam, gam/ after.
+- AFTER COMPACTION (lead 15:3x): gate result (chain-73c26f0c26.out ends "== CHAIN DONE rc N"; a local wait task
+  watches it) -> knurls -> land before 00:00 and tell the lead the land time -> gamma's gate (394c39327 in bool-uv /
+  branch bool-gamma, one gate at a time) -> gamma land. GCC 13 on common.cpp done (ok).
 - Left (not needed for the bar): op_unify +30..90 ms (usd vchange, new_faces_valid on helix faces).
 
 ## GAMMA (next)
