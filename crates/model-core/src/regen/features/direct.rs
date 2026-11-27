@@ -378,6 +378,22 @@ fn beside_its_own_surface(shape: &Shape, faces: &[usize]) -> bool {
     })
 }
 
+/// Whether each of `faces` shares an edge with a face that isn't moved on the same surface (pieces a Split cut).
+fn pieces_of_neighbours(shape: &Shape, faces: &[usize]) -> bool {
+    let all = shape.faces();
+    let Ok(ef) = shape.edge_faces() else { return false };
+    let surface = |f: usize| all.get(f).and_then(|x| x.face_surface().ok());
+    faces.iter().all(|&f| {
+        ef.iter().any(|fs| match fs.as_slice() {
+            &[a, b] if a != b && (a as usize == f || b as usize == f) => {
+                let o = if a as usize == f { b as usize } else { a as usize };
+                !faces.contains(&o) && surface(f).is_some_and(|s| surface(o).is_some_and(|t| s == t))
+            }
+            _ => false,
+        })
+    })
+}
+
 pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     let ty = ev.enum_("moveFaceType").to_string();
     // moveFace.fs: the faces are checked before the direction or axis.
@@ -493,7 +509,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         }
         // moveFace.fs "Reapply fillet" (default on): the fillets beside the
         // moved faces are removed and rolled again at their radii.
-        if ev.params.get("reFillet").is_none_or(|_| ev.bool("reFillet")) {
+        // (A translation moves only planes along their normals there: curved faces would stay put, c2-config-parts-
+        // screws' Move face 3.)
+        let along_normals = translate_dir.is_none_or(|d| shapes.iter().all(|s| s.face_plane().ok().flatten().is_some_and(|pl| (pl.unit_normal().dot(d).abs() - 1.0).abs() < 1e-6)));
+        if along_normals && ev.params.get("reFillet").is_none_or(|_| ev.bool("reFillet")) {
             let blends = super::detail_a::blends_to_reapply(&body.shape, &body.faces, &faces, false)?;
             if !blends.is_empty() {
                 let td = translate_dir;
@@ -568,7 +587,11 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     }
                 }
                 if rigid {
-                    move_rigid(ev, bi, &faces, &DMat4::from_translation(d * dist)).map_err(|_| fe(failed_msg))?;
+                    // Split pieces of an unmoved face's surface: removing them heals nothing away (OCCT's try took 6 s
+                    // on c2-config-parts-screws' Move face 3).
+                    if pieces_of_neighbours(&body.shape, &faces) || move_rigid(ev, bi, &faces, &DMat4::from_translation(d * dist)).is_err() {
+                        translate_by_booleans(ev, bi, &faces, d * dist).map_err(|_| fe(failed_msg))?;
+                    }
                     continue;
                 }
                 match k::offset_faces_each(&body.shape, &shapes, &each) {
@@ -656,6 +679,38 @@ fn face_slab(f: &Shape, d: f64) -> FResult<Shape> {
 /// are the moved faces. A part that falls apart keeps its largest piece
 /// (Onshape keeps one part: a hole grown to touch both sides leaves one half).
 fn offset_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], dist: f64) -> FResult<()> {
+    let op = if dist > 0.0 { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
+    slab_booleans(ev, bi, faces, op, |f| face_slab(f, dist))
+}
+
+/// Move face (translate) of faces their neighbours can't follow (split pieces of one surface: c2-config-parts-screws'
+/// Move face 3 slides a socket's cone pieces up its bore, live's hex walls between): the prism each face sweeps is added
+/// (it moves out of the part) or cut (into it), the prisms' far faces are the moved faces.
+fn translate_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], v: DVec3) -> FResult<()> {
+    let body = ev.ctx.bodies[bi].clone();
+    let failed = || fe("Could not transform selected faces as requested.");
+    let mut outward = None;
+    for &fi in faces {
+        let f = body.shape.sub_shape(ShapeType::Face, fi)?;
+        let p = inner_point(&f).ok_or_else(failed)?;
+        let out = body.shape.classify_point(p + v * 0.5, v.length() * 1e-6)? == k::PointClass::Outside;
+        if outward.is_some_and(|o| o != out) {
+            return Err(failed());
+        }
+        outward = Some(out);
+    }
+    let op = if outward == Some(true) { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
+    slab_booleans(ev, bi, faces, op, |f| {
+        let r = k::extrude(f, v)?;
+        if !r.shape.is_valid() {
+            return err("Could not transform selected faces as requested.");
+        }
+        Ok(r.shape)
+    })
+}
+
+/// Each face's slab added to or cut from the part (see [`offset_by_booleans`]).
+fn slab_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], op: k::BooleanOp, slab: impl Fn(&Shape) -> FResult<Shape>) -> FResult<()> {
     use super::sheetmetal_util::{bool_named, body_named, tool_named};
     let body = ev.ctx.bodies[bi].clone();
     let feature = ev.feature;
@@ -663,9 +718,8 @@ fn offset_by_booleans(ev: &mut EvalCtx, bi: usize, faces: &[usize], dist: f64) -
     for &fi in faces {
         let f = body.shape.sub_shape(ShapeType::Face, fi)?;
         let parent = body.faces[fi].clone();
-        tools.push(tool_named(face_slab(&f, dist)?, |_| Arc::new(TopoName::face(feature, Role::Offset(parent.clone())))));
+        tools.push(tool_named(slab(&f)?, |_| Arc::new(TopoName::face(feature, Role::Offset(parent.clone())))));
     }
-    let op = if dist > 0.0 { k::BooleanOp::Fuse } else { k::BooleanOp::Cut };
     let (shape, names) = bool_named(ev, op, &body_named(&body), &tools)?;
     let un = k::unify_same_domain(&shape)?;
     let names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &un.history, &un.shape, &BTreeMap::new(), None);

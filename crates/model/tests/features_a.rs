@@ -2439,6 +2439,46 @@ fn move_face_offset_and_translate() {
     assert_eq!(res.display.features[2].status, FeatureStatus::Error);
 }
 
+/// Move face Translate of pieces a Split cut from one face slides them along it (live c2-config-parts-screws' Move face
+/// 3: a socket's cone pieces moved up its bore, hex walls between them): a drilled hole's tip split by a hexagon whose
+/// corners are on the bore, the 6 pieces outside it moved 5 mm up the bore. Ours left them where they were (Reapply
+/// fillet moved only planes) and, without it, failed.
+#[test]
+fn move_face_translate_slides_split_pieces_along_a_bore() {
+    use std::f64::consts::PI;
+    let mut t = T::new();
+    let (s, p) = hole_setup(&mut t);
+    t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p }])), ("unitsSystem", en("METRIC")), ("holeDiameterV3", e("10 mm")), ("holeDepthV3", e("10 mm"))]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let corners: Vec<_> = (0..6).map(|i| sk.add_point(DVec2::new(0.03, 0.02) + DVec2::from_angle(i as f64 * PI / 3.0) * 0.005)).collect();
+    let lines: Vec<_> = (0..6).map(|i| sk.add_line_between(corners[i], corners[(i + 1) % 6]).unwrap()).collect();
+    let hex = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let res = t.ok();
+    let cone = |b: &Body, i: usize| matches!(b.shape.faces()[i].face_surface(), Ok(noshape_kernel::Surface::Cone { .. }));
+    let tip = res.context.bodies[0].shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cone { .. }))).expect("the hole's tip");
+    t.add("splitPart", &[
+        ("splitType", en("FACE")),
+        ("faceTargets", q(vec![Reference::Face((*res.context.bodies[0].faces[tip]).clone())])),
+        ("faceTools", q(lines.iter().map(|l| Reference::SketchEntity { sketch: hex, entity: l.0 }).collect())),
+    ]);
+    let res = t.ok();
+    let b = &res.context.bodies[0];
+    let axis_dist = |i: usize| (b.shape.faces()[i].centroid().unwrap().truncate() - DVec2::new(0.03, 0.02)).length();
+    let pieces: Vec<Reference> = (0..b.faces.len()).filter(|&i| cone(b, i) && axis_dist(i) > 0.004).map(|i| Reference::Face((*b.faces[i]).clone())).collect();
+    // The cone's seam halves one of the 6.
+    assert_eq!(pieces.len(), 7);
+    let (v0, n0) = (total_volume(&res.context), b.faces.len());
+    t.add("moveFace", &[("moveFaces", q(pieces)), ("moveFaceType", en("TRANSLATE")), ("direction", q(vec![edge_axis_z()])), ("translationDistance", e("5 mm"))]);
+    let res = t.ok();
+    let b = &res.context.bodies[0];
+    // The pieces' footprint (the circle less the hexagon) 5 mm deep is filled; 6 flat walls more, the seam's halves one.
+    let filled = (PI - 1.5 * 3f64.sqrt()) * 0.005f64.powi(2) * 0.005;
+    assert!(near(v0 - total_volume(&res.context), -filled, 1e-5), "{} vs {}", v0 - total_volume(&res.context), -filled);
+    assert_eq!(b.faces.len(), n0 + 5);
+    let walls = b.shape.faces().iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|pl| pl.unit_normal().z.abs() < 1e-9) && f.area().is_ok_and(|a| (a - 0.005 * 0.005).abs() < 1e-9)).count();
+    assert_eq!(walls, 6);
+}
+
 /// References saved when OCCT's offset made a Move face Offset name every face the Offset of the one it was
 /// (IMPELLER-MOVE-FACE-2-REF): a fillet on the edge between two sides by those names still finds it.
 #[test]
