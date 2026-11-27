@@ -20,12 +20,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     326.6444 + JJ6 cyl 1220.5154, ours (OCCT fallback) 335.766 + 1144.84 + 2 corner patches 64.39). Direct build declines
     on 0.87 um zero-width pieces (sliver patch core-scratch/cpc-sliver.patch skips them) then "an invalid solid": the
     R20 cylinder's wire runs to u 1.586 > pi/2. Rerun 14:1x with the kernel change (JDBG): junction balls are right
-    (tangency_ball at x -216.552, 4.8 mm past the vertex = live's JJ6 run-on); the arc edge 4/5 loft's ROUND face is
-    tangent to the z=50 / z=0 plane at that ball and dips ~2.7 um through it just past it (a loft between a section
-    touching the plane and ones touching the cylinder), so blend_direct cuts a 0.34 mm curve (tool 0 cut 0 (-216.769,20,0)
-    -> (-216.626,20.308,0)) = sqrt(2 R 2.7um). Tried, no effect: shared section on the junction edge's supports; exact
-    (spline-through-feet) cylinder sides (core-scratch/cpc-junction-wip.patch). Needs blend_direct to take a tool face
-    tangent to a part face along its contact as touching (snap the cut to the contact), or an exact round there.
+    (tangency_ball at x -216.552, 4.8 mm past the vertex = live's JJ6 run-on); part faces 3/4 (the R20 cylinders) are
+    cut exactly there (cut 0 from the u=0 contact to g at u=pi/2). The bad wire comes after: the arc edge 4/5 loft's side
+    (a strip "on" the cylinder within 2.7 um) runs past the tangent line to its junction section's corner (0.31 mm, u
+    1.586); the kept cylinder piece's wire picks up that strip edge (tol 0.76 mm after fit_vertex_tolerances). Tried, no
+    effect: shared junction section on the junction edge's supports; exact (spline-through-feet) cylinder sides (core-scratch/cpc-junction-wip.patch). Next idea: trim a strip at its part face's boundary, or
+    end the junction section's side where its support face ends.
   5 PARKED 13:4x c2-impeller-loft (parity 13:2x on 30439ec5e: 27/48; Fillet 3 34/93/60 vs live 34/95/62, faces and volume
     as live; then zum Halter ERROR "Failed to fillet selections." and the cascade to 47). Fillet 3 edges by type+length
     (.imp3.sh, vibex7 ~/tmp/core/imp3): (a) vertex splits along the y=+-27 run-ons and label kinds (live LINE/SPLINE vs
