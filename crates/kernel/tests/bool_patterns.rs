@@ -1821,6 +1821,30 @@ fn a_steep_plane_exactly_through_a_cones_apex() {
     assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
 }
 
+/// Two coaxial cones sharing their apex 4 mm below both faces, the narrower cut from the wider (qa's fuzz seed 1846: a
+/// Shell's): their surfaces meet only at the apex, which neither face reaches, so no section (it declined "cones meeting
+/// at an apex"). Taken, valid, OCCT's counts and volume.
+#[test]
+fn coaxial_cones_whose_common_apex_lies_off_both_faces() {
+    let _ = k::set_working_scale(1000.0);
+    let wide = k::make_cone(&z_frame(DVec3::ZERO), 0.006, 0.012, 0.004, TAU).unwrap();
+    let narrow = k::make_cone(&z_frame(DVec3::ZERO), 0.002, 0.004, 0.004, TAU).unwrap();
+    let opts = k::BooleanOptions::default();
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&wide), std::slice::from_ref(&narrow), &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&wide), std::slice::from_ref(&narrow), &opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
+}
+
 /// A cut of a threaded rod (recorded): its cylinder's faces between the thread's turns go round between rulings at one
 /// angle (helical strips, no seam), th0 there with the rulings its loop runs up on the far side (it declined "a
 /// cylinder face without curved edges"); a piece's end a tolerance round the axis past a turn is not across the

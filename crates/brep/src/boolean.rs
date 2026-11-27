@@ -4396,6 +4396,12 @@ impl Ctx<'_> {
             let s = -c0 / c1;
             let rc = r01 + k1 * s;
             if rc <= GREY * tol {
+                // (None where the point lies outside either face.)
+                let p = o1 + a1 * s;
+                let (lo, hi) = (self.faces[f1].lo.max(self.faces[f2].lo), self.faces[f1].hi.min(self.faces[f2].hi));
+                if (lo - p).max_element() > GREY * tol || (p - hi).max_element() > GREY * tol {
+                    return Ok(());
+                }
                 return Err(Decline("cones meeting at an apex"));
             }
             let k = Circ { c: o1 + a1 * s, n: a1, x, y, r: rc };
