@@ -2259,13 +2259,13 @@ fn rib_sheet(base: &Shape, wire: &Shape, dir: DVec3, plane: Option<DVec3>, t: f6
     }
     let Some(slab) = slab else { return err(RIB_FAILED) };
     let pieces = k::cut(&slab, base)?.shape.solids();
-    // rib.fs applyBoolean: the part must split the sweep. Live L22: with
-    // extended ends that fails on the profile, where the sweep runs into the
-    // part; a sweep that misses it is no intersection (live "kern (10-23
-    // 23:00)" R3: a rib toward a cylinder lying on the plate).
+    // rib.fs applyBoolean: the part must split the sweep, else no intersection, even where ends on its faces run into
+    // it (live "kern (10-23 23:00)" R3: a rib toward a cylinder lying on the plate; depth batch 3's
+    // mistake-rib-flipped-misses: the bracket's rib turned away from its corner). Extended to the part by the option
+    // and never reaching it, the profile fails (live L22: a rib above an open box).
     if pieces.len() < 2 {
-        let into = !tips.is_empty() && k::common(&slab, base).is_ok_and(|c| c.shape.volume().is_ok_and(|v| v > (t * t * t) * 1e-9));
-        return err(if into { RIB_FAILED } else { RIB_MISS });
+        let short = extend && curves[1..].iter().any(|c| k::distance(c, base).is_ok_and(|d| d.distance > tol));
+        return err(if short { RIB_FAILED } else { RIB_MISS });
     }
     let far = p0 + dir * len;
     let mut rib: Vec<Shape> = pieces.into_iter().filter(|s| k::distance(s, e).is_ok_and(|d| d.distance < tol) && !near(s, far) && !tips.iter().any(|q| near(s, *q))).collect();

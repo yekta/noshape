@@ -2673,14 +2673,8 @@ fn hole_and_rib_match_onshape() {
         ("R2 no extend", Ok((21798.20222255957, 13, 1))),
         ("R3", Err("None of the ribs intersected a part.")),
     ];
-    // OPEN: R3's message. The extended rib runs into the plate and we say
-    // "Failed to create a rib from a selected profile." as live L22 does for a
-    // rib above an open box; Onshape says "None of the ribs intersected a
-    // part." here (live "kern (10-23 23:00)" R3 follow-up). The rule between
-    // the two isn't known yet.
-    const OPEN: &[&str] = &["R3"];
     let mut bad = Vec::new();
-    for (label, w) in want.iter().filter(|(l, _)| !OPEN.contains(l)) {
+    for (label, w) in want.iter() {
         let g = got.iter().find(|(l, _)| l == label).map(|(_, g)| g);
         let ok = match (w, g) {
             (Ok((v, f, n)), Some(Ok((gv, gf, gn)))) => (gv - v).abs() <= if *label == "H5" { 0.05 } else { 1e-3 } && gf == f && gn == n,

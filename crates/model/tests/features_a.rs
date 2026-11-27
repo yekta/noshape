@@ -884,6 +884,11 @@ fn rib_in_l_bracket() {
     assert_eq!(res.context.bodies.len(), 1);
     let v = total_volume(&res.context);
     assert!(near(v - v0, 0.05 * 0.05 * 0.5 * 0.005, 2e-3), "rib volume {}", v - v0);
+    // Turned away from the corner its ends still run into the part, but the part doesn't split it: rib.fs's no
+    // intersection (live depth batch 3's mistake-rib-flipped-misses on its bracket, 11-26).
+    t.set(rib, "oppositeDirection", b(false));
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("None of the ribs intersected a part.")));
 }
 
 /// std ribEditLogic: once a profile is picked, the direction that reaches a part is chosen and Parts filled with it.
