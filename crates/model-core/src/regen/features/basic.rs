@@ -85,9 +85,9 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
             // distance offsets nothing (V1700_BOOLEAN_ZERO_OFFSET).
             let offset = if op == "SUBTRACTION" && ev.bool("offset") { ev.length("offsetDistance")? * if ev.bool("oppositeDirection") { -1.0 } else { 1.0 } } else { 0.0 };
             let picked = (offset.abs() > 1e-12 && !ev.bool("offsetAll")).then(|| ev.resolve_faces(ev.query("entitiesToOffset")));
-            // boolean.fs BOOLEAN_OFFSET_NO_FACES: none of the tools' faces picked (live boolean-subtract-offset-ok s8).
+            // boolean.fs BOOLEAN_OFFSET_NO_FACES: none of the tools' faces picked; the field stays unred (live boolean-subtract-offset-ok s8).
             if picked.as_ref().is_some_and(|p| !p.iter().any(|f| tools_idx.contains(&f.0))) {
-                return err_at(&["entitiesToOffset"], "Select faces to offset.");
+                return err("Select faces to offset.");
             }
             // Each tool's picked faces (every face with Offset all), offset on all threads (c2-fan-blade-sweep's four
             // threaded copies), then named in order.
