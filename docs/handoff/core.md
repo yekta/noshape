@@ -20,19 +20,23 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **SCREWS MOVE FACE 3: QUEUED 7f88950e (11-27 01:1x)** (commit 7211adcc2; T1 features_a::move_face_translate_slides_
   split_pieces_along_a_bore; corpus A/B .ab8.sh ALL-SAME; model tests 655 ok, clippy clean). Note for bool: MF3 406 ms =
   one boolean on the threaded body.
-- **IMPELLER CHAMFER -> FILLET 3 (UNCOMMITTED in core-rf, 11-27 01:2x)**: the body first diverges at Chamfer Stevenrohr
-  Halterung (bevel 6.0969 vs live 6.1849 mm2, cylinder 303.4215 vs .5758). live/blend/q-imp-chamfer-surf/surf.json has
-  live's bevel poles: ruled (u deg 1) in the edge's normal planes, |ruling| e = 1.2739 everywhere (core-scratch/imp
-  rul.py); ours drifted (chord-length interpolated sections paired by parameter; cmp.py: 21 um off mid-width).
-  Fix in kernel rim_chamfer.rs: offset sections = C2 cubic through the offset points ON THE EDGE'S PARAMETER
-  (cubic_through, own Cox-de Boor + dense solve): bevel 6.1754, cylinder 303.5789 (= live). Fillet 3 then FAILS
-  (2 more chain edges): the cylinder x extruded edge stays split at (5, +-2.6104, -43.1063) (a straight 3.5 mm
-  B-spline + line; live one line). rim_chamfer_cut's join_edges_at point tol scale*1e-7 likely misses the moved vertex:
-  TRYING scale*1e-5 (blend_section.rs, run .rc1.sh = build cli-rc + chamfer/Fillet 3 compare + statuses + edges;
-  output bjsbi1nbb). LEAD 11-27: bool is changing unify's edge joins (only at Boolean-made vertices, 1e-7 m): TELL
-  BOOL before landing anything touching join_edges_at / its tolerances. Then: Fillet 3 vs live (93/60 vs 95/62,
-  live's bevel extended LINEARLY in u and v, bevel.json), corpus A/B (.ab8.sh pattern, swap rim_chamfer.rs and
-  blend_section.rs), T1 (a rim chamfer on a spline edge: rulings in normal planes), land.
+- **IMPELLER CHAMFER -> FILLET 3 (UNCOMMITTED in core-rf, 11-27 02:01)**: body first diverges at Chamfer Stevenrohr
+  Halterung (bevel 6.0969 vs live 6.1849 mm2). Done, uncommitted: (1) kernel rim_chamfer.rs offset sections = C2
+  cubic_through on the EDGE'S PARAMETER (k=48; k=16 fails the ruling test): rulings in normal planes, cylinder 303.5789
+  (= live). (2) boolean.cpp op_join_edges_at: the "extend the line" path also when the section's far end is on the
+  line within tol (turn was 6.7e-8 < 1e-4 -> chord path -> unify won't merge): the x 1.5..60.9 line is ONE edge now
+  (live). bool told (c918bba0 11-27 01:3x): no collision; bool's unify-verts change would also join it. (3) T1 in
+  kernel tests/features.rs a_tube_ends_offset_chamfer_runs_on...: rulings (e within 1e-8, out of the normal plane <1e-5)
+  + one line after join_edges_at; passes; fails with either old file (.rim_chamfer.old.rs / .boolean.old.cpp, .kt6.sh).
+  join tol back to scale*1e-7 (blend_section.rs).
+  BLOCKER: Fillet 3 still Error (old code OK): blend_section.rs run-on CORNER (~line 990, faces [2,5,9] = x5 plane +
+  both bevels, extended by extend_face_part_over): split of the run-on piece by the walls = 1 cell (old 5 cells, 1
+  dropped). Per wall: plane 2 cells, each new bevel wall 1 cell (own bevel: section 1 edge = touching only?). Next: see
+  why the new bevel's extension (GeomLib ExtendSurfByLength C1) no longer crosses the piece; live extends the bevel
+  LINEARLY in u and v (bevel.json) - try a linear extension for ruled walls. DEBUG prints RODBG/RCDBG are in
+  blend_section.rs (remove before commit). Scripts: .rc4.sh (build cli-rd + bd.sh + RODBG grep), .kt5.sh (T1).
+  After: Fillet 3 vs live (93/60 vs 95/62), corpus A/B (.ab8.sh, swap the 3 files), clippy, g++-13 (boolean.cpp), land.
+  rb.sh keeps mtimes: touch -c swapped files (stale cli-rd 01:41 showed old bevel).
 - FILLET-R12-BLOCK-OVERFLOW: qa verified (3/3 scenarios, 46/46 states).
 - psui's two TICKETS items (Up to part overlap, Remove pattern of only part): skasm's (lead 11-27).
 - PATTERN-AFTER-INSERTED-CHAMFER: fixed by 6a8e411db, skasm added the e2e and closed it.
