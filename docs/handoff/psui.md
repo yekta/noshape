@@ -9,9 +9,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (the script exports OCCT_ROOT=/opt/occt CARGO_PROFILE_DEV_DEBUG=line-tables-only TMPDIR=$HOME/tmp/psui); `git diff --name-only origin/main | xargs touch -c` first. ~/bin/slot
   only for suites, gates, timing pairs (DECISIONS 9e5b481d4). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
   `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
-- Scenario / app runs: vibex6, at most 3 app instances (shared with studios). Heavy runs (scenario shards) through
-  `~/bin/slot <cmd>` there (one per host, waits for 10 GB free). The app build there OOMs under load: scripts build
-  with `-j 4`.
+- Hosts (lead 11-27, vibex6 gone): builds and app/replay runs on vibe2 (with the land queue: one run of mine at a
+  time); scenario shards and suites on vibex8 through `~/bin/slot <cmd>` (run-shards.sh points there, an-run.sh at
+  vibe2 via slot). Nothing kept on vibex6 survives.
 - Land only with `tools/tiers/land.sh` (`--status` for results). Start an rb.sh run, wait until it builds (its sync
   done), then land.sh: land.sh's rebase during an rb.sh sync breaks that build.
 - Live: Chrome on :107, CDP 127.0.0.1:9333, helpers /root/live-pw; captures are asked of live2 in
@@ -33,25 +33,41 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## IN FLIGHT 16:2x (after compaction: start here)
-- LANDED: B-spline selection audit as d62170db (lead told 15:0x); 17c3189f as 7ce32dc540.
-- QUEUED 16:2x (see land log): Edit image's picker on Current document with nothing picked (sketch-image-edit and
-  -place match, resp/ps29.log); qa batch 5's two rows, not code: drw-export-format-dwg/-dxf/-dwg-then-pdf seed live's
-  remembered export (export_drawing.json: DWG 2018, DXF Explode all), part-menu-release-all-configurations /
-  -configured-release-items turn managed workflows on; all 5 match (resp/ps30.log). TICKETS: those two + core's
-  SPLIT-TRIMMED-PARTIAL-ERRORS (04b6d11a4) marked fixed, to verify.
-- sketch-tool-insert-image s3: its 11-07 take predates the picker reading; retake asked (REQUESTS "psui 11-27 15:42").
-- Edge reach (PICK-FACE-OVER-NEAR-EDGE), held, uncommitted (stash psui-reach while landing): renderer.rs pick_reaching
-  `body`, builder.rs body_fn, viewport.rs pick_body, behaviors.rs, offscreen.rs, feel_tests.rs (2 edge tests). TEMP
-  trace in renderer.rs (NOSHAPE_PICK_TRACE, never commit). Land only when split-face-ok s7 matches AND live answers
-  REQUESTS "psui 11-27 08:46". Backups resp/reach-trace.patch, resp/wip-1150.patch.
-- frame-corner-coped-limit s5 and the other focus disagreements: our rule is today's runtime (live 04:19 confirmed);
-  the takes are pre-11-21, retakes asked in REQUESTS "psui 11-27 06:2x": wait for them, no code change.
-- Edge reach: ps18 trace: Part 1's edge (id 15, body 1, prio 8) has a pick pixel at d2 = 25 (5.0 px, the line's width)
-  from the split-face-ok click over Part 2's face (prio 2): kept at radius 5, so it wins. Needs live's cutoff over
-  another part's face: REQUESTS "psui 11-27 08:46" extended 11:2x (5.5 / 6 px). Don't land before the answer.
-- live 11-2x: "Release all configurations…" takes queued (6362d352, start config-ps); "Disable imported appearances"
-  is the Appearances panel row's item (needs recorder work: not asked for).
+## IN FLIGHT 20:5x (after compaction: start here)
+- 21:3x: ps40 green (readout, export prefs/title, runner rel_px, drawing-ui check); ps39 full psui lib run with two
+  arenas: peak 3703 MB (was 6.76 GB), 670 passed, 1563 s. LANDED via land.sh 21:3x (wait for the lead's word; never
+  poll --status). After it: report (<=5 lines: maker 7/13 + filed rows, memory 6.76 -> 3.7 GB, reach + export landed),
+  cc skasm on its two rows, rerun maker + sketch-used sets on main.
+- NEXT (live 21:2x, batch 9 0865c00b, not on main yet): ui_script state pieces per tests/ui-parity/README.md (Part
+  Studio panels section): (1) "part_data" when the scenario sets "part_data": true: per part name, part_number,
+  description, material, appearance {hex, opacity 0..255, default}, hidden; (2) Appearance editor as dialog kind
+  "appearance" (A, #, R, G, B, Tessellation quality; tabs Palette/Mixer; Enter applies and closes, no ✓); (3) the
+  Appearances panel in panels (id "appearances", rows). Live facts: behaviours.md "Depth batch 9".
+- Branch rebased on origin/main 20:5x, commits (not landed yet): 704e0a91d4 edge reach 5 px over another part's face;
+  b3d560e6f1 maker flow fixes (used outline counterclockwise, Intersection angle, Perp lines angle, Use quick click,
+  N centre, related sketch, glyph inert, dump); 8f17e5e730 two malloc arenas in UI test binaries; a209af82f9 Export
+  "Export N Parts" + unique parts not remembered (DECISIONS 11-27) + runner drag `"to": {"rel_px": [dx, dy]}`
+  (the `{"world": [x, y, z]}` target already existed in part_studio/ui_script.rs); f2d903b869 TICKETS.
+- 01daa2e25e (qa 21:xx, P3 UIP-DIALOG-TEXT-NATIVE-SELECT): Insert view's chosen source dumped as a select value, so
+  run.py's panel_text_form drops it with the options for live2 >= 11-17.3 takes. After the rebase mark qa's row fixed
+  (not on my base yet). qa's world-drag note: done (world existed; rel_px added in a209af82f9).
+- ps40 (resp/ps40.sh, vibe2 after ps39's memory run): scene selection_readout (the compile fix), ops
+  export_remembers + prefs::, psui --lib export, app ui_script::. Green -> land.
+- ps39 results: maker 6/13 (7/13 with live's retake 8d0f42b8f on main: tangent-connected-used matches); sketch-used
+  0/19 all at s13 constraints 6/5 = skasm's spline Horizontal, fixed on main b73df15bec: rerun both sets after the land.
+  Full psui lib run with 2 arenas: see ~/tmp/psui/mem3/hwm.txt on vibe2 / ps39.log T-MEM-DONE (ps38 base 6.76 GB).
+- Filed 20:5x: TICKETS "psui 11-27 20:5x: the maker flow" (skasm SKETCH-COINCIDENT-FREE-LINE-SLIDES,
+  SKETCH-TANGENT-ARC-SPAN; mine SKETCH-DIM-CIRCLE-RIM-TOP waits for REQUESTS "psui 11-27 20:4x"; lead
+  UIP-COMPARE-ITEM-ORDER, UIP-COMPARE-FREE-CLICK-DERIVED). After the land: cc skasm on its two rows + REQUESTS
+  "psui 11-27 16:26"; report to the lead (<=5 lines).
+- Export open: "Include hidden instances in export" is still remembered (no live take checks it; DECISIONS lists only
+  Format, Options, Resolution, Units, Y axis up). Batch 8's export-* and section-view-* takes are on 78dc566b3e, not
+  main yet: replay them when live lands them.
+- Hosts: vibe2 = builds/app runs (one at a time, land queue shares it); vibex8 for shards via ~/bin/slot.
+
+## EARLIER
+- sketch-tool-insert-image s3: retake asked (REQUESTS "psui 11-27 15:42").
+- frame-corner-coped-limit s5 and the other focus disagreements: retakes asked in REQUESTS "psui 11-27 06:2x".
 
 ## NEXT
 - qa's diffs from live's option-combination batches as filed; interaction-feel rows to verify (archive 11-27).
