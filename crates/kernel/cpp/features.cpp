@@ -1323,15 +1323,18 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
       if (endFaces.Contains(f.Current()))
         touchesEnd = true;
     }
-    if (touchesStart)
-    {
+    // A piece running past the target is left out while another stops at it (live 11-27: a block's top face up to a
+    // part standing in some of it makes only the part's run through the face; with a gap under the part it fails).
+    if (touchesStart && touchesEnd)
+      reachesEnd = true;
+    else if (touchesStart)
       keep.push_back(e.Current());
-      reachesEnd = reachesEnd || touchesEnd;
-    }
   }
+  if (keep.empty() && reachesEnd)
+    fail_op("up-to target does not fully bound the extruded profile");
   if (keep.empty())
     fail_op("up-to extrude produced no solid (is the profile a face?)");
-  if (reachesEnd)
+  if (sheet && reachesEnd)
     fail_op("up-to target does not fully bound the extruded profile");
   if (!sheet && keep.size() > 1)
     keep = joined_pieces(keep, hist);

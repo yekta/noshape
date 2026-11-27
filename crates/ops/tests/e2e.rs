@@ -12707,7 +12707,8 @@ fn top_block(ctx: &mut Ctx, a: [f64; 2], b: [f64; 2], depth: &str) -> Value {
 }
 
 /// psui DEPTH-EXTRUDE-UP-TO-PART-OVERLAP (live depth batch 1 extrude-up-to-part-overlap-ok): Part 1's top face (40 × 30
-/// at z 10) extruded New up to Part 2 (20 × 10 × 15, standing in Part 1's right edge): a third part, to Part 2's top.
+/// at z 10) extruded New up to Part 2 (20 × 10 × 15, standing in Part 1's right edge): a third part of the face's run
+/// through Part 2 only, 500 mm³ (live 11-27).
 #[test]
 fn up_to_a_part_standing_in_the_face_makes_a_third_part() {
     let mut ctx = Ctx::new();
@@ -12721,7 +12722,7 @@ fn up_to_a_part_standing_in_the_face_makes_a_third_part() {
     assert_eq!(x["feature_status"]["status"], "Ok", "{x}");
     let parts = call(&mut ctx, "query_parts", json!({}));
     let p3 = parts["parts"].as_array().unwrap().iter().find(|p| p["name"] == "Part 3").unwrap_or_else(|| panic!("{parts}"));
-    assert!((num(&p3["volume"]) - 6000.0).abs() < 1e-3, "{p3}");
+    assert!((num(&p3["volume"]) - 500.0).abs() < 1e-3, "{p3}");
 }
 
 /// psui DEPTH-PATTERN-REMOVE-OWN-PART (live depth batch 2 mistake-linear-pattern-remove-own-part): a Linear pattern of

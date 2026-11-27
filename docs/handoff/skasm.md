@@ -1,17 +1,41 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-27 01:03 UTC. Read docs/DECISIONS.md
+Updated 2026-11-27 03:08 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-27): psui's depth tickets taken from core (lead)
-- DEPTH-EXTRUDE-UP-TO-PART-OVERLAP: extrude.rs End::UpToPart: where the part leaves some of the profile unbounded
-  ("does not fully bound"), retried up to the part plus the plane at its far side (far_side). Inferred from dx's
-  behaviours 11-04 rule (first face per point; a start on the body goes to its far side): live's Part 3 volume not
-  captured (the take has only the parts list).
-- DEPTH-PATTERN-REMOVE-OWN-PART: pattern.rs part_pattern: Remove / Intersect seeds are always tools, targets = scope
-  less the seeds (std subfeatureToolsTargets; before, a seed inside the scope stayed a target). Corpus A/B:
-  abp.sh pr.patch on vibex7.
-- PATTERN-AFTER-INSERTED-CHAMFER landed as an ops e2e (fixed by core 6a8e411db).
+## NOW (11-27 04:20 UTC): Up to part correction queued (A/B 132/190 same, suites green); next: re-apply /root/skasm-scratch/extend-straight.patch, make Fillet 1 OK across the C1 joint, land with Mutual trim 1; Fillet 8 parked (below)
+- 0b33ec60 (pattern "No merge scope selected." + a WRONG Up to part far-side rule) was CHECKING 02:06. Fix forward in
+  the worktree: features.cpp op_prism_until leaves out pieces reaching the long prism's end while one stops at the part
+  (Part 3 500 mm³; gap case fails); extrude.rs far_side reverted; T1s + e2e pass (vibex8 02:4x). Corpus A/B queued on
+  vibex7 (abp.sh upto2.patch = features.cpp + extrude.rs; rerun 03:2x as task bjzr3476d with the 2 h limit after the 30 min one killed the first; build.cpp/core.rs already parked in extend-straight.patch, `git apply` it after the land). Then suites, land
+  ONLY those files (+ tests, TICKETS, handoff): park build.cpp/core.rs first (saved: /root/skasm-scratch/extend-straight.patch).
+- KNIFEHANDLE-LOFT1 found: live's Extend handle (maintainCurvature false) = Loft 1 ruled straight on along its v
+  derivative (B(u,v) = A(u,0) + v A_v(u,0), exact to 1e-15 in live's net), new edge 20 mm along each ruling (live's edge
+  midpoint matched to 0.002 mm). Ours: OCCT ExtendSurfByLength (curved, cut at one v) 69.1307. Live's own Loft 1 edge
+  is P1 exactly (135.1709 = our 2 x 67.5857); live's reported lengths run ~0.015 short (67.5691 for 67.5854).
+  extend-straight.patch (build.cpp extended_straight + extend_face_at straight path; T1 core::a_moved_boundary_runs_straight_on):
+  Mutual trim 1 now matches (31/32), BUT Fillet 1 fails ("Failed to fillet selections.", 15 s; was OK): likely the
+  C1 joint (curvature jump at v=0, as live's) under the fillet's trim edge. Next: find where the fillet fails (no
+  "fillet" kernel dump with NOSHAPE_DUMP_OPS, and RUST_LOG=debug prints nothing in the parity child: put an eprintln
+  of the kernel error in detail.rs blend_failed, or a probe on the extend_face_at-42 dump + Mutual trim), e.g. split the
+  face at C1 knots for OCCT and join back. Our loft's end tangent
+  is up to 0.04 deg off live's (khtan.py): straight on our loft = 69.1754 vs live's surface 69.1591.
+  Scripts: khcmp.py, khtan.py, khmid.py, kstep.py (STEP B-spline surfaces), bin/kx-ns.sh, bin/khf1-ns.sh; dump in
+  /root/skasm-scratch/khdump.
+- hunting-knife Fillet 8 (16/36/22, live 15/37/25): the fillet is between Loft 1 (face 213 in parts-50.step) and the
+  Revolve 1 sphere butt; edge at Extrude 10 one closed edge as live (81.399, live 81.385). fillet_split_closed splits
+  it in two -> 2 faces (live 1). Live's loft-side boundary is 6 edges, split at 1.056/3.734/31.796 mm from the bottom
+  = our loft's double knots with a curvature jump (±1.022/3.621/31.594 on the rim; hkknots.py), not the smooth one at
+  the bottom (0.5); but ours also has one at ±38.73 (jump 0.076|0.173) where live has none. Asked live:
+  HUNTING-KNIFE-FILLET8-SPLITS answered (live/skasm/knife-fillet8-1127): live's loft has every interior u knot double
+  and curvature jumps at all five span-group boundaries 0.0214/0.0593(small)/0.0719/0.3888/0.4674 (livek.py), but
+  splits only at 0.0214/0.0719/0.3888; not a curvature, ratio or radius rule (Fillet 8 r = 1 mm). Rule unknown:
+  parked (P2). Next idea: the 3 splits/half = a 6-entity profile (bottom, 2 sides x 2, top; Sketch 13 has 6 segments,
+  unchecked which sketch Loft 1 uses) while 0.0593/0.4674 come from the other profile. Dump: /root/skasm-scratch/hkdump (bin/f8dbg-ns.sh).
+- SURF-INTRO-CAR answered (behaviours "four geometry requests", 11-27 02:25): edge-by-edge in
+  derived/b7635b82…/live-edges.jsonl; Fillet 1 end arc 24.8077 mm, side line top z 15.206.
+- vibex7 holds ~/.slot-quiet 02:00-04:00: heavy runs then on vibex8 (~/tmp/skasm/corp/models has knifehandle only).
+- skdbg-parity.patch applied in the worktree for the dumps: revert crates/ops/src/parity.rs before committing.
 
 ## NOW (11-26 23:35 UTC)
 - 09cb32fd's failure was the land slot's link (mold undefined hashbrown symbol in noshape-ops), not ours; the Split 4

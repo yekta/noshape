@@ -2204,12 +2204,12 @@ fn a_counterbored_hole_on_a_bore_already_there_cuts_its_counterbore() {
     assert!((removed - ring).abs() < 1e-3, "{removed} mm³, the ring {ring}");
 }
 
-/// psui DEPTH-EXTRUDE-UP-TO-PART-OVERLAP (live depth batch 1 extrude-up-to-part-overlap-ok): a 40 × 30 × 10 block and a
-/// 20 × 10 × 15 one standing in its right edge; the first's top face extruded New up to the second: live makes a third
-/// part, the face up to the second's top (its far side, where it doesn't stand over the face). Ours failed ("Failed to
-/// extrude selections, check input.").
+/// psui DEPTH-EXTRUDE-UP-TO-PART-OVERLAP (live depth batch 1 extrude-up-to-part-overlap-ok, geometry live 11-27): a
+/// 40 × 30 × 10 block and a 20 × 10 × 15 one standing in its right edge; the first's top face extruded New up to the
+/// second: live makes a third part of the face's run through the second only (x 30..40, y 10..20, z 10..15, 500 mm³).
+/// Ours failed ("Failed to extrude selections, check input.").
 #[test]
-fn up_to_a_part_over_some_of_the_face_goes_to_its_far_side() {
+fn up_to_a_part_standing_in_some_of_the_face_makes_its_run_through_the_part() {
     let mut t = T::new();
     let (_, x1) = t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
     let (_, x2) = t.block(0.03, 0.01, 0.05, 0.02, "15 mm");
@@ -2222,7 +2222,29 @@ fn up_to_a_part_over_some_of_the_face_goes_to_its_far_side() {
     assert_eq!(r.context.bodies.len(), 3);
     let p3 = r.context.bodies.iter().find(|b| b.id.feature == up).expect("Part 3");
     let (v, bb) = (p3.shape.volume().unwrap(), p3.shape.bounding_box(false).unwrap());
-    assert!(near(v, 0.04 * 0.03 * 0.005, 1e-6) && (bb.min.z - 0.01).abs() < 1e-6 && (bb.max.z - 0.015).abs() < 1e-6, "{v} {bb:?}");
+    let box_near = |a: DVec3, b: DVec3| (a - b).abs().max_element() < 1e-6;
+    assert!(near(v, 0.01 * 0.01 * 0.005, 1e-6) && box_near(bb.min, DVec3::new(0.03, 0.01, 0.01)) && box_near(bb.max, DVec3::new(0.04, 0.02, 0.015)), "{v} {bb:?}");
+    assert_eq!(p3.shape.faces().len(), 6);
+}
+
+/// The same with the second block at z 12..15, a gap over the face: live fails (EXTRUDE_FAILED, 11-27).
+#[test]
+fn up_to_a_part_over_some_of_the_face_with_a_gap_fails() {
+    let mut t = T::new();
+    let (_, x1) = t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+    let (_, x2) = t.block(0.03, 0.01, 0.05, 0.02, "3 mm");
+    t.set(x2, "startOffset", b(true));
+    t.set(x2, "startOffsetBound", en("BLIND"));
+    t.set(x2, "startOffsetDistance", e("12 mm"));
+    let r = t.ok();
+    let p1 = r.context.bodies.iter().find(|b| b.id.feature == x1).unwrap();
+    let top = p1.shape.faces().iter().position(|f| (f.centroid().unwrap().z - 0.01).abs() < 1e-9).expect("top face");
+    let p2 = r.context.bodies.iter().find(|b| b.id.feature == x2).unwrap();
+    assert!((p2.shape.bounding_box(false).unwrap().min.z - 0.012).abs() < 1e-6, "the second block from z 12");
+    let up = t.add("extrude", &[("entities", q(vec![Reference::Face((*p1.faces[top]).clone())])), ("operationType", en("NEW")), ("endBound", en("UP_TO_BODY")), ("endBoundEntityBody", q(vec![Reference::Body(p2.id.clone())]))]);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|f| f.id == up).unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Failed to extrude selections, check input.")));
 }
 
 /// psui DEPTH-PATTERN-REMOVE-OWN-PART (live depth batch 2 mistake-linear-pattern-remove-own-part): a block, a Linear
