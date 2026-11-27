@@ -2217,6 +2217,41 @@ impl PartStudioView {
         Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
     }
 
+    /// Where the pointer is on the open feature's own preview, with a field that takes vertices: the model before it's
+    /// visible vertex within the pick's reach (live fillet-variable-two-vertices-ok s7: the block's corner, rounded away
+    /// by the preview, picked into Vertices).
+    fn before_vertex_under(&self, position: glam::DVec2, cx: &App) -> Option<scene_builder::PickTarget> {
+        let dialog = self.edit.as_ref()?.dialog.read(cx);
+        let (_, filter, _) = dialog.active_filter()?;
+        if !filter.intersects(noshape_model::params::QueryFilter::VERTEX) {
+            return None;
+        }
+        let before = self.ui.preview_before.as_ref()?;
+        let vp = self.viewport.read(cx);
+        let mut nearest: Option<(f64, &Reference, glam::DVec3)> = None;
+        for b in before.bodies.iter().filter(|b| !b.hidden) {
+            for (r, p) in b.vertex_refs.iter().zip(&b.mesh.vertices) {
+                let p = glam::DVec3::new(f64::from(p[0]), f64::from(p[1]), f64::from(p[2]));
+                let Some(at) = vp.project(p) else { continue };
+                let dist = at.distance(position);
+                if dist <= 5.0 && nearest.is_none_or(|(n, _, _)| dist < n) {
+                    nearest = Some((dist, r, p));
+                }
+            }
+        }
+        let (_, r, p) = nearest?;
+        // (Not one a face of that model hides.)
+        let (o, d) = vp.ray(vp.project(p)?);
+        let t = (p - o).dot(d) / d.length_squared();
+        if face_depths(before, None, o, d).iter().any(|f| *f < t - 1e-4 * (1.0 + t.abs())) {
+            return None;
+        }
+        if behaviors::made_by(r, dialog.feature.id) || dialog.selected_refs().contains(r) {
+            return None;
+        }
+        Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: Some(p) })
+    }
+
     /// Where the pointer is on the open feature's own preview: the face the model before it has there, nearest first
     /// (live 10-27 PREVIEW-SELF-PICK: a Fillet's band hovers and picks the original top or front face), unless the
     /// dialog holds it already (live walk6-2: nothing new lights on the picked face inside an Extrude's preview).
@@ -2801,7 +2836,7 @@ impl PartStudioView {
                 let own = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
                 let target = match target {
                     Some(t) if !own.is_some_and(|f| behaviors::made_by(&t.reference, f)) => Some(t),
-                    t => self.held_face_under(*position, cx).or_else(|| self.before_face_under(*position, cx)).or(t),
+                    t => self.held_face_under(*position, cx).or_else(|| self.before_vertex_under(*position, cx)).or_else(|| self.before_face_under(*position, cx)).or(t),
                 };
                 let (now, os_double) = self.viewport.update(cx, |vp, _| (vp.now(), vp.take_click_count() >= 2));
                 let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference, now, os_double));

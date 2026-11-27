@@ -311,11 +311,14 @@ impl FeatureDialog {
                     let rows = s.hints.has(Hints::DRIVEN_QUERY) && !s.hints.has(Hints::COLLAPSE_ARRAY_ITEMS) && !s.hints.has(Hints::ALLOW_ARRAY_FOCUS);
                     let n = values.array(s.id).len();
                     if rows && n > 0 {
-                        // The array itself reads as an enum with its first entry's value (live: one edge gives "Edges"
-                        // Position, then "Continuity" Position; two edges add another "Continuity").
+                        // The array itself reads as its first entry's first input (live: one edge gives "Edges"
+                        // Position, then "Continuity" Position; two edges add another "Continuity"; a variable fillet's
+                        // vertex gives "Vertices" 5 mm, then "Radius" 5 mm, live fillet-variable-two-vertices-ok).
                         let entries: Vec<Value> = (0..n).filter(|k| !self.closed_items.contains(&format!("{}.{k}", s.id))).flat_map(|k| self.item_fields(s.id, k, specs)).collect();
-                        if let Some(first) = entries.iter().find(|f| f["kind"] == "enum") {
-                            fields.push(json!({ "label": label, "kind": "enum", "text": first["text"].clone(), "state": "ok" }));
+                        match entries.iter().find(|f| f["kind"] == "enum" || f["kind"] == "number") {
+                            Some(f) if f["kind"] == "enum" => fields.push(json!({ "label": label, "kind": "enum", "text": f["text"].clone(), "state": "ok" })),
+                            Some(f) => fields.push(json!({ "label": label, "kind": "number", "text": f["text"].clone(), "focused": false, "state": "ok" })),
+                            None => {}
                         }
                         fields.extend(entries);
                         continue;

@@ -1403,6 +1403,67 @@ fn a_hole_without_points_says_only_that(cx: &mut TestAppContext) {
     assert!(first.is_some_and(|(dx, dy)| (dx + 25.).abs() <= 1. && (dy + 2.).abs() <= 1.) && placed(cx) == first, "the tip from the title's right / top: {first:?}, after a move {:?} (live -25, -2 from ours)", placed(cx));
 }
 
+/// A variable fillet's picked vertices (live fillet-variable-two-vertices-ok s7, s9): the Vertices field reads as its
+/// first vertex's Radius ("Vertices" 5 mm), then each vertex's Radius (5 mm, 3 mm).
+#[gpui::test]
+fn a_variable_fillets_vertices_read_as_their_radii(cx: &mut TestAppContext) {
+    use noshape_model::params::{ParamValue, ParamValues};
+    let (window, view) = block(cx, "dlg-fillet-vertices");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Fillet dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("isVariable", ParamValue::Bool(true), cx);
+        let item = |r: &str| {
+            let mut it = ParamValues::default();
+            it.set("vertexRadius", ParamValue::Expr(noshape_units::ExprValue::new(r)));
+            it
+        };
+        d.set_value("vertexSettings", ParamValue::Array(vec![item("5 mm"), item("3 mm")]), cx);
+    }));
+    draw(cx, window);
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let fields = state["dialog"]["fields"].as_array().cloned().unwrap_or_default();
+    let at = fields.iter().position(|f| f["label"] == "Vertices").expect("the Vertices field");
+    let got: Vec<(String, String)> = fields[at..at + 3].iter().map(|f| (format!("{}:{}", f["label"].as_str().unwrap_or(""), f["kind"].as_str().unwrap_or("")), f["text"].as_str().unwrap_or("").to_string())).collect();
+    let want = [("Vertices:number", "5 mm"), ("Radius:number", "5 mm"), ("Radius:number", "3 mm")].map(|(a, b)| (a.to_string(), b.to_string()));
+    assert_eq!(got, want.to_vec());
+}
+
+/// A vertex the preview rounded away still picks (live fillet-variable-two-vertices-ok s7): the block's front top edge
+/// filleted, Variable fillet on, a click on the edge's end corner adds that vertex of the model before the fillet to
+/// Vertices.
+#[gpui::test]
+fn a_corner_under_a_fillets_preview_picks_into_vertices(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = block(cx, "dlg-fillet-corner");
+    let (edge, corner) = cx.update(|cx| {
+        let b = &view.read(cx).display.bodies[0];
+        let pts: Vec<glam::DVec3> = b.mesh.vertices.iter().map(|p| glam::DVec3::new(f64::from(p[0]), f64::from(p[1]), f64::from(p[2]))).collect();
+        let (lo, hi) = pts.iter().fold((pts[0], pts[0]), |(lo, hi), p| (lo.min(*p), hi.max(*p)));
+        // The front top edge: its polyline at y = min, z = max.
+        let e = b.mesh.edges.iter().position(|e| e.iter().all(|p| (f64::from(p[1]) - lo.y).abs() < 1e-7 && (f64::from(p[2]) - hi.z).abs() < 1e-7)).expect("the front top edge");
+        (b.edge_refs[e].clone(), glam::DVec3::new(lo.x, lo.y, hi.z))
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Fillet dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("entities", ParamValue::Query(vec![edge]), cx);
+        d.set_value("isVariable", ParamValue::Bool(true), cx);
+        d.user_focus_query("vertexSettings");
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let at = cx.update(|cx| view.read(cx).viewport.read(cx).project(corner)).expect("the corner on screen");
+    let pointer = Pointer::new(cx, window, &view);
+    pointer.move_to(cx, &view, at);
+    pointer.click(cx, &view, at);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let picked: Vec<Reference> = cx.update(|cx| dialog.read(cx).feature.params.array("vertexSettings").iter().flat_map(|it| it.query("vertex").to_vec()).collect());
+    assert!(matches!(picked.as_slice(), [Reference::Vertex(_)]), "{picked:?}");
+}
+
 /// Routing curve's Point edit type Multiple (std routingCurve.fs addMultiPointsManipulator / multiTriadManipulator,
 /// live2 audit-1119 missing-commands row 4): a click on a point toggles it in Selected points; the triad sits at the
 /// selected points' centre and its X arrow moves each of them by the drag, the others stay.
