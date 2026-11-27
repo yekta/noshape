@@ -1,0 +1,46 @@
+{
+ "name": "asm-insert-spline-part-ok",
+ "about": "spline-fillet-asm (a part with a B-spline side face and fillets on it, as a derived or imported part brings them, in an assembly beside a block and a pin): Insert a second Part 1 (the spline part) with one click in the view, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 7: derived and imported parts in an assembly (lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 4000
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

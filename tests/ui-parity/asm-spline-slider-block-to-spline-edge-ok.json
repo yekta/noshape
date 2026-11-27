@@ -1,0 +1,51 @@
+{
+ "name": "asm-spline-slider-block-to-spline-edge-ok",
+ "about": "spline-fillet-asm (a part with a B-spline side face and fillets on it, as a derived or imported part brings them, in an assembly beside a block and a pin): Slider: Part 2's top face to the spline's bottom edge, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 7: derived and imported parts in an assembly (lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Slider mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     80,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     52,
+     15,
+     0
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

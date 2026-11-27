@@ -1,0 +1,73 @@
+{
+ "name": "asm-mc-spline-face-move-ok",
+ "about": "spline-fillet-asm (a part with a B-spline side face and fillets on it, as a derived or imported part brings them, in an assembly beside a block and a pin): Mate connector on the spline face, Move z 5 mm, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 7: derived and imported parts in an assembly (lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     52,
+     15,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Move"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "",
+    "index": 2
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

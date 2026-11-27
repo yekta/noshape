@@ -1,0 +1,53 @@
+{
+ "name": "asm-select-spline-face-and-fillet",
+ "about": "spline-fillet-asm (a part with a B-spline side face and fillets on it, as a derived or imported part brings them, in an assembly beside a block and a pin): click the spline face, then Fillet 2's face (two selected), then hover Fillet 1's face",
+ "area": "assembly",
+ "source": "live depth batch 7: derived and imported parts in an assembly (lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     52,
+     15,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     51.414,
+     15,
+     19.414
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     2,
+     0.536,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   },
+   "ms": 1500
+  }
+ ]
+}

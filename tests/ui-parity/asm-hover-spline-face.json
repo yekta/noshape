@@ -1,0 +1,21 @@
+{
+ "name": "asm-hover-spline-face",
+ "about": "spline-fillet-asm (a part with a B-spline side face and fillets on it, as a derived or imported part brings them, in an assembly beside a block and a pin): hover the spline face (1.5 s)",
+ "area": "assembly",
+ "source": "live depth batch 7: derived and imported parts in an assembly (lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     52,
+     15,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   },
+   "ms": 1500
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+{
+ "name": "asm-spline-revolute-pin-to-spline-face-ok",
+ "about": "spline-fillet-asm (a part with a B-spline side face and fillets on it, as a derived or imported part brings them, in an assembly beside a block and a pin): Revolute: the pin's side to the spline face, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 7: derived and imported parts in an assembly (lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revolute mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     82.83,
+     37.17,
+     20
+    ],
+    "instance": "Part 3 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     52,
+     15,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
