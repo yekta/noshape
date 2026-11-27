@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-27 08:5x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-27 11:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,32 +33,33 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## Shard triage + focus rule + qa P2s (lead 11-27): LANDED 08:5x (queued), two items in flight
-- Queued 08:5x: the focus rule, Hole table text, part menu, Boolean offset, Hole TAP_INCONSISTENT, Full round blame,
-  Edit material, Where used, Insert image picker, spline points, sketch-region measure, Loft Thin regions + pick owner,
-  tests, TICKETS (coverage-1 rows ~9284-9289, depth-3 rows 40-47 marked).
-- IN STASH `psui-reach-0846` (`git stash list --format='%H %gs' | grep psui-reach`; apply by sha, then drop):
-  1. Edge reach: over another part's face an edge reaches 5 px, not 6 (renderer.rs pick_reaching's `body`,
-     builder.rs PickMap::body_fn, viewport.rs pick_body, behaviors.rs sets it; offscreen.rs callers). GPUI
-     feel::an_edge_ending_in_another_part_does_not_reach_past_its_end passes with it (fails without); scene lib + render
-     pick tests ok (ps7). LEAD: land only when the split-face-ok replay matches AND live answers REQUESTS "psui 11-27
-     08:46" (edge reach over another part's face). Next: replay split-face-ok + split-part-front-face-ok with it.
-  2. dialogs::a_part_face_swept_along_its_edge_adds_into_the_part (SWEEP-PART-FACE-PROFILE-ADD): passes with waits
-     between profile and path (ps7); ps8 (08:4x) tries the path picked at once (the replay's pace). If ps8 passes, the
-     app loses the run elsewhere: replay mistake-sweep-add-no-change with NOSHAPE_UI_SHOTS + a log line in
-     std_edit_logic's result (changes dropped when params changed meanwhile?). App stderr has no logic lines.
-- Still differing (ps5): fillet-variable-two-vertices-ok s7 (fields[8] kind live "number" / ours "other");
-  sketch-image-place/edit s3 (live's Libraries tab: a search field; needs a live capture);
-  mistake-split-trim-to-face-partial s7 (live error / ours ok).
-- ps4 rescored on today's takes (vibe2 ~/tmp/psui/ps4-rescore.log): live's focus retakes disagree with the focus rule
-  (a checkbox click focuses the checkbox in live): edit-curve-control-points-details s5, fillet-overflow-smooth-toggles
-  s7, frame-corner-coped-limit s5, linear-pattern-centered-skip s12, loft-connections-isocurves s3;
-  loft-surface-thin-tabs s3 (live none / ours field), mistake-hole-counterbore-diameter-5 s11 (live none),
-  query-variable-created-owned-by s3, curve-pattern-feature-distance s3 (live null / ours the query). Next after the two
-  items above.
-- Full round's 3 parts: core's FULL-ROUND-SPLITS-PART (lead 08:4x). Left to skasm: spline points' constraints.
-- core (ps3 triage): circular-pattern-face-boss-ok s11, circular-pattern-feature-boss-reapply-ok s14,
-  mistake-linear-pattern-* titleState, gusset x2, mistake-rib-flipped-misses; sweep-thin trim-ends message.
+## IN FLIGHT 11:2x (after compaction: start here)
+- LAND 538d28d1 (08:5x) FAILED: model-data hole_tables tests still expected the old text; fixed e4cab5e73 (0.2010 in,
+  5.000 mm, 1/4 in; model-data 125 ok on vibex8). Re-land with everything below (tree must be clean: stash the reach
+  change + trace with `git stash push -u -m psui-reach`, land, apply by sha, drop).
+- COMMITTED, to land: 8894046f3 Windows click fix (LEAD 09:1x: v0.4.73 Windows CI lost a rim-test click: GPUI
+  simulate_click runs background work between down and up, the viewport times the press on the real clock and drops a
+  press >= 520 ms as a long press; Pointer::click now sends down+up in one update; ps14: part-studio-ui 661 ok);
+  38da04e1a ASM-DIALOG-FOCUS (ps16: Limits x5, mc rotate, pattern directions match; assembly-ui 233 ok) +
+  TICKETS ASM-MATE-ROTATION-SIGN (skasm: our 45 deg mate rotation is live's transpose). Tell qa the subjects of
+  486ff6e1e ("assembly dialogs name their Limits fields, …") and 38da04e1a after the land; asm-mate-connector-realign
+  needs a live retake (old take: Realign keeps the keyboard; realign-edge: the axis box takes it).
+- LEAD 11:1x (core uipdep3): Sweep's Thin tab keeps the keyboard on "Faces and sketch regions to sweep": 788387b0e
+  (in the failed land) already does it; test the_sweep_thin_tab_keeps_the_keyboard_on_its_profiles_field (ps17 ok),
+  committed; in this land.
+- Edge reach (PICK-FACE-OVER-NEAR-EDGE), held, uncommitted: renderer.rs pick_reaching `body`, builder.rs body_fn,
+  viewport.rs pick_body, behaviors.rs, offscreen.rs, feel_tests.rs (2 edge tests, both pass in GPUI). The app replay
+  (same 0.275 mm/px camera as live) still takes Part 1's edge at split-face-ok s7. TEMP trace (never commit):
+  renderer.rs NOSHAPE_PICK_TRACE eprintln in pick_reaching. ps18 (resp/ps18.log) = replicate + traced split-face-ok.
+  LEAD: land only when the replay matches AND live answers REQUESTS "psui 11-27 08:46". Backup resp/reach-staged.patch.
+- live 11-2x: "Release all configurations…" takes queued (6362d352, start config-ps); "Disable imported appearances"
+  is the Appearances panel row's item (needs recorder work: not asked for).
+- Still differing (ps5): fillet-variable-two-vertices-ok s7 (fields[8] kind number/other); sketch-image-place/edit s3
+  (Libraries search field: needs a live capture); mistake-split-trim-to-face-partial s7 (live error / ours ok).
+- ps4 rescored: live's focus retakes disagree with the focus rule (a checkbox click focuses the checkbox in live):
+  edit-curve-control-points-details s5, fillet-overflow-smooth-toggles s7, frame-corner-coped-limit s5,
+  linear-pattern-centered-skip s12, loft-connections-isocurves s3; loft-surface-thin-tabs s3, mistake-hole-counterbore-
+  diameter-5 s11, query-variable-created-owned-by s3, curve-pattern-feature-distance s3.
 
 ## NEXT
 - qa's diffs from live's option-combination batches as filed; interaction-feel rows to verify (archive 11-27).
