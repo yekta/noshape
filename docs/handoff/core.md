@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 22:36 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 01:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -17,21 +17,23 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **SCISSOR FILLETS FIX-FORWARD: QUEUED dc73ccf7** (ec47e4e4 FAILED: kernel_robustness::a_concave_arcs_round_stops_at_
   the_convex_rounds_and_runs_them_on; fixed by 6ce108cc4: the short-chain check runs on over folds; model tests 654 ok,
   scissor F5/F2/F4/F25/F18 still Ok).
-- **IMPELLER FILLET 3 (PARKED 11-27 00:17, fresh translation vibex7 ~/tmp/core/imp/fresh)**: on it all 4 picks of
-  "Fillet Stevenrohr zum Halter" resolve and it is Ok; first error Move face 1 ("Could not offset"). Fillet 3 93/60 vs
-  live 95/62 = one more valence-2 vertex per side on live's chamfer x x=5-plane edge (5, +-0.5284, -43.6212; both have
-  the one at +-0.6138). Run-on end x 0.957, live 0.097. Sweep of rim_chamfer's run-on (ZZ_RC_ALONG x (d+e), probe
-  /root/core-scratch/rim-chamfer-zz.diff, .sw.sh / .fl2.sh): 0.2669 (= e) gives live's chamfer vertex exactly and end
-  0.049, 0.28 -> 0.102, but Fillet 3 fails at 0.25/0.4/0.5, counts never change, and "Stevenrohr zum Halter" then
-  fails: grazing, not a law to land. Needs live's chamfer surface (not in live.jsonl). ZZ_PICKS probe: /root/core-scratch/zz-picks.diff.
-- **SCREWS MOVE FACE 3 (FIX UNCOMMITTED in core-rf, 11-27 00:5x)**: direct.rs: Reapply fillet only for translations
-  of planes along their normals (it left the cone pieces in place, Ok, no change); rigid translate falls back to
-  translate_by_booleans (each face's prism along the move, fused/cut via slab_booleans, shared with
-  offset_by_booleans); pieces_of_neighbours skips move_rigid's 6 s OCCT try. c2-config-parts-screws 63/63 to the end
-  (was 33/63). New T1 features_a::move_face_translate_slides_split_pieces_along_a_bore; run `.kt2.sh` (move_face
-  tests: 15 pass, the new T1 FAILS at its line 2468 `pieces.len() == 6`: the test's split/pick, not the fix, to check). Then commit, clippy, land. Note for bool: MF3 406 ms = one boolean on
-  the threaded body (brep try 70 ms + OCCT 190). Scripts: .mf.sh (trace/faces), .mfp.sh (profile), .pmi3.sh (parity,
-  saves vibex7 ~/tmp/core/scr/fresh).
+- **SCREWS MOVE FACE 3: QUEUED 7f88950e (11-27 01:1x)** (commit 7211adcc2; T1 features_a::move_face_translate_slides_
+  split_pieces_along_a_bore; corpus A/B .ab8.sh ALL-SAME; model tests 655 ok, clippy clean). Note for bool: MF3 406 ms =
+  one boolean on the threaded body.
+- **IMPELLER CHAMFER -> FILLET 3 (UNCOMMITTED in core-rf, 11-27 01:2x)**: the body first diverges at Chamfer Stevenrohr
+  Halterung (bevel 6.0969 vs live 6.1849 mm2, cylinder 303.4215 vs .5758). live/blend/q-imp-chamfer-surf/surf.json has
+  live's bevel poles: ruled (u deg 1) in the edge's normal planes, |ruling| e = 1.2739 everywhere (core-scratch/imp
+  rul.py); ours drifted (chord-length interpolated sections paired by parameter; cmp.py: 21 um off mid-width).
+  Fix in kernel rim_chamfer.rs: offset sections = C2 cubic through the offset points ON THE EDGE'S PARAMETER
+  (cubic_through, own Cox-de Boor + dense solve): bevel 6.1754, cylinder 303.5789 (= live). Fillet 3 then FAILS
+  (2 more chain edges): the cylinder x extruded edge stays split at (5, +-2.6104, -43.1063) (a straight 3.5 mm
+  B-spline + line; live one line). rim_chamfer_cut's join_edges_at point tol scale*1e-7 likely misses the moved vertex:
+  TRYING scale*1e-5 (blend_section.rs, run .rc1.sh = build cli-rc + chamfer/Fillet 3 compare + statuses + edges;
+  output bjsbi1nbb). LEAD 11-27: bool is changing unify's edge joins (only at Boolean-made vertices, 1e-7 m): TELL
+  BOOL before landing anything touching join_edges_at / its tolerances. Then: Fillet 3 vs live (93/60 vs 95/62,
+  live's bevel extended LINEARLY in u and v, bevel.json), corpus A/B (.ab8.sh pattern, swap rim_chamfer.rs and
+  blend_section.rs), T1 (a rim chamfer on a spline edge: rulings in normal planes), land.
+- FILLET-R12-BLOCK-OVERFLOW: qa verified (3/3 scenarios, 46/46 states).
 - psui's two TICKETS items (Up to part overlap, Remove pattern of only part): skasm's (lead 11-27).
 - PATTERN-AFTER-INSERTED-CHAMFER: fixed by 6a8e411db, skasm added the e2e and closed it.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
@@ -45,9 +47,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   blend_section Support::Face when Newton's foot leaves the face) on Move face 2's new (live) geometry; live does
   Move face 1, Delete face 2 and both fillets OK -> the real fix is making them succeed (parity work, not speed).
 ## Now (11-25)
-- **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
-  fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
-  need a FRESH parity run (save/ copies keep old references): .bd2.sh.
 - **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
   39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
 - **SCISSOR 11-26 15:0x (in 56131f3c)**: (a) detail_a.rs blends_to_reapply: the spread
@@ -96,10 +95,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there.
   19:2x probes: core-scratch/f18cde-probe.patch (f18c/d/e.out); state in the P0 entry above.  (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
-- **REPLACE FACE 1 (bool's, c2-replace-face-exercise)**: landed 83082091 (reblend adds curved edges first: 4 spheres).
-  Left -2 mm3: live keeps the RIM; our blends_to_reapply propagates floor fillets -> spheres -> vertical fillets -> rim
-  and rolls it again. Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case. Probe:
-  core-scratch/refillet-probe.patch (kernel crash_inputs zz_probe_refillet on NOSHAPE_DUMP_OPS fillet-3).
 - **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
   7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
   skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
@@ -166,8 +161,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **c2-hunting-knife f24:** live's lines disagree (16-23 LINE, 24 OTHER); refetch 15-24 asked (REQUESTS 11-15 00:45).
 
 ## Next, in order
-000. Lead 11-26 22:0x, after scissor: screws Move face 3 (Split 4, Offset surfaces 1, knife F8, knifehandle MT1: skasm).
-00. P1 PATTERN-AFTER-INSERTED-CHAMFER: already fixed (6a8e411db, v0.4.60): 29505.03 = live on core-rf 20:1x; TICKETS row marked for qa.
 0. **BLEND-FAILS-1125** (lead 11-25 14:1x; blend parked): Fillets/Chamfers that fail in ours and build in live. Sources: model
    suite vibex7 ~/qa-parity/models.log (11:37, qa 1125-0803), asm-scissor-lift studios (my slabs run, vibex7
    ~/tmp/core/sc/pa-slabs.out). Skipped (parked): scissor 9cbb0e F18/F19/F23, impeller "Fillet Stevenrohr zum Halter".

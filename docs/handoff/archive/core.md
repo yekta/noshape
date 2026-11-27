@@ -5112,3 +5112,12 @@ skasm meanwhile; I'll list what I change here before landing.
 - **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 landed (+0 -0). Next there: recheck 97ad5f Linear pattern 1 (fuses copies live keeps apart).
 - **P0 SPEED**: c927ff4e QUEUED (core-spd): hose, radiator = 0.4.68; profile kit vibex7 ~/tmp/core/spd (m/ models,
   pft.py, spd-prof.sh, ~/qa-rel/<v>/noshape-cli). Impeller: no regression on main (old-base test builds).
+
+## Moved from the handoff 11-27 01:25
+- **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
+  fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
+  need a FRESH parity run (save/ copies keep old references): .bd2.sh.
+- **REPLACE FACE 1 (bool's, c2-replace-face-exercise)**: landed 83082091 (reblend adds curved edges first: 4 spheres).
+  Left -2 mm3: live keeps the RIM; our blends_to_reapply propagates floor fillets -> spheres -> vertical fillets -> rim
+  and rolls it again. Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case. Probe:
+  core-scratch/refillet-probe.patch (kernel crash_inputs zz_probe_refillet on NOSHAPE_DUMP_OPS fillet-3).
