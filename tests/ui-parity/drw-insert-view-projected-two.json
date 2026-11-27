@@ -1,0 +1,89 @@
+{
+ "name": "drw-insert-view-projected-two",
+ "about": "Insert view: Front placed at sheet [90,150], then clicks at [200,150] and [90,60]: live places only the Right projected view (the click below Front adds none), Escape",
+ "area": "drawing",
+ "source": "live depth batch 5 (11-27)",
+ "start": "block-drawing-empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     90,
+     150
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     200,
+     150
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     90,
+     60
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

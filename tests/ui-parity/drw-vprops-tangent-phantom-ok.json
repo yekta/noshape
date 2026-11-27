@@ -1,0 +1,48 @@
+{
+ "name": "drw-vprops-tangent-phantom-ok",
+ "about": "View properties: Tangent edges Solid -> Phantom, OK",
+ "area": "drawing",
+ "source": "live depth batch 5 (11-27)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Solid",
+    "pick": "Phantom"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

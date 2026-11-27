@@ -1,0 +1,1233 @@
+{
+ "scenario": "drw-insert-view-simplification-none",
+ "recorded": "2026-11-27T06:55:11.792Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "42a62da113dea6e0c3bb2456",
+  "start": "block-drawing-empty",
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 2",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [],
+   "annotations": [],
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     623,
+     110,
+     1716,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25563
+   }
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Insert view"
+    }
+   },
+   "ok": true,
+   "ti": 136732,
+   "tmove": 136968,
+   "moves": 1,
+   "tdown": 137315,
+   "at": [
+    568,
+    59
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "View orientation",
+      "View scale",
+      "View simplification",
+      "Show sketch appearances"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 163032,
+   "te": 163032
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Insert"
+    }
+   },
+   "ok": true,
+   "ti": 163032,
+   "tmove": 163347,
+   "moves": 1,
+   "tdown": 163653,
+   "at": [
+    544,
+    121
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "View orientation",
+      "View scale",
+      "View simplification",
+      "Show sketch appearances"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSDRAWINGVIEW",
+      "title": "Select a part or assembly",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
+      "inputs": [
+       {
+        "placeholder": "Search parts or sketches",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 190425,
+   "te": 190425
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "list_row": "Part Studio 1"
+    }
+   },
+   "ok": true,
+   "ti": 190425,
+   "via": "live's row for the start's Part Studio: \"start block Copy 2\" (the start is a copy)",
+   "tmove": 190774,
+   "moves": 1,
+   "tdown": 191237,
+   "at": [
+    823,
+    463
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": null
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "View orientation",
+      "View scale",
+      "View simplification",
+      "Show sketch appearances"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSDRAWINGVIEW",
+      "title": "Select a part or assembly",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
+      "inputs": [
+       {
+        "placeholder": "Search parts or sketches",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 217795,
+   "te": 217795
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "list_row": "Part 1"
+    }
+   },
+   "ok": true,
+   "ti": 217795,
+   "tmove": 218064,
+   "moves": 1,
+   "tdown": 218508,
+   "at": [
+    869,
+    463
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "View orientation",
+      "View scale",
+      "View simplification",
+      "Show sketch appearances",
+      "Show annotations from model"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start block Copy 2 Part 1"
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 245660,
+   "te": 245660
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 245660,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "View orientation",
+      "View scale",
+      "View simplification",
+      "Show sketch appearances",
+      "Show annotations from model"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start block Copy 2 Part 1"
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 272211,
+   "te": 272211
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Auto",
+     "pick": "None"
+    }
+   },
+   "ok": true,
+   "ti": 272211,
+   "tmove": 272337,
+   "moves": 1,
+   "at": [
+    599,
+    205
+   ],
+   "via": "native select in the drawing: option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "View orientation",
+      "View scale",
+      "View simplification",
+      "Show sketch appearances",
+      "Show annotations from model"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start block Copy 2 Part 1"
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "None"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 287635,
+   "te": 287635
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 287635,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "View orientation",
+      "View scale",
+      "View simplification",
+      "Show sketch appearances",
+      "Show annotations from model"
+     ],
+     "fields": [
+      {
+       "label": "Use existing",
+       "kind": "select",
+       "value": "start block Copy 2 Part 1"
+      },
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View simplification",
+       "kind": "select",
+       "value": "None"
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 314541,
+   "te": 314541
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "sheet_point": [
+      90,
+      110
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 314541,
+   "tmove": 316410,
+   "moves": 1,
+   "tdown": 316751,
+   "at": [
+    975,
+    524
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Projected view",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        89.9,
+        110.2
+       ],
+       "parent": null,
+       "scale": "2:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 344593,
+   "te": 344593
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 344593,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Projected view",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        89.9,
+        110.2
+       ],
+       "parent": null,
+       "scale": "2:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 372489,
+   "te": 372489
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 372489,
+   "pointer": {
+    "at": [
+     868,
+     462
+    ],
+    "hover": [],
+    "element": "iframe.foreign-data-container"
+   },
+   "tdown": 372497,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        89.9,
+        110.2
+       ],
+       "parent": null,
+       "scale": "2:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 399887,
+   "te": 399887
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 399887,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 2",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        89.9,
+        110.2
+       ],
+       "parent": null,
+       "scale": "2:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 427829,
+   "te": 427829
+  }
+ ],
+ "t0_epoch_ms": 1795762387994
+}

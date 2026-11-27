@@ -1,0 +1,47 @@
+{
+ "name": "drw-vprops-annotations-off-ok",
+ "about": "View properties: Show annotations from model off, OK",
+ "area": "drawing",
+ "source": "live depth batch 5 (11-27)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Show annotations from model"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

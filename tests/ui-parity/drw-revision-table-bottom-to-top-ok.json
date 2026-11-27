@@ -1,0 +1,80 @@
+{
+ "name": "drw-revision-table-bottom-to-top-ok",
+ "about": "Revision table properties: Order Bottom to top, OK",
+ "area": "drawing",
+ "source": "live depth batch 5 (11-27)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revision table"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     150,
+     150
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sheet_point": [
+     130,
+     146
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Revision table properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Top to bottom",
+    "pick": "Bottom to top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

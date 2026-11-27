@@ -1,0 +1,48 @@
+{
+ "name": "drw-vprops-orientation-top-ok",
+ "about": "View properties: base view orientation Front -> Top, OK (projected views follow?)",
+ "area": "drawing",
+ "source": "live depth batch 5 (11-27)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View properties..."
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Front",
+    "pick": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

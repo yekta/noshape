@@ -1,0 +1,73 @@
+{
+ "name": "drw-insert-view-back",
+ "about": "Insert view: Back, placed, Escape",
+ "area": "drawing",
+ "source": "live depth batch 5 (11-27)",
+ "start": "block-drawing-empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Front",
+    "pick": "Back"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     90,
+     110
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}

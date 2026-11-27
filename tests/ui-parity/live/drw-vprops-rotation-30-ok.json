@@ -1,0 +1,1990 @@
+{
+ "scenario": "drw-vprops-rotation-30-ok",
+ "recorded": "2026-11-27T05:27:49.526Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "e28475f51fccecd24c42745b",
+  "start": "block-drawing",
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": {
+   "tab": "Part 1 Drawing 1 (3)",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "position": [
+      81,
+      81
+     ],
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     623,
+     110,
+     1716,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25563
+   }
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "view": "Front"
+    }
+   },
+   "ok": true,
+   "ti": 203952,
+   "tmove": 205349,
+   "moves": 1,
+   "tdown": 205700,
+   "at": [
+    940,
+    638
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "name": "RmbMenu",
+     "rows": [
+      "Show/hide",
+      "View orientation",
+      "Tangent edges",
+      "Adjust linestyle...",
+      "Insert custom table of start block Copy 2 ...",
+      "",
+      "View properties...",
+      "Order",
+      "Align views",
+      "",
+      "Switch to start block Copy 2",
+      "Move to sheet...",
+      "Copy",
+      "Paste as table",
+      "Select for replication",
+      "Replicate annotations",
+      "",
+      "Add comment",
+      "",
+      "Clear selection",
+      "Zoom to fit",
+      "Delete"
+     ],
+     "checked": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "disabled": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+     ],
+     "highlighted": -1
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 231431,
+   "te": 231432
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "View properties..."
+    }
+   },
+   "ok": true,
+   "ti": 231432,
+   "tmove": 231518,
+   "moves": 2,
+   "tdown": 232673,
+   "at": [
+    1065,
+    298
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape\u00a0ui\u00a0parity\u00a0lane4-1115",
+      "Workspace",
+      "Main",
+      "Type",
+      "Part",
+      "Reference",
+      "Part\u00a01",
+      "In progress",
+      "View orientation",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1716,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.17026
+     }
+    }
+   },
+   "t": 259048,
+   "te": 259048
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 259048,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape\u00a0ui\u00a0parity\u00a0lane4-1115",
+      "Workspace",
+      "Main",
+      "Type",
+      "Part",
+      "Reference",
+      "Part\u00a01",
+      "In progress",
+      "View orientation",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1716,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.17026
+     }
+    }
+   },
+   "t": 286517,
+   "te": 286517
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Rotation angle"
+    }
+   },
+   "ok": true,
+   "ti": 286517,
+   "tmove": 286650,
+   "moves": 1,
+   "tdown": 286964,
+   "at": [
+    620,
+    310
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape\u00a0ui\u00a0parity\u00a0lane4-1115",
+      "Workspace",
+      "Main",
+      "Type",
+      "Part",
+      "Reference",
+      "Part\u00a01",
+      "In progress",
+      "View orientation",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1716,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.17026
+     }
+    }
+   },
+   "t": 313729,
+   "te": 313729
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "key",
+    "key": "mod+a"
+   },
+   "ok": true,
+   "ti": 313729,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape\u00a0ui\u00a0parity\u00a0lane4-1115",
+      "Workspace",
+      "Main",
+      "Type",
+      "Part",
+      "Reference",
+      "Part\u00a01",
+      "In progress",
+      "View orientation",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1716,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.17026
+     }
+    }
+   },
+   "t": 339113,
+   "te": 339113
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "type",
+    "text": "30"
+   },
+   "ok": true,
+   "ti": 339113,
+   "tdown": 339113,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape\u00a0ui\u00a0parity\u00a0lane4-1115",
+      "Workspace",
+      "Main",
+      "Type",
+      "Part",
+      "Reference",
+      "Part\u00a01",
+      "In progress",
+      "View orientation",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1716,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.17026
+     }
+    }
+   },
+   "t": 365672,
+   "te": 365672
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 365672,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "tdown": 365678,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape\u00a0ui\u00a0parity\u00a0lane4-1115",
+      "Workspace",
+      "Main",
+      "Type",
+      "Part",
+      "Reference",
+      "Part\u00a01",
+      "In progress",
+      "View orientation",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1716,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.17026
+     }
+    }
+   },
+   "t": 391803,
+   "te": 391803
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 600
+   },
+   "ok": true,
+   "ti": 391803,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "View properties",
+     "text": [
+      "View properties",
+      "Document",
+      "noshape\u00a0ui\u00a0parity\u00a0lane4-1115",
+      "Workspace",
+      "Main",
+      "Type",
+      "Part",
+      "Reference",
+      "Part\u00a01",
+      "In progress",
+      "View orientation",
+      "Scale",
+      "Rotation angle",
+      "Tangent edges",
+      "View render mode",
+      "View simplification",
+      "Sheet",
+      "Sheet1",
+      "Name",
+      "View label",
+      "Scale label",
+      "Show sketch appearances",
+      "Show annotations from model",
+      "BOM table reference",
+      "Cut list table reference"
+     ],
+     "fields": [
+      {
+       "label": "View orientation",
+       "kind": "select",
+       "value": "Front"
+      },
+      {
+       "label": "Explode/Position",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "Display state",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Solid"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Best performance"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Auto"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": ""
+      },
+      {
+       "label": "View label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Scale label",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show sketch appearances",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Show annotations from model",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      },
+      {
+       "label": "",
+       "kind": "select",
+       "value": "Unassigned"
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1716,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.17026
+     }
+    }
+   },
+   "t": 417829,
+   "te": 417829
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "ti": 417829,
+   "tmove": 417946,
+   "moves": 1,
+   "tdown": 418245,
+   "at": [
+    674,
+    90
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 444311,
+   "te": 444311
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 444312,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1 (3)",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "position": [
+        81,
+        81
+       ],
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
+    }
+   },
+   "t": 483722,
+   "te": 483722
+  }
+ ],
+ "t0_epoch_ms": 1795757080730
+}

@@ -1,0 +1,55 @@
+{
+ "name": "drw-bom-insert-bottom-to-top",
+ "about": "BOM table: Order Bottom to top, placed",
+ "area": "drawing",
+ "source": "live depth batch 5 (11-27)",
+ "start": "pin-block-asm-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "BOM table"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Top to bottom",
+    "pick": "Bottom to top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "sheet_point": [
+     260,
+     200
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
