@@ -1,6 +1,6 @@
 {
  "name": "drw-export-dwg-then-pdf",
- "about": "Export Drawing: DWG then back to PDF (are PDF's options kept?)",
+ "about": "Export Drawing: DWG then back to PDF (are PDF's options kept?) (Live's account remembers an earlier export's DWG 2018 and DXF Explode all into polylines: seeded.)",
  "area": "drawing",
  "source": "live depth batch 5 (11-27)",
  "start": "block-drawing",
@@ -56,5 +56,16 @@
    "until": "ms",
    "ms": 800
   }
- ]
+ ],
+ "config_files": {
+  "export_drawing.json": {
+   "format": "PDF",
+   "dwg": {
+    "version": 8
+   },
+   "dxf": {
+    "text": 2
+   }
+  }
+ }
 }
