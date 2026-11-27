@@ -1,5 +1,6 @@
 {
  "name": "export-parasolid-options",
+ "remembered": {"export": {"STL Format": "Binary", "Units": "Millimeter", "Resolution": "Medium", "Format": "STL", "Export models oriented Y axis up": false, "Options": "Download"}},
  "about": "block: the part's Export\u2026 dialog (opens on STL), Format PARASOLID, Y axis up on, Use latest version off, Cancel (the part's dialog has no unique-parts or hidden-instances boxes)",
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (Export dialog formats and options with no recorded scenario)",

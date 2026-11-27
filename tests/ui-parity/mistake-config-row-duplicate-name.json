@@ -1,0 +1,51 @@
+{
+ "name": "mistake-config-row-duplicate-name",
+ "about": "block: a second row named Default",
+ "area": "part-studio",
+ "source": "live depth batch 10 (parametric making; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_cell": ":Name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Default"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  }
+ ],
+ "config_data": true
+}

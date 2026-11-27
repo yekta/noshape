@@ -1,5 +1,6 @@
 {
  "name": "export-parts-two-selected",
+ "remembered": {"export": {"Format": "STEP", "Export models oriented Y axis up": false, "Preprocessing": "None", "Version": "AP242", "Use latest version": true, "Use custom units for export": false, "Include derived tolerances in export": true, "Use custom annotation text height for MBD export": false, "Options": "Store file in a new tab", "Export unique parts as individual files": false, "Include hidden instances in export": false}},
  "about": "spline-parts: Part 1 and Part 3 selected in the parts list, right-click \u203a Export\u2026, Format STL: the Export 2 Parts dialog",
  "area": "export",
  "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",

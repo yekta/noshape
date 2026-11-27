@@ -1,0 +1,1135 @@
+{
+ "scenario": "config-variable-input-dialog-fields",
+ "recorded": "2026-11-27T22:50:03.969Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.6"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "8b3a739f32e74904e12ce702",
+  "start": "block",
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "variables": {
+   "tables": [],
+   "configuration": null,
+   "insert_into_all": null,
+   "configuration_panel": false,
+   "help": null
+  },
+  "configurations": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Configuration panel"
+    }
+   },
+   "ok": true,
+   "ti": 24956,
+   "tmove": 25023,
+   "moves": 1,
+   "tdown": 25311,
+   "at": [
+    1904,
+    478
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 262.974,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "variables": {
+     "tables": [],
+     "configuration": [],
+     "insert_into_all": null,
+     "configuration_panel": true,
+     "help": null
+    },
+    "configurations": null
+   },
+   "t": 27530,
+   "te": 27530
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 27530,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 262.974,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "variables": {
+     "tables": [],
+     "configuration": [],
+     "insert_into_all": null,
+     "configuration_panel": true,
+     "help": null
+    },
+    "configurations": null
+   },
+   "t": 30862,
+   "te": 30862
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "caret": "Add configuration input"
+    }
+   },
+   "ok": true,
+   "ti": 30862,
+   "tmove": 30903,
+   "moves": 1,
+   "tdown": 31194,
+   "at": [
+    1653,
+    129
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "List",
+      "Checkbox",
+      "Configuration variable"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 262.974,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "variables": {
+     "tables": [],
+     "configuration": [],
+     "insert_into_all": null,
+     "configuration_panel": true,
+     "help": null
+    },
+    "configurations": null
+   },
+   "t": 33077,
+   "te": 33077
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Configuration variable"
+    }
+   },
+   "ok": true,
+   "ti": 33077,
+   "tmove": 33120,
+   "moves": 2,
+   "tdown": 34198,
+   "at": [
+    1564,
+    225
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "title": "Variable input",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Integer",
+       "selected": false
+      },
+      {
+       "label": "Real",
+       "selected": false
+      },
+      {
+       "label": "Text",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "Default",
+       "kind": "number",
+       "text": "1 mm"
+      },
+      {
+       "label": "Minimum",
+       "kind": "number",
+       "text": "0 mm"
+      },
+      {
+       "label": "Maximum",
+       "kind": "number",
+       "text": "100000 mm"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "titleState": "error"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "configuration-setup-dialog",
+      "title": "Variable input",
+      "text": "Variable input / Name / Length / Angle / Integer / Real / Text / Default / Minimum / Maximum",
+      "inputs": [
+       {
+        "placeholder": "Name",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": "1 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "0 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "100000 mm"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 262.974,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "variables": {
+     "tables": [],
+     "configuration": [],
+     "insert_into_all": null,
+     "configuration_panel": true,
+     "help": null
+    },
+    "configurations": null
+   },
+   "t": 36352,
+   "te": 36352
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 36352,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "title": "Variable input",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Integer",
+       "selected": false
+      },
+      {
+       "label": "Real",
+       "selected": false
+      },
+      {
+       "label": "Text",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "Default",
+       "kind": "number",
+       "text": "1 mm"
+      },
+      {
+       "label": "Minimum",
+       "kind": "number",
+       "text": "0 mm"
+      },
+      {
+       "label": "Maximum",
+       "kind": "number",
+       "text": "100000 mm"
+      }
+     ],
+     "error": null,
+     "ok": "disabled",
+     "titleState": "error"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "configuration-setup-dialog",
+      "title": "Variable input",
+      "text": "Variable input / Name / Length / Angle / Integer / Real / Text / Default / Minimum / Maximum",
+      "inputs": [
+       {
+        "placeholder": "Name",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": "1 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "0 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "100000 mm"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 262.974,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "variables": {
+     "tables": [],
+     "configuration": [],
+     "insert_into_all": null,
+     "configuration_panel": true,
+     "help": null
+    },
+    "configurations": null
+   },
+   "t": 39747,
+   "te": 39747
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "type",
+    "text": "len"
+   },
+   "ok": true,
+   "ti": 39747,
+   "tdown": 39747,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "len",
+     "selection": [
+      3,
+      3
+     ],
+     "all": false
+    },
+    "dialog": {
+     "title": "Variable input",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Integer",
+       "selected": false
+      },
+      {
+       "label": "Real",
+       "selected": false
+      },
+      {
+       "label": "Text",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "string",
+       "text": "len"
+      },
+      {
+       "label": "Default",
+       "kind": "number",
+       "text": "1 mm"
+      },
+      {
+       "label": "Minimum",
+       "kind": "number",
+       "text": "0 mm"
+      },
+      {
+       "label": "Maximum",
+       "kind": "number",
+       "text": "100000 mm"
+      }
+     ],
+     "error": null,
+     "ok": "enabled",
+     "titleState": "ok"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "configuration-setup-dialog",
+      "title": "Variable input",
+      "text": "Variable input / Name / Length / Angle / Integer / Real / Text / Default / Minimum / Maximum",
+      "inputs": [
+       {
+        "placeholder": "Name",
+        "value": "len"
+       },
+       {
+        "placeholder": null,
+        "value": "1 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "0 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "100000 mm"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 262.974,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "variables": {
+     "tables": [],
+     "configuration": [],
+     "insert_into_all": null,
+     "configuration_panel": true,
+     "help": null
+    },
+    "configurations": null
+   },
+   "t": 41873,
+   "te": 41873
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "ti": 41873,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "len",
+     "selection": [
+      3,
+      3
+     ],
+     "all": false
+    },
+    "dialog": {
+     "title": "Variable input",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Integer",
+       "selected": false
+      },
+      {
+       "label": "Real",
+       "selected": false
+      },
+      {
+       "label": "Text",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "string",
+       "text": "len"
+      },
+      {
+       "label": "Default",
+       "kind": "number",
+       "text": "1 mm"
+      },
+      {
+       "label": "Minimum",
+       "kind": "number",
+       "text": "0 mm"
+      },
+      {
+       "label": "Maximum",
+       "kind": "number",
+       "text": "100000 mm"
+      }
+     ],
+     "error": null,
+     "ok": "enabled",
+     "titleState": "ok"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "configuration-setup-dialog",
+      "title": "Variable input",
+      "text": "Variable input / Name / Length / Angle / Integer / Real / Text / Default / Minimum / Maximum",
+      "inputs": [
+       {
+        "placeholder": "Name",
+        "value": "len"
+       },
+       {
+        "placeholder": null,
+        "value": "1 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "0 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "100000 mm"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 262.974,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "variables": {
+     "tables": [],
+     "configuration": [],
+     "insert_into_all": null,
+     "configuration_panel": true,
+     "help": null
+    },
+    "configurations": null
+   },
+   "t": 44198,
+   "te": 44198
+  }
+ ],
+ "t0_epoch_ms": 1795819784500
+}

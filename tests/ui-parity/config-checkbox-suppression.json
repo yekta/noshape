@@ -1,0 +1,74 @@
+{
+ "name": "config-checkbox-suppression",
+ "about": "block: a Checkbox input Thick, then Extrude 1 \u203a Configure suppression: the panel's table",
+ "area": "part-studio",
+ "source": "live depth batch 10 (parametric making; lead 11-27)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Checkbox"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "type",
+   "text": "Thick"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure suppression"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  }
+ ],
+ "config_data": true
+}

@@ -1,0 +1,43 @@
+{
+ "name": "mistake-vs-undefined",
+ "about": "vs-vars: Variable Studio 1: height = #nope + 1 mm",
+ "area": "part-studio",
+ "source": "live depth batch 10 (parametric making; lead 11-27)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "height:Value"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "#nope + 1 mm"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

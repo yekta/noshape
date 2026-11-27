@@ -1,5 +1,6 @@
 {
   "name": "drw-export-formats-more",
+  "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
   "about": "The Export dialog's other formats in turn: DWT, JPEG, TIFF, Drawing definition list, Inspection list, then Cancel",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",

@@ -1,5 +1,6 @@
 {
  "name": "drw-export-format-svg",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "Export Drawing: Format SVG (its options), Cancel",
  "area": "drawing",
  "source": "live depth batch 5 (11-27)",

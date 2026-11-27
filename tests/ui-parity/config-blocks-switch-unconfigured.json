@@ -1,0 +1,33 @@
+{
+ "name": "config-blocks-switch-unconfigured",
+ "about": "config-blocks: Size set to Large with nothing configured: the features and parts stay",
+ "area": "part-studio",
+ "source": "live depth batch 10 (parametric making; lead 11-27)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_param": "Size",
+    "pick": "Large"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 3000
+  }
+ ],
+ "config_data": true
+}

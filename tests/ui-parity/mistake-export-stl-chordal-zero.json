@@ -1,5 +1,6 @@
 {
  "name": "mistake-export-stl-chordal-zero",
+ "remembered": {"export": {"STL Format": "Binary", "Units": "Millimeter", "Resolution": "Medium", "Format": "STL", "Export models oriented Y axis up": false, "Options": "Store file in a new tab"}},
  "about": "block: STL, Resolution Custom, Chordal tolerance 0, Export; Export\u2026 again (what was kept), Medium, Export",
  "area": "export",
  "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",

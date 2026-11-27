@@ -1,5 +1,6 @@
 {
  "name": "drw-export-format-dxf",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "Export Drawing: Format DXF (its options), Cancel (Live's account remembers an earlier export's DWG 2018 and DXF Explode all into polylines: seeded.)",
  "area": "drawing",
  "source": "live depth batch 5 (11-27)",

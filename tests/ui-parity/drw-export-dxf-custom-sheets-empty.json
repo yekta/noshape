@@ -1,5 +1,6 @@
 {
  "name": "drw-export-dxf-custom-sheets-empty",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "Export...: DXF, Sheets -> Custom sheets: the range box and the red 'Sheet range cannot be empty'; Cancel",
  "area": "dx",
  "source": "studios 11-12 (drawing gap audit, behaviours L1545)",

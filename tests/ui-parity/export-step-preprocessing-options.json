@@ -1,5 +1,6 @@
 {
  "name": "export-step-preprocessing-options",
+ "remembered": {"export": {"STL Format": "Binary", "Units": "Millimeter", "Resolution": "Medium", "Format": "STL", "Export models oriented Y axis up": false, "Options": "Download"}},
  "about": "block: the part's Export\u2026 dialog (opens on STL), Format STEP, Preprocessing Automatic, custom units on, derived tolerances off, custom annotation text height on, Cancel",
  "area": "psui",
  "source": "live coverage audit 2026-11-14 (Export dialog formats and options with no recorded scenario)",

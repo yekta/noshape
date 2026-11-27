@@ -1,5 +1,6 @@
 {
  "name": "rel-rh-export",
+ "remembered": {"export": {"Format": "STL", "Export models oriented Y axis up": false, "STL Format": "Binary", "Units": "Millimeter", "Resolution": "Medium", "Options": "Download"}},
  "about": "After releasing Part 1: Revision history › the row's Export",
  "area": "studios",
  "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1) Recordable since 11-14 (Professional): a company-owned start (live2 COMPANYOWNED=1), managed workflows on. Recorded by live 11-15 (company-owned doc-versions, workflows on). Live's Export opened with its last-used format (STL, Millimeter): config_files export_solid.json.",

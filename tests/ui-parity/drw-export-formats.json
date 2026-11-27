@@ -1,5 +1,6 @@
 {
   "name": "drw-export-formats",
+  "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
   "about": "studios 08:58: Export… Format list, DWG version list, PDF",
   "area": "studios",
   "ticket": "DRAWING-UI-PARITY",

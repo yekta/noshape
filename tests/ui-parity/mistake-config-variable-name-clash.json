@@ -1,0 +1,57 @@
+{
+ "name": "mistake-config-variable-name-clash",
+ "about": "vars: a Configuration variable named width beside the #width variable",
+ "area": "part-studio",
+ "source": "live depth batch 10 (parametric making; lead 11-27)",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configuration variable"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "type",
+   "text": "width"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ],
+ "config_data": true
+}

@@ -1,5 +1,6 @@
 {
  "name": "drw-export-dialog",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "right-click the drawing tab, Export\u2026: the Export Drawing dialog's fields (its last-used format); then Cancel",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",

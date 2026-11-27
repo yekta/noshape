@@ -1,5 +1,6 @@
 {
  "name": "export-stl-inch",
+ "remembered": {"export": {"Format": "3MF", "Export models oriented Y axis up": false, "Resolution": "Medium", "Options": "Store file in a new tab"}},
  "about": "maker-plate: the plate's Export\u2026, STL, Units Inch, Export; Export\u2026 again: Inch remembered; Millimeter, Export",
  "area": "export",
  "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",

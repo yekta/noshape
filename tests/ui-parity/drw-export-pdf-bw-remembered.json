@@ -1,5 +1,6 @@
 {
  "name": "drw-export-pdf-bw-remembered",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "Export...: PDF, Color -> Black and white, Export (the bubble); Export... again shows PDF with Black and white; then Color restored and exported",
  "area": "dx",
  "source": "studios 11-12 (drawing gap audit, behaviours L14938, L35233)",

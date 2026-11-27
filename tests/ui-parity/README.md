@@ -42,6 +42,12 @@ show (release management on the Free plan), with `source` "spec from Onshape doc
 counts toward coverage, never toward match (live has no recording of it); live's runners skip it. `--all` runs it on
 ours.
 
+`"remembered": {"export": {label: value}}` (live 11-27, qa EXPORT-REMEMBERED-START): live's account remembers the
+Export dialogs' last Format, Options, Units (and the format's own selects and checkboxes) across takes, so a take's
+Export opens at what the previous take left. These are the select and checkbox fields of the first Export… /
+Export N Parts / Export Drawing / Export as DXF/DWG dialog the take opened, as live showed them; ours presets them
+as its remembered export settings before the first state.
+
 ### start
 A name from `starts.json`: a units setting and a feature list in FeatureScript terms (std's feature types and
 parameter ids; sketches as shapes with corner / centre points in mm on a named plane), so live builds it over REST
@@ -199,6 +205,24 @@ A target a side can't find makes that step `"ok": false` with `"error"`; the run
 `{"button": "Configuration panel"}` (the right strip), `{"button": "Add configuration input"}` (Configure Part
 Studio, or the panel's bottom button: by their shared tooltip), `{"config_more": "<input name>"}` an input's ⋯,
 `{"config_more": ""}` the panel's own ⋯ (by Filter inputs), `{"config_row": "<row name>"}` a List input's row.
+
+Live 11-27 (depth batch 10): `{"config_cell": "<row>:<column>"}` a List input table's cell, the row by its name (`""`
+the add row below the last), the column by its header (`"Name"`, a configured parameter's `"Depth"`, a configured
+suppression's `"Extrude 2"`, `""` the row's gutter); `"input": "<input name>"` picks the table when there are several
+(else the first). `{"config_param": "<input>", "pick": "<row>"}` an input in the Configurations box above the feature
+list (shown once the Part Studio is configured): a List's select and the row picked (switches the configuration), a
+Checkbox's box (toggles it), a Configuration variable's value field (click, then type and Enter).
+
+`"config_data": true` (a scenario key): each Part Studio state also has
+- `variables` as on a Variable Studio tab (below): `tables` the Variable table panel's tables while it is open (`[]`
+  closed), `configuration` the Configuration panel's inputs while it is open (null closed); a List input adds
+  `"columns": ["Extrude 1 › Depth"]` (each configured parameter, "<feature> › <parameter>") and `"values": [["10 mm"],
+  ["20 mm"]]` (per row, in row order: a value's text, a suppression's checked as true / false); `shown` is the row the
+  Part Studio shows;
+- `configurations`: the Configurations box above the feature list, `[{"label": "Configuration", "kind": "list",
+  "value": "Large"}, {"label": "Thick", "kind": "checkbox", "value": true}, {"label": "len", "kind": "variable",
+  "value": "25 mm"}]`; null while the Part Studio has no configuration input.
+Regeneration after a switch or an edit is read from the Mass properties dialog's Volume (the takes end on it).
 
 ### Part Studio panels, picks and in context (psui, 11-07)
 

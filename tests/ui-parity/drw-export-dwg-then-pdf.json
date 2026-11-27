@@ -1,5 +1,6 @@
 {
  "name": "drw-export-dwg-then-pdf",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "Export Drawing: DWG then back to PDF (are PDF's options kept?) (Live's account remembers an earlier export's DWG 2018 and DXF Explode all into polylines: seeded.)",
  "area": "drawing",
  "source": "live depth batch 5 (11-27)",

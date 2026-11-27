@@ -1,5 +1,6 @@
 {
  "name": "doc-tab-menu-export",
+ "remembered": {"export": {"Format": "PARASOLID", "Export models oriented Y axis up": false, "Version": "38.1", "Use latest version": true, "Options": "Download", "Export unique parts as individual files": false, "Include hidden instances in export": false}},
  "about": "Part Studio tab › Export…: the Export modal, then cancel",
  "area": "studios",
  "source": "everyday (studios 11-07, Documents batch 3)",

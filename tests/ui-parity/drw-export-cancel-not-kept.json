@@ -1,5 +1,6 @@
 {
  "name": "drw-export-cancel-not-kept",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "Export...: Format PDF -> DXF, Cancel; Export... again opens on the last exported format, not DXF",
  "area": "dx",
  "source": "studios 11-12 (drawing gap audit, behaviours L35240)",

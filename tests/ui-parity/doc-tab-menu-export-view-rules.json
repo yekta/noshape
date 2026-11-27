@@ -1,5 +1,6 @@
 {
  "name": "doc-tab-menu-export-view-rules",
+ "remembered": {"export": {"Format": "PARASOLID", "Export models oriented Y axis up": false, "Version": "38.1", "Use latest version": true, "Options": "Download", "Export unique parts as individual files": false, "Include hidden instances in export": false}},
  "about": "a Part Studio tab › Export… › View export rules (Preferences at User export rules)",
  "area": "studios",
  "source": "psui 11-09 (documents coverage)",

@@ -1,5 +1,6 @@
 {
  "name": "drw-export-format-dwt",
+ "remembered": {"export": {"Format": "PDF", "Version": "1.5", "Overridden dimensions": "Show underlines", "Text": "Normal", "Color": "Color", "Options": "Download", "Hide inspection items": false}},
  "about": "Export Drawing: Format DWT (its options), Cancel",
  "area": "drawing",
  "source": "live depth batch 5 (11-27)",

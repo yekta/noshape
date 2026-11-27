@@ -1,5 +1,6 @@
 {
  "name": "export-asm-instance-3mf",
+ "remembered": {"export": {"STL Format": "Binary", "Units": "Millimeter", "Resolution": "Medium", "Format": "STL", "Export models oriented Y axis up": false, "Options": "Store file in a new tab"}},
  "about": "pin-block: the assembly: the pin's row \u203a Export\u2026, 3MF, Export",
  "area": "export",
  "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",

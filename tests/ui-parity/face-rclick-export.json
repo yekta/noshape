@@ -1,5 +1,6 @@
 {
  "name": "face-rclick-export",
+ "remembered": {"export": {"Format": "PARASOLID", "Export models oriented Y axis up": false, "Version": "38.1", "Use latest version": true, "Options": "Download"}},
  "about": "the block's top face right-clicked: Export… opens the part's export dialog (format, options); Esc cancels",
  "area": "psui",
  "source": "psui coverage audit 2026-11-12, batch 3 (docs/parity/ps-coverage-audit.md \"Still left\")",

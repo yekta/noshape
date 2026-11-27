@@ -1,5 +1,6 @@
 {
  "name": "export-parts-three-individual-files",
+ "remembered": {"export": {"STL Format": "Binary", "Units": "Millimeter", "Resolution": "Medium", "Format": "STL", "Export models oriented Y axis up": false, "Options": "Store file in a new tab", "Export unique parts as individual files": false, "Include hidden instances in export": false}},
  "about": "spline-parts: all three parts selected, Export\u2026, STL, Export unique parts as individual files on, Export; Export\u2026 again (the remembered state), the box off, Export",
  "area": "export",
  "source": "live depth batch 8 (after modelling: export, measure, mass properties, section view; lead 11-27)",
