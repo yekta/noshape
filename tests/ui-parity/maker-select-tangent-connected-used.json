@@ -68,6 +68,13 @@
    "ms": 600
   },
   {
+   "do": "hover",
+   "on": {
+    "menu": "Tangent connected edges"
+   },
+   "ms": 300
+  },
+  {
    "do": "click",
    "on": {
     "menu": "Tangent connected edges"
