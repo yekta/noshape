@@ -19,6 +19,57 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
+## NEXT (state 11-27 01:36 UTC; lead 01:1x: stage 1 land, stage 2 gate, nuts land, unify under the full gate)
+- STAGE 1 = 568ee31d2 LANDING (gate dc6352480: replay +0 -0, suite 131 -> 131, speed 1.00x, shells 6 -> 6, crates
+  pass; knurls on vibex7 (/root/bool-scratch/kn-s1.sh): 0 diff lines in all 5).
+- STAGE 2 = 0c3bcfec3 (bool-ms2, branch bool-ffm2 on stage 1): gate unit bool-gate-0c3bcfec3-x8 running since 01:17
+  -> /root/bool-hat-scratch/chain-0c3bcfec3.out; then knurls (kn-s1.sh pattern: copy the gate trees' binaries first).
+  Ahead() runs march::own for ext x ext, ext x nurbs, ext x revolution, rational nurbs x torus; NOSHAPE_BOOL_MARCH=0
+  off. Report docs moved + per-family ms (5 vs 66, 41 vs 199, 8 vs 26, 11 vs 164).
+- NUTS DIVIDER = 44b3ab42e (bool-fb, branch bool-nuts-div on 0c3bcfec3; skasm's exact-cylinder patch inside): cylinder
+  faces going round > a turn divided by iso-u lines, rejoined after. Nuts removes 8.615 (live 8.6), c2-config-parts-nuts
+  17/17 (OCCT only 14/17); kernel 617/617, clippy, GCC 13 ok. Gate after stage 2's, land, tell skasm. bool-fb's
+  brep_replay.rs probes uncommitted (/root/bool-scratch/probes-fb.diff): never commit.
+- UNIFY (lead GO: after the three above; gate all corpora + parity56 + knurls + full model suite, 0 new differences or
+  each closer to live). bool-uv, branch bool-unify-verts on 44b3ab42e, UNCOMMITTED, probes removed: OcShape::
+  myInputVertices (op_boolean, !opts.unify); unify_keeping_inputs at every Boolean unify (rust, local, trimmed, OCCT
+  paths) and op_unify: input vertices the unify removed with no edge of theirs removed -> rerun with t_unify_keep
+  (keep_marked_edges KeepShape, merge_planar mergeable, join_loop_pieces joints skip them); merge_planar collinear =
+  shared vertex within 1e-7 m of the far ends' line, between them. Rib 1 now 73/214/144 = live. T1
+  boolean_groups::a_fuses_unify_joins_edges_only_at_the_booleans_vertices (data/topology/parting-line-rib1.brep.zst).
+  Kernel 617/618: bool_patterns::an_invalid_fuse_result_unifies_as_usd 1173 -> 1131 faces (louver's invalid fuse
+  result, only the distance test applies): look why before the gate.
+
+## NEXT (state 11-26 22:40 UTC)
+- IMPELLER MOVE FACE 1 (core P0 via lead): reported 22:15, NOT ours: the regen records the fuse as path occt, empty; ours
+  declines ("a point near two vertices"); OCCT is empty on core's files (vibex8 ~/tmp/bool/mf1-bool, mode 700) with
+  rust 0/1, fuzzy, serial, swap, scaled. RUST=0 is Ok only because its body differs (upstream feature 15 / Fillet 3).
+- NUTS Sweep 1 (skasm's patch, bool-fb's copy /root/bool-scratch/bool-fb-nuts-applied.diff): the cut (recorded vibex8
+  ~/tmp/bool/nr/rec/8f220cf13f4e37aa) goes to OCCT (ours declines the B-spline flanks) and fails: tool crest = exact cylinder
+  r 1.621 on the bore's own cylinder, ONE face over 7 turns (u 5.8..50.7); OCCT common 0, cut removes 26 mm3 (live 8.6),
+  18 non-manifold edges. Point classification is fine; OCCT's same-domain cylinder handling of a >2pi face is not.
+  ShapeDivideAngle doesn't split it. Fix idea (not started, tell lead): split >1-turn cylinder faces at u=2pi*k before
+  the Boolean (pcurves projected are wrong period: split_on won't do), rejoin after; or skasm's sweep makes per-turn faces.
+- RIB 1 (parting-line, recorded vibex8 ~/tmp/bool/nr/recpl/f5c8541ff0c9e0c3, fuse BOTTOM + 8 ribs): ours = OCCT exactly
+  (149/354/208, unified 73/213/143, live 73/214/144). Our unify (boolean.cpp ~12440: keeps every vertex not freed) leaves
+  e136 8.338 + e137 0.224 mm collinear lines between faces z 3 and x -21.5 (vertex shared by only those two). Vertex
+  policy question, not the Boolean; parked.
+- STAGE 2 IN PROGRESS: worktree bool-ms2, branch bool-ffm2 on bool-ffm (uncommitted): march::family() (kinds nurbs /
+  rational nurbs / torus / sphere / extrusion / revolution) + per-family counts in free_sections_vs_occt. Run over all
+  corpora (vibex8 ~/tmp/bool/ffms2.out, kt-ms2): 0-differ families with matches: extrusion x extrusion (4, ours 5 vs
+  OCCT 66 ms), extrusion x nurbs (11, 41 vs 199), extrusion x revolution (23, 8 vs 26), rational nurbs x torus (2, 11
+  vs 164). Differing: nurbs x nurbs (3: shfall 08547623), nurbs x sphere (2: sp-cut 990256f0) -> OCCT. Others 0 matched.
+  DESIGN (to write): march.rs FAMILIES + set_on (kernel: NOSHAPE_BOOL_MARCH=0 off) + takes(); lib.rs Output.marched
+  Vec<Marched{faces [(arg,face);2], on [NurbsCurve;2], tol}> (blend.rs/prism.rs ctors too); boolean.rs ahead block
+  (~5800): pairs of those families, not canonical pairs of moves, marched by par_map, ids OWN=1<<31|k, removed from
+  src.ahead; occt_sections: cx.marched first (reverse order: swap on); kernel fill_result: march_faces (4 u32) + march
+  (on0/on1 offsets via push_curve, tol) new BrepResult fields; rust_boolean.cpp type-5 branch (~1911): id&OWN -> EllEdge
+  from decoded NURBS (3D at cv[1], 2D pcurves) and input(srcs, arg, FACE, idx) faces. T1, then gate + parity56 + knurls,
+  A/B per family (docs moved, time).
+- Probe trees (never commit): bool-mf (old main 13:45; probes in brep_replay.rs + features.cpp NOSHAPE_PROBE_ANGLE),
+  bool-fb (detached origin/main c49a13ee0 + probe_pair_files). vibex8 binaries kt-fb, kt-main, kt-ms2, recordings
+  ~/tmp/bool/nr, mf1-bool; vibex7 ~/tmp/bool/nr (ops-nuts, rec*): delete when done.
+
 ## NEXT (state 11-26 21:40 UTC)
 - LANDED c31e98add (asm-scissor-lift Hole 2 falls back). Cleanup due: vibex7 + vibex8 ~/tmp/bool/hole2,
   /root/bool-scratch/h2, vibex7 ~/tmp/bool/knfb, bool-fb's target.
