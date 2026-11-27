@@ -1,0 +1,29 @@
+{
+ "name": "part-menu-configured-release-items",
+ "start": "config-ps",
+ "area": "part-studio",
+ "source": "psui 11-27 02:5x (3) coverage: Release all configurations\u2026",
+ "about": "config-ps (config-blocks' Part Studio, company-owned, managed workflows ON): right-click Part 1 in the Parts list: the menu (release items of a configured Part Studio), Escape",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}

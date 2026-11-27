@@ -1,0 +1,51 @@
+{
+ "name": "part-menu-release-all-configurations",
+ "start": "config-ps",
+ "area": "part-studio",
+ "source": "psui 11-27 02:5x (3) coverage: Release all configurations\u2026",
+ "about": "config-ps (config-blocks' Part Studio, company-owned, managed workflows ON): Parts list \u203a Part 1 \u203a Release all configurations\u2026: the dialog 8 s later, Escape (doesn't close it), then Close (nothing released)",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release all configurations\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 8000
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  }
+ ]
+}
