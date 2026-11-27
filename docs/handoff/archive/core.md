@@ -5150,3 +5150,10 @@ skasm meanwhile; I'll list what I change here before landing.
   Boolean errors; sections diving to d = q + (q-c)/|q-c| * r/10 (or r/2): a face 64-152 um in air, fuses lose the body.
   Needs the turn region derived properly (what live's 2.7077 face is) or native blend faces. GProp volumes of this
   body are noise (72199 default vs 66062 adaptive, +59 after a good fuse): judge fuses by result-body / body-result.
+
+## Moved 11-27 08:2x
+- **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
+  39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
+  live 11-27 (live/core/body-draft-self-1127): Body draft with Draft on self: Faces scope -> ERROR
+  BODY_DRAFT_INVALID_FACE_REFERENCE, Edges scope -> BODY_DRAFT_INVALID_EDGE_REFERENCE, part unchanged; with a parting
+  plane both OK (8043.7443 mm3 on 40x20x10, pull Top, 5 deg, z5). An edge in Faces -> BODY_DRAFT_SELECT_FACES.

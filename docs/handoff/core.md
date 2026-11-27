@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 08:05 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 08:44 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 ## P0s (lead 11-26; block v0.4.72)
@@ -28,11 +28,29 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   live face for face at Fillet Stevenrohr einnschub. Corpus (OLD 11-18 import): Sketch Bohrung Flansch "Select a sketch
   plane." + 3 downstream: its plane is Extrude 6's CapEnd, whose sides Move face 1 offsets; Move face 1 was Error in
   the import's build, now Ok, so the old name is gone (fresh import resolves it). knifehandle -0.02 mm3 (check vs live).
+- **P0 FIRST (lead 11-27 08:1x; qa compat on green 6c2c1fe9 vs 0.4.72): OLD-IMPORT REFERENCES IN c2-impeller-loft.**
+  Sketch Bohrung Flansch Ok -> Error "Select a sketch plane." (+ Remove/Extrude Bohrungssitz, Fillet Bohrungen Flansch,
+  Fillet Flansch zum Stroemungskanal). CAUSE (08:2x): 664abc017 (rim chamfer) made the old import's Move face 1 Ok
+  (compat 5e42155d clean, 6c2c1fe9 first bad). Move face 1 offsets Extrude 6's side + Extrude 4's CapStart by OCCT's
+  offset (direct.rs name_result with offset_role): every face it touches named Offset(the one it was), so Extrude 6's
+  CapEnd (only re-trimmed) -> Face{MF1, Offset(CapEnd)}, then Split by MF2; the saved sketch names the bare CapEnd.
+  FIX 65cc51362 (LANDING with f4b54ff9c): direct.rs alias_offset_faces at move_face's end: each Offset(k) this Move face made
+  whose k no longer resolves gets an alias k -> Offset(k) (Bodies aliases; edges by those faces follow too). T1
+  features_a::a_sketch_on_a_face_a_move_face_before_it_offsets_follows_the_face (.mf1.sh). Corpus A/B .ab12.sh on
+  vibex8: ONLY impeller differs; its 5 features back to 0.4.72's exact states (sketch Ok, Remove/Bohrungssitz Info,
+  Fillet Bohrungen 'Unfilleted edge overlapped', zum Stroemungskanal Ok); 8 parts (7 seat solids 255 mm3, as 0.4.72's 10). Probes: core-scratch/p0imp/{names,fg,dec}.py
+  (vibex7 ~/tmp/core: release vs green face names, decoded ids).
+- **RIB-FLIPPED-MESSAGE: COMMITTED f4b54ff9c (core-uip3, lands with the P0 fix)**: solid_a.rs rib one-piece branch: RIB_MISS unless
+  the user's "Extend profiles to part" extension misses the part (L22 -> RIB_FAILED); tests features_a::rib_in_l_bracket
+  (flipped -> miss), kernel_robustness hole_and_rib R3 no longer OPEN. Rib tests 14/14 ok (.rb1.sh,
+  08:1x). FACE-PATTERN-BOSS-LIVE-FAILS checked 08:2x (probe core-scratch/p0imp/probe-fp.rs, not committed): ours
+  one solid, OCCT-valid, +502.65 mm3 (the copy whole), but the two bosses' cylinders TOUCH along a line (y -4) with no
+  edge: non-manifold contact (Parasolid's reason to fail). Told the lead; a fix = a touching-faces check after the pattern.
 - **ZUM HALTER CORNER: PARKED (lead 11-27 07:4x; Error as in 0.4.72 and main): native-blend-faces candidate.** WIP
   core-scratch/imp/crease-turn-wip3.patch (notes core-scratch/imp/corner-notes.md; the full STATE text in the archive):
   crease junctions, both crease edges untrimmed, >= 32 stations at creases (0.06 um on the bevel), fuzzy Fuse retry
   (unsafe alone: fuzzy fuses returned valid shapes that lost the body). The crease TURNS break every Boolean.
-- **QA 11-27 uipdep3 rows (TICKETS 118cba619), worktree core-uip3: LANDING 11-27 08:0x**: FULL-ROUND-SPLITS-PART
+- **QA 11-27 uipdep3 rows (TICKETS 118cba619), worktree core-uip3: QUEUED 8cec2b63 08:0x**: FULL-ROUND-SPLITS-PART
   (detail.rs full_round: the tool's top half way to where the sides meet when sooner than r; the ridge's slopes cross
   1.4 mm over its top, r 13.4: a bowtie section, 3 parts) and SWEEP-THIN-EDGE-NO-TRIM (thin.rs line_frame: a part's
   straight edge wall in the plane square to the path; has_planeless_part_wall -> sweep.fs's warning "Failed to find
@@ -46,11 +64,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   part NAMES still differ from live (later).
 - **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity_impeller_loft_regenerates_in_time < 40 s).
 ## Now (11-25)
-- **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
-  39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
-  live 11-27 (live/core/body-draft-self-1127): Body draft with Draft on self: Faces scope -> ERROR
-  BODY_DRAFT_INVALID_FACE_REFERENCE, Edges scope -> BODY_DRAFT_INVALID_EDGE_REFERENCE, part unchanged; with a parting
-  plane both OK (8043.7443 mm3 on 40x20x10, pull Top, 5 deg, z5). An edge in Faces -> BODY_DRAFT_SELECT_FACES.
 - **SCISSOR 11-26 15:0x (in 56131f3c)**: (a) detail_a.rs blends_to_reapply: the spread
   to "blends touching removed blends" skips a LARGER cylinder met along a line (the round's support): 9cbb0e MF2 now
   live's 44 faces, 109400.892 (live .89). (b) direct.rs tweak_planes_in_turn: planes facing several ways (all
