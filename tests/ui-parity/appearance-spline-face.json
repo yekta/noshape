@@ -1,0 +1,65 @@
+{
+ "name": "appearance-spline-face",
+ "about": "spline-parts: the spline face › Add appearance to face…, # FFAA00, Enter; the panel",
+ "area": "part-studio",
+ "source": "live depth batch 9 (the part's look and data; lead 11-27)",
+ "start": "spline-parts",
+ "part_data": true,
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     52,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add appearance to face…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "#"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "FFAA00"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Appearance panel"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

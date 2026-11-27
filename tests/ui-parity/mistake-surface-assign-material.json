@@ -1,0 +1,71 @@
+{
+ "name": "mistake-surface-assign-material",
+ "about": "surfaces: right-click Surface 2 › Assign material for Surface 2… (a surface takes a material too), ABS, OK",
+ "area": "part-studio",
+ "source": "live depth batch 9 (the part's look and data; lead 11-27)",
+ "start": "surfaces",
+ "part_data": true,
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     10,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Assign material for Surface 2…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Material"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "type",
+   "text": "ABS"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

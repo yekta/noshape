@@ -1,0 +1,50 @@
+{
+ "name": "appearance-part-opacity-half",
+ "about": "block: Edit appearance…, A (opacity) 0.5, Enter: a see-through part",
+ "area": "part-studio",
+ "source": "live depth batch 9 (the part's look and data; lead 11-27)",
+ "start": "block",
+ "part_data": true,
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit appearance…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "A"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "0.5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

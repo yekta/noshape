@@ -1,0 +1,65 @@
+{
+ "name": "properties-two-parts-description",
+ "about": "overlap: Part 1 and Part 2 › Properties…: Description Bracket, Save: both",
+ "area": "part-studio",
+ "source": "live depth batch 9 (the part's look and data; lead 11-27)",
+ "start": "overlap",
+ "part_data": true,
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Description"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Bracket"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Save"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2000
+  }
+ ]
+}

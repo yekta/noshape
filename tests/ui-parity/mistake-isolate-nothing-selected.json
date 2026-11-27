@@ -1,0 +1,23 @@
+{
+ "name": "mistake-isolate-nothing-selected",
+ "about": "block: Shift+I (Isolate) with nothing selected",
+ "area": "part-studio",
+ "source": "live depth batch 9 (the part's look and data; lead 11-27)",
+ "start": "block",
+ "part_data": true,
+ "steps": [
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "shift+i"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

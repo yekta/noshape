@@ -1,0 +1,3142 @@
+{
+ "scenario": "mistake-surface-assign-material",
+ "recorded": "2026-11-27T21:20:42.912Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.4"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "30c107f2b5cee1a20abc3723",
+  "start": "surfaces",
+  "startElement": "d2fe165f32216a89775a7d24",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 3"
+  },
+  "parts": [
+   "Part 1",
+   "Surfaces (2)"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "part_data": [
+   {
+    "name": "Part 1",
+    "part_number": null,
+    "description": null,
+    "material": null,
+    "appearance": {
+     "hex": "3B61B4",
+     "opacity": 255,
+     "default": true
+    },
+    "hidden": false
+   },
+   {
+    "name": "Surface 1",
+    "part_number": null,
+    "description": null,
+    "material": null,
+    "appearance": {
+     "hex": "9DCFED",
+     "opacity": 255,
+     "default": true
+    },
+    "hidden": false
+   },
+   {
+    "name": "Surface 2",
+    "part_number": null,
+    "description": null,
+    "material": null,
+    "appearance": {
+     "hex": "A5A5A5",
+     "opacity": 255,
+     "default": true
+    },
+    "hidden": false
+   }
+  ]
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "face": [
+      10,
+      10,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 25628,
+   "tmove": 25681,
+   "moves": 1,
+   "hover": [
+    "JIC"
+   ],
+   "tdown": 27020,
+   "at": [
+    1132,
+    481
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Edit Extrude 2\u2026",
+      "Edit Sketch 2\u2026",
+      "Show dimensions",
+      "Show dependencies of Extrude 2\u2026",
+      "New sketch\u2026",
+      "Offset plane\u2026",
+      "Extrude\u2026",
+      "Revolve\u2026",
+      "Hide Surface 2",
+      "Hide other surfaces",
+      "Hide all surfaces",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Section view\u2026",
+      "Copy Surface 2",
+      "Create Drawing of Surface 2\u2026",
+      "Export as DXF/DWG\u2026",
+      "Export\u2026",
+      "Where used for Surface 2\u2026",
+      "Select",
+      "Select other\u2026",
+      "Add comment",
+      "Zoom to fit",
+      "Zoom to selection",
+      "View normal to",
+      "Delete Surface 2\u2026",
+      "Delete Extrude 2",
+      "Assign material for Surface 2\u2026",
+      "Edit appearance for Surface 2\u2026",
+      "Add appearance to face\u2026"
+     ],
+     "highlighted": 21,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 29670,
+   "te": 29670
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Assign material for Surface 2\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 29670,
+   "tmove": 29720,
+   "moves": 2,
+   "tdown": 30788,
+   "at": [
+    1245,
+    618
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [],
+     "fields": [],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 33519,
+   "te": 33519
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 33519,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": false
+      }
+     ],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / No material assigned",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 37560,
+   "te": 37560
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Material"
+    }
+   },
+   "ok": true,
+   "ti": 37560,
+   "tmove": 37572,
+   "moves": 1,
+   "tdown": 37865,
+   "at": [
+    385,
+    197
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "- None -",
+       "density": "0.000e+0 lb/in3",
+       "active": true
+      },
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acrylic",
+       "density": "4.202e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alnico",
+       "density": "2.670e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alumina Oxide",
+       "density": "1.390e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1060",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1100",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 2024",
+       "density": "1.004e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 356",
+       "density": "9.700e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 380",
+       "density": "1.000e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 5052",
+       "density": "9.682e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 6061",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7050",
+       "density": "1.012e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7075",
+       "density": "1.015e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7178",
+       "density": "1.022e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum bronze (3-10% Al)",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum foil",
+       "density": "9.845e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Antimony",
+       "density": "2.417e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Ash, White",
+       "density": "2.384e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Babbitt",
+       "density": "2.627e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Balsa",
+       "density": "5.780e-3 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Basswood",
+       "density": "1.517e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beech, European",
+       "density": "2.601e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium",
+       "density": "6.647e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium copper",
+       "density": "2.953e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Birch",
+       "density": "2.529e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass",
+       "density": "3.067e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - casting",
+       "density": "3.089e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - rolled and drawn",
+       "density": "3.100e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass 60/40",
+       "density": "3.078e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brick",
+       "density": "6.376e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - lead",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - phosphorous",
+       "density": "3.197e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": ""
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / Density: 0.000e+0 lb/in3 / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / Acrylic / Density: 4.202e-2 lb/in3 / Alnico / Density: 2.670e-1 lb/in3 / Alumina O",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 41044,
+   "te": 41044
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 41044,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "- None -",
+       "density": "0.000e+0 lb/in3",
+       "active": true
+      },
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acrylic",
+       "density": "4.202e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alnico",
+       "density": "2.670e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alumina Oxide",
+       "density": "1.390e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1060",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1100",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 2024",
+       "density": "1.004e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 356",
+       "density": "9.700e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 380",
+       "density": "1.000e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 5052",
+       "density": "9.682e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 6061",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7050",
+       "density": "1.012e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7075",
+       "density": "1.015e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7178",
+       "density": "1.022e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum bronze (3-10% Al)",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum foil",
+       "density": "9.845e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Antimony",
+       "density": "2.417e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Ash, White",
+       "density": "2.384e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Babbitt",
+       "density": "2.627e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Balsa",
+       "density": "5.780e-3 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Basswood",
+       "density": "1.517e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beech, European",
+       "density": "2.601e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium",
+       "density": "6.647e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium copper",
+       "density": "2.953e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Birch",
+       "density": "2.529e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass",
+       "density": "3.067e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - casting",
+       "density": "3.089e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - rolled and drawn",
+       "density": "3.100e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass 60/40",
+       "density": "3.078e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brick",
+       "density": "6.376e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - lead",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - phosphorous",
+       "density": "3.197e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": ""
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / Density: 0.000e+0 lb/in3 / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / Acrylic / Density: 4.202e-2 lb/in3 / Alnico / Density: 2.670e-1 lb/in3 / Alumina O",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 44378,
+   "te": 44378
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "type",
+    "text": "ABS"
+   },
+   "ok": true,
+   "ti": 44378,
+   "tdown": 44378,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "ABS",
+     "selection": [
+      3,
+      3
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": true
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "PC/ABS",
+       "density": "3.974e-2 lb/in3",
+       "active": false
+      }
+     ],
+     "search": "ABS"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / PC/ABS / Density: 3.974e-2 lb/in3 / No material assigned",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": "ABS"
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 47510,
+   "te": 47510
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "ti": 47510,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "ABS",
+     "selection": [
+      3,
+      3
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": true
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "PC/ABS",
+       "density": "3.974e-2 lb/in3",
+       "active": false
+      }
+     ],
+     "search": "ABS"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / PC/ABS / Density: 3.974e-2 lb/in3 / No material assigned",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": "ABS"
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 51383,
+   "te": 51383
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 51383,
+   "pointer": {
+    "at": [
+     385,
+     196
+    ],
+    "hover": [],
+    "element": "input.form-control.ui-select-search"
+   },
+   "tdown": 51391,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "ABS",
+       "open": false
+      },
+      {
+       "label": "Name",
+       "kind": "input",
+       "value": "ABS",
+       "readonly": true
+      },
+      {
+       "label": "Density (lb/in\u00b3)",
+       "kind": "input",
+       "value": "0.038",
+       "readonly": true
+      },
+      {
+       "label": "Poisson's ratio",
+       "kind": "input",
+       "value": "0.364",
+       "readonly": true
+      },
+      {
+       "label": "Young's modulus (Pa)",
+       "kind": "input",
+       "value": "2310000000",
+       "readonly": true
+      },
+      {
+       "label": "Tensile yield strength (Pa)",
+       "kind": "input",
+       "value": "44800000",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate tensile strength (Pa)",
+       "kind": "input",
+       "value": "40400000",
+       "readonly": true
+      },
+      {
+       "label": "Compressive yield strength (Pa)",
+       "kind": "input",
+       "value": "0",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate compressive strength (Pa)",
+       "kind": "input",
+       "value": "0",
+       "readonly": true
+      }
+     ],
+     "assigned": null
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / ABS / Name / Density (lb/in\u00b3) / Poisson's ratio / Young's modulus (Pa) / Tensile yield strength (Pa) / Ultimate tensile strength (Pa) / Compressive yield strength (Pa) / Ultimate compressive strength (Pa)",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": "ABS"
+       },
+       {
+        "placeholder": null,
+        "value": "0.038"
+       },
+       {
+        "placeholder": null,
+        "value": "0.364"
+       },
+       {
+        "placeholder": null,
+        "value": "2310000000"
+       },
+       {
+        "placeholder": null,
+        "value": "44800000"
+       },
+       {
+        "placeholder": null,
+        "value": "40400000"
+       },
+       {
+        "placeholder": null,
+        "value": "0"
+       },
+       {
+        "placeholder": null,
+        "value": "0"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 54023,
+   "te": 54023
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 54023,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "ABS",
+       "open": false
+      },
+      {
+       "label": "Name",
+       "kind": "input",
+       "value": "ABS",
+       "readonly": true
+      },
+      {
+       "label": "Density (lb/in\u00b3)",
+       "kind": "input",
+       "value": "0.038",
+       "readonly": true
+      },
+      {
+       "label": "Poisson's ratio",
+       "kind": "input",
+       "value": "0.364",
+       "readonly": true
+      },
+      {
+       "label": "Young's modulus (Pa)",
+       "kind": "input",
+       "value": "2310000000",
+       "readonly": true
+      },
+      {
+       "label": "Tensile yield strength (Pa)",
+       "kind": "input",
+       "value": "44800000",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate tensile strength (Pa)",
+       "kind": "input",
+       "value": "40400000",
+       "readonly": true
+      },
+      {
+       "label": "Compressive yield strength (Pa)",
+       "kind": "input",
+       "value": "0",
+       "readonly": true
+      },
+      {
+       "label": "Ultimate compressive strength (Pa)",
+       "kind": "input",
+       "value": "0",
+       "readonly": true
+      }
+     ],
+     "assigned": null
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / ABS / Name / Density (lb/in\u00b3) / Poisson's ratio / Young's modulus (Pa) / Tensile yield strength (Pa) / Ultimate tensile strength (Pa) / Compressive yield strength (Pa) / Ultimate compressive strength (Pa)",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": "ABS"
+       },
+       {
+        "placeholder": null,
+        "value": "0.038"
+       },
+       {
+        "placeholder": null,
+        "value": "0.364"
+       },
+       {
+        "placeholder": null,
+        "value": "2310000000"
+       },
+       {
+        "placeholder": null,
+        "value": "44800000"
+       },
+       {
+        "placeholder": null,
+        "value": "40400000"
+       },
+       {
+        "placeholder": null,
+        "value": "0"
+       },
+       {
+        "placeholder": null,
+        "value": "0"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 57933,
+   "te": 57933
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "ti": 57933,
+   "tmove": 57938,
+   "moves": 1,
+   "tdown": 58243,
+   "at": [
+    484,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": "ABS",
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 61616,
+   "te": 61616
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 61616,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Surface 2",
+       "id": "JIC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Surfaces (2)"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "2400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    },
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "3B61B4",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     },
+     {
+      "name": "Surface 2",
+      "part_number": null,
+      "description": null,
+      "material": "ABS",
+      "appearance": {
+       "hex": "A5A5A5",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 65719,
+   "te": 65719
+  }
+ ],
+ "t0_epoch_ms": 1795814423224
+}

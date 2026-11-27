@@ -1,0 +1,37 @@
+{
+ "name": "rename-spline-part-dblclick",
+ "about": "spline-parts: double-click Part 2's row, Block, Enter",
+ "area": "part-studio",
+ "source": "live depth batch 9 (the part's look and data; lead 11-27)",
+ "start": "spline-parts",
+ "part_data": true,
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Block"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

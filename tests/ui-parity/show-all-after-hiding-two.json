@@ -1,0 +1,57 @@
+{
+ "name": "show-all-after-hiding-two",
+ "about": "spline-parts: Part 1 and Part 3 hidden, then empty space › Show all",
+ "area": "part-studio",
+ "source": "live depth batch 9 (the part's look and data; lead 11-27)",
+ "start": "spline-parts",
+ "part_data": true,
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 3",
+    "mods": "shift"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show all"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

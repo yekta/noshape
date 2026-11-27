@@ -1,0 +1,2253 @@
+{
+ "scenario": "properties-reopen-saved",
+ "recorded": "2026-11-27T21:09:55.372Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.4"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "3c9598785f30d8de786d30ba",
+  "start": "block",
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "part_data": [
+   {
+    "name": "Part 1",
+    "part_number": null,
+    "description": null,
+    "material": null,
+    "appearance": {
+     "hex": "9DCFED",
+     "opacity": 255,
+     "default": true
+    },
+    "hidden": false
+   }
+  ]
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "ti": 26440,
+   "tmove": 26789,
+   "moves": 1,
+   "tdown": 27097,
+   "at": [
+    493,
+    690
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Properties\u2026",
+      "Assign material\u2026",
+      "Edit appearance\u2026",
+      "Copy here\u2026",
+      "Copy Part 1",
+      "Create Drawing of Part 1\u2026",
+      "Export\u2026",
+      "Where used\u2026",
+      "Create task\u2026",
+      "Hide",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Add comment",
+      "Zoom to selection",
+      "Delete\u2026"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 29768,
+   "te": 29768
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Properties\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 29768,
+   "tmove": 29816,
+   "moves": 2,
+   "tdown": 30861,
+   "at": [
+    595,
+    358
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Properties",
+     "fields": [
+      {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Name *",
+       "kind": "input",
+       "value": "Part 1"
+      },
+      {
+       "label": "Category",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Part number",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Revision",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "State *",
+       "kind": "select",
+       "value": "In progress"
+      },
+      {
+       "label": "Vendor",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Project",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Product line",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Material",
+       "kind": "input",
+       "value": "Unassigned"
+      },
+      {
+       "label": "Title 1",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 2",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 3",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Not revision managed",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude from all BOMs",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Unit of measure",
+       "kind": "select",
+       "value": "Each"
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Reset all",
+      "Apply",
+      "Save",
+      "Close"
+     ],
+     "text": "Properties Part 1 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Reset all Apply Save Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 33603,
+   "te": 33603
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 33603,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Properties",
+     "fields": [
+      {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Name *",
+       "kind": "input",
+       "value": "Part 1"
+      },
+      {
+       "label": "Category",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Part number",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Revision",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "State *",
+       "kind": "select",
+       "value": "In progress"
+      },
+      {
+       "label": "Vendor",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Project",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Product line",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Material",
+       "kind": "input",
+       "value": "Unassigned"
+      },
+      {
+       "label": "Title 1",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 2",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 3",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Not revision managed",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude from all BOMs",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Unit of measure",
+       "kind": "select",
+       "value": "Each"
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Reset all",
+      "Apply",
+      "Save",
+      "Close"
+     ],
+     "text": "Properties Part 1 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Reset all Apply Save Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 37500,
+   "te": 37500
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Part number"
+    }
+   },
+   "ok": true,
+   "ti": 37500,
+   "tmove": 37532,
+   "moves": 1,
+   "tdown": 37839,
+   "at": [
+    952,
+    403
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Properties",
+     "fields": [
+      {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Name *",
+       "kind": "input",
+       "value": "Part 1"
+      },
+      {
+       "label": "Category",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Part number",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Revision",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "State *",
+       "kind": "select",
+       "value": "In progress"
+      },
+      {
+       "label": "Vendor",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Project",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Product line",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Material",
+       "kind": "input",
+       "value": "Unassigned"
+      },
+      {
+       "label": "Title 1",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 2",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 3",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Not revision managed",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude from all BOMs",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Unit of measure",
+       "kind": "select",
+       "value": "Each"
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Reset all",
+      "Apply",
+      "Save",
+      "Close"
+     ],
+     "text": "Properties Part 1 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Reset all Apply Save Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 40237,
+   "te": 40237
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "key",
+    "key": "mod+a"
+   },
+   "ok": true,
+   "ti": 40237,
+   "pointer": {
+    "at": [
+     952,
+     403
+    ],
+    "hover": [],
+    "element": "input#prop-1732.form-control.ng-pristine"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Properties",
+     "fields": [
+      {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Name *",
+       "kind": "input",
+       "value": "Part 1"
+      },
+      {
+       "label": "Category",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Part number",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Revision",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "State *",
+       "kind": "select",
+       "value": "In progress"
+      },
+      {
+       "label": "Vendor",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Project",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Product line",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Material",
+       "kind": "input",
+       "value": "Unassigned"
+      },
+      {
+       "label": "Title 1",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 2",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 3",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Not revision managed",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude from all BOMs",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Unit of measure",
+       "kind": "select",
+       "value": "Each"
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Reset all",
+      "Apply",
+      "Save",
+      "Close"
+     ],
+     "text": "Properties Part 1 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Reset all Apply Save Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 42711,
+   "te": 42711
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "type",
+    "text": "P-100"
+   },
+   "ok": true,
+   "ti": 42711,
+   "tdown": 42711,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "P-100",
+     "selection": [
+      5,
+      5
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Properties",
+     "fields": [
+      {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Name *",
+       "kind": "input",
+       "value": "Part 1"
+      },
+      {
+       "label": "Category",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Part number",
+       "kind": "input",
+       "value": "P-100"
+      },
+      {
+       "label": "Revision",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "State *",
+       "kind": "select",
+       "value": "In progress"
+      },
+      {
+       "label": "Vendor",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Project",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Product line",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Material",
+       "kind": "input",
+       "value": "Unassigned"
+      },
+      {
+       "label": "Title 1",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 2",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 3",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Not revision managed",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude from all BOMs",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Unit of measure",
+       "kind": "select",
+       "value": "Each"
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Reset all",
+      "Apply",
+      "Save",
+      "Close"
+     ],
+     "text": "Properties Part 1 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Reset all Apply Save Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 45595,
+   "te": 45595
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Save"
+    }
+   },
+   "ok": true,
+   "ti": 45595,
+   "via": "text-only button",
+   "tmove": 45642,
+   "moves": 1,
+   "tdown": 45936,
+   "at": [
+    1442,
+    670
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": "P-100",
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 48779,
+   "te": 48779
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 2000
+   },
+   "ok": true,
+   "ti": 48779,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": "P-100",
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 53133,
+   "te": 53133
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "ti": 53133,
+   "tmove": 53461,
+   "moves": 1,
+   "tdown": 53760,
+   "at": [
+    493,
+    690
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Properties\u2026",
+      "Assign material\u2026",
+      "Edit appearance\u2026",
+      "Copy here\u2026",
+      "Copy Part 1",
+      "Create Drawing of Part 1\u2026",
+      "Export\u2026",
+      "Where used\u2026",
+      "Create task\u2026",
+      "Hide",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Add comment",
+      "Zoom to selection",
+      "Delete\u2026"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": "P-100",
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 56382,
+   "te": 56382
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Properties\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 56383,
+   "tmove": 56434,
+   "moves": 2,
+   "tdown": 57476,
+   "at": [
+    595,
+    358
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Properties",
+     "fields": [
+      {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Name *",
+       "kind": "input",
+       "value": "Part 1"
+      },
+      {
+       "label": "Category",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Part number",
+       "kind": "input",
+       "value": "P-100"
+      },
+      {
+       "label": "Revision",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "State *",
+       "kind": "select",
+       "value": "In progress"
+      },
+      {
+       "label": "Vendor",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Project",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Product line",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Material",
+       "kind": "input",
+       "value": "Unassigned"
+      },
+      {
+       "label": "Title 1",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 2",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 3",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Not revision managed",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude from all BOMs",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Unit of measure",
+       "kind": "select",
+       "value": "Each"
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Reset all",
+      "Apply",
+      "Save",
+      "Close"
+     ],
+     "text": "Properties Part 1 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Reset all Apply Save Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": "P-100",
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 60077,
+   "te": 60077
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 60077,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "div"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Properties",
+     "fields": [
+      {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Name *",
+       "kind": "input",
+       "value": "Part 1"
+      },
+      {
+       "label": "Category",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Part number",
+       "kind": "input",
+       "value": "P-100"
+      },
+      {
+       "label": "Revision",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "State *",
+       "kind": "select",
+       "value": "In progress"
+      },
+      {
+       "label": "Vendor",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Project",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Product line",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Material",
+       "kind": "input",
+       "value": "Unassigned"
+      },
+      {
+       "label": "Title 1",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 2",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Title 3",
+       "kind": "input",
+       "value": ""
+      },
+      {
+       "label": "Not revision managed",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Exclude from all BOMs",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Unit of measure",
+       "kind": "select",
+       "value": "Each"
+      }
+     ],
+     "buttons": [
+      "Undo",
+      "Redo",
+      "Reset all",
+      "Apply",
+      "Save",
+      "Close"
+     ],
+     "text": "Properties Part 1 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Reset all Apply Save Close"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": "P-100",
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 64009,
+   "te": 64009
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Close"
+    }
+   },
+   "ok": true,
+   "ti": 64010,
+   "tmove": 64050,
+   "moves": 1,
+   "tdown": 64342,
+   "at": [
+    1503,
+    670
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": "P-100",
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 67011,
+   "te": 67011
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 67011,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": "P-100",
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 70247,
+   "te": 70247
+  }
+ ],
+ "t0_epoch_ms": 1795813774978
+}

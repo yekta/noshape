@@ -1,0 +1,2429 @@
+{
+ "scenario": "material-search-steel",
+ "recorded": "2026-11-27T21:02:30.067Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.4"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "b07af26ffb7bdf91b59aae53",
+  "start": "block",
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "part_data": [
+   {
+    "name": "Part 1",
+    "part_number": null,
+    "description": null,
+    "material": null,
+    "appearance": {
+     "hex": "9DCFED",
+     "opacity": 255,
+     "default": true
+    },
+    "hidden": false
+   }
+  ]
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "ti": 24948,
+   "tmove": 25291,
+   "moves": 1,
+   "tdown": 25584,
+   "at": [
+    493,
+    690
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Properties\u2026",
+      "Assign material\u2026",
+      "Edit appearance\u2026",
+      "Copy here\u2026",
+      "Copy Part 1",
+      "Create Drawing of Part 1\u2026",
+      "Export\u2026",
+      "Where used\u2026",
+      "Create task\u2026",
+      "Hide",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Add comment",
+      "Zoom to selection",
+      "Delete\u2026"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 28136,
+   "te": 28136
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Assign material\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 28136,
+   "tmove": 28181,
+   "moves": 2,
+   "tdown": 29254,
+   "at": [
+    595,
+    380
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [],
+     "fields": [],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 31801,
+   "te": 31801
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 31801,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": false
+      }
+     ],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / No material assigned",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 35701,
+   "te": 35701
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Material"
+    }
+   },
+   "ok": true,
+   "ti": 35701,
+   "tmove": 35714,
+   "moves": 1,
+   "tdown": 36005,
+   "at": [
+    805,
+    709
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "- None -",
+       "density": "0.000e+0 lb/in3",
+       "active": true
+      },
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acrylic",
+       "density": "4.202e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alnico",
+       "density": "2.670e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alumina Oxide",
+       "density": "1.390e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1060",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1100",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 2024",
+       "density": "1.004e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 356",
+       "density": "9.700e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 380",
+       "density": "1.000e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 5052",
+       "density": "9.682e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 6061",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7050",
+       "density": "1.012e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7075",
+       "density": "1.015e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7178",
+       "density": "1.022e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum bronze (3-10% Al)",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum foil",
+       "density": "9.845e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Antimony",
+       "density": "2.417e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Ash, White",
+       "density": "2.384e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Babbitt",
+       "density": "2.627e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Balsa",
+       "density": "5.780e-3 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Basswood",
+       "density": "1.517e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beech, European",
+       "density": "2.601e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium",
+       "density": "6.647e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium copper",
+       "density": "2.953e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Birch",
+       "density": "2.529e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass",
+       "density": "3.067e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - casting",
+       "density": "3.089e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - rolled and drawn",
+       "density": "3.100e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass 60/40",
+       "density": "3.078e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brick",
+       "density": "6.376e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - lead",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - phosphorous",
+       "density": "3.197e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": ""
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / Density: 0.000e+0 lb/in3 / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / Acrylic / Density: 4.202e-2 lb/in3 / Alnico / Density: 2.670e-1 lb/in3 / Alumina O",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 38886,
+   "te": 38886
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 38886,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "- None -",
+       "density": "0.000e+0 lb/in3",
+       "active": true
+      },
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS",
+       "density": "3.801e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "ABS M30",
+       "density": "3.757e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acetal (Delrin)",
+       "density": "4.899e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Acrylic",
+       "density": "4.202e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alnico",
+       "density": "2.670e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Alumina Oxide",
+       "density": "1.390e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1060",
+       "density": "9.754e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 1100",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 2024",
+       "density": "1.004e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 356",
+       "density": "9.700e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 380",
+       "density": "1.000e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 5052",
+       "density": "9.682e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 6061",
+       "density": "9.827e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7050",
+       "density": "1.012e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7075",
+       "density": "1.015e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum - 7178",
+       "density": "1.022e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum bronze (3-10% Al)",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Aluminum foil",
+       "density": "9.845e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Antimony",
+       "density": "2.417e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Ash, White",
+       "density": "2.384e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Babbitt",
+       "density": "2.627e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Balsa",
+       "density": "5.780e-3 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Basswood",
+       "density": "1.517e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beech, European",
+       "density": "2.601e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium",
+       "density": "6.647e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Beryllium copper",
+       "density": "2.953e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Birch",
+       "density": "2.529e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass",
+       "density": "3.067e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - casting",
+       "density": "3.089e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass - rolled and drawn",
+       "density": "3.100e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brass 60/40",
+       "density": "3.078e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Brick",
+       "density": "6.376e-2 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - lead",
+       "density": "2.962e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Bronze - phosphorous",
+       "density": "3.197e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": ""
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / Density: 0.000e+0 lb/in3 / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / ABS / Density: 3.801e-2 lb/in3 / ABS M30 / Density: 3.757e-2 lb/in3 / Acetal (Delrin) / Density: 4.899e-2 lb/in3 / Acrylic / Density: 4.202e-2 lb/in3 / Alnico / Density: 2.670e-1 lb/in3 / Alumina O",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 42217,
+   "te": 42217
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "type",
+    "text": "steel"
+   },
+   "ok": true,
+   "ti": 42217,
+   "tdown": 42217,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "steel",
+     "selection": [
+      5,
+      5
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": true
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Carbon Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Hardened Alloy Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Hardened Carbon Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Hardened Stainless Steel",
+       "density": "2.796e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel",
+       "density": "2.796e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 17-4",
+       "density": "2.800e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 18-8",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 2205",
+       "density": "2.825e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 303",
+       "density": "2.890e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 304",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 316",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 416",
+       "density": "2.818e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 1010",
+       "density": "2.843e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 1020",
+       "density": "2.843e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 4130",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 4340",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 8620",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A194 Grade 2H",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A285 Grade C",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A325 Type 1",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A36",
+       "density": "2.840e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A490 Type 1",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A490 Type 3",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A563 Grade A",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A563 Grade DH",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 10.9",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 12.9",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 4.8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 5.8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 8.8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Grade 2",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Grade 5",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Grade 8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": "steel"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / Carbon Steel / Density: 2.836e-1 lb/in3 / Hardened Alloy Steel / Density: 2.836e-1 lb/in3 / Hardened Carbon Steel / Density: 2.836e-1 lb/in3 / Hardened Stainless Steel / Density: 2.796e-1 lb/in3 / Stainless Steel / Density: 2.796e-1 lb",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": "steel"
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 45427,
+   "te": 45427
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "ti": 45427,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "steel",
+     "selection": [
+      5,
+      5
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": true
+      }
+     ],
+     "assigned": "No material assigned",
+     "choices": [
+      {
+       "name": "300 Series Stainless Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": true
+      },
+      {
+       "name": "400 Series Stainless Steel",
+       "density": "2.789e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A2 Stainless Steel",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "A4 Stainless Steel",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Carbon Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Hardened Alloy Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Hardened Carbon Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Hardened Stainless Steel",
+       "density": "2.796e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel",
+       "density": "2.796e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 17-4",
+       "density": "2.800e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 18-8",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 2205",
+       "density": "2.825e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 303",
+       "density": "2.890e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 304",
+       "density": "2.901e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 316",
+       "density": "2.887e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Stainless Steel 416",
+       "density": "2.818e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 1010",
+       "density": "2.843e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 1020",
+       "density": "2.843e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 4130",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 4340",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel 8620",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A194 Grade 2H",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A285 Grade C",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A325 Type 1",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A36",
+       "density": "2.840e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A490 Type 1",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A490 Type 3",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A563 Grade A",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel ASTM A563 Grade DH",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 10.9",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 12.9",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 4.8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 5.8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Class 8.8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Grade 2",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Grade 5",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      },
+      {
+       "name": "Steel Grade 8",
+       "density": "2.836e-1 lb/in3",
+       "active": false
+      }
+     ],
+     "search": "steel"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / 300 Series Stainless Steel / Density: 2.836e-1 lb/in3 / 400 Series Stainless Steel / Density: 2.789e-1 lb/in3 / A2 Stainless Steel / Density: 2.901e-1 lb/in3 / A4 Stainless Steel / Density: 2.887e-1 lb/in3 / Carbon Steel / Density: 2.836e-1 lb/in3 / Hardened Alloy Steel / Density: 2.836e-1 lb/in3 / Hardened Carbon Steel / Density: 2.836e-1 lb/in3 / Hardened Stainless Steel / Density: 2.796e-1 lb/in3 / Stainless Steel / Density: 2.796e-1 lb",
+      "inputs": [
+       {
+        "placeholder": "Search by material or category",
+        "value": "steel"
+       },
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 49425,
+   "te": 49425
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 49425,
+   "pointer": {
+    "at": [
+     805,
+     708
+    ],
+    "hover": [],
+    "element": "input.form-control.ui-select-search"
+   },
+   "tdown": 49433,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": false
+      }
+     ],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / No material assigned",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 53405,
+   "te": 53405
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "ti": 53405,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "material",
+     "title": "Material",
+     "tabs": [
+      {
+       "label": "Library",
+       "selected": true
+      },
+      {
+       "label": "Custom",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Library",
+       "kind": "select",
+       "value": "Onshape Material Library"
+      },
+      {
+       "label": "Material",
+       "kind": "select",
+       "value": "- None -",
+       "open": false
+      }
+     ],
+     "assigned": "No material assigned"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "material-dialog",
+      "title": "Material",
+      "text": "Material / Library / Custom / Onshape Material Library / - None - / No material assigned",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 56303,
+   "te": 56303
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 56303,
+   "pointer": {
+    "at": [
+     805,
+     708
+    ],
+    "hover": [],
+    "element": "span"
+   },
+   "tdown": 56307,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 60163,
+   "te": 60163
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 60163,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "part_data": [
+     {
+      "name": "Part 1",
+      "part_number": null,
+      "description": null,
+      "material": null,
+      "appearance": {
+       "hex": "9DCFED",
+       "opacity": 255,
+       "default": true
+      },
+      "hidden": false
+     }
+    ]
+   },
+   "t": 63329,
+   "te": 63329
+  }
+ ],
+ "t0_epoch_ms": 1795813330835
+}

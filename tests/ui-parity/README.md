@@ -221,6 +221,18 @@ Studio, or the panel's bottom button: by their shared tooltip), `{"config_more":
   "value": "- None -", "open"}, then the property rows {"label": "Density (lb/in³)", "kind": "input", "value",
   "readonly"}], "assigned": "No material assigned" | null}`, plus `"choices": [{"name", "density", "active"}]` (the
   shown rows, at most 40) and `"search"` while the list is open.
+- The Appearance editor (live 11-27): `{"tab": "Palette" | "Mixer"}`; Enter in a colour field applies the colour and
+  closes the editor (it has no ✓). Its `dialog` is `{"title": "Appearance", "kind": "appearance", "tabs":
+  [{"label": "Palette", "selected"}, {"label": "Mixer", "selected"}], "fields": [{"label": "A", "kind": "number", "text":
+  "1.00"}, {"label": "#", …"9DCFED"}, {"label": "R", …"157"}, G, B, {"label": "Tessellation quality", "kind": "select",
+  "value": "Auto"}], "error": null, "ok": null}`.
+- The open Appearance panel is one of `panels`: `{"id": "appearances", "title": "Appearances", "tabs": [{"label":
+  "Parts and surfaces", "selected"}, {"label": "Sketches and curves", "selected"}], "rows": [its texts below the tabs,
+  top to bottom: "Part 1", "Face appearance 1", …], "fields": [an open colour editor's A, #, R, G, B]}`.
+- `"part_data": true` (a scenario key, live 11-27): each state has `part_data`, the Part Studio's parts in the parts
+  list's order as the document holds them: `[{"name", "part_number": null | "P-100", "description", "material": null |
+  "ABS" (the material's name), "appearance": {"hex": "9DCFED", "opacity": 0..255, "default": true while the colour
+  is the automatic one}, "hidden": false}]` (Hide / Show set `hidden`; a face's appearance shows in the panel's rows).
 - The sketch Text dialog (live 11-14): `{"button": "Bold" | "Italic" | "Flip horizontal" | "Flip vertical" | "ok" |
   "cancel"}`, `{"dropdown": "Font", "pick": "Inter"}`, `{"field": "Text"}` the text box. Its `dialog` (over the
   Sketch dialog) is `{"kind": "sketch-text", "title": "Text", "fields": [{"label": "Font", "kind": "select", "value"},
