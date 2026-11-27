@@ -152,6 +152,9 @@ const LIVE_LINES_AS_OTHER: &[LiveLineAsOther] = &[
     // core 11-27: the asymmetric fillet's B-spline face (above, LIVE_SCATTER) leaves its two straight tangent edges OTHER
     // (live JJF, JJN: 18 line / 4 other, ours 20 / 2).
     LiveLineAsOther { doc: "c2-opt-fillet-partial-asym-smooth", from_feature: "Fillet 2", part: "Part 1" },
+    // core 11-27: the curvature fillet's B-spline face leaves its four straight tangent edges OTHER (Part 2: 15 line / 6
+    // other, ours 19 / 2; faces and volume as live).
+    LiveLineAsOther { doc: "c2-body-draft-naming", from_feature: "Fillet 1", part: "Part 2" },
 ];
 
 /// Edges live adds inside a near-tangent sliver, within Parasolid's tolerance, or by a vertex splitting one edge into two

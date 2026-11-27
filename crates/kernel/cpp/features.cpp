@@ -7339,7 +7339,8 @@ uint64_t set_fillet_work(uint64_t steps)
   return was;
 }
 
-std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports, bool share);
+std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports, bool share,
+                                        const std::vector<bool>& curvature = {});
 namespace {
 
 // (u, v) of p on an elementary surface; nothing on others.
@@ -13980,7 +13981,8 @@ bool inside_polygon(const std::vector<gp_Pnt2d>& poly, double x, double y)
 // 31.3199), where OCCT's plate, the least bending over the whole plane, overshoots (26.93 / 27.85 / 38.00).
 // `supports[i]` null: edge i only passed through. Null where it doesn't come out a valid face. `share`: on the edges
 // themselves (a face of a part being rebuilt), not copies.
-std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports, bool share)
+std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports, bool share,
+                                        const std::vector<bool>& curvature)
 {
   if (edges.size() < 2 || supports.size() != edges.size())
     return std::nullopt;
@@ -14010,6 +14012,10 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
   std::vector<gp_Dir> N;
   std::vector<bool>   tangent;
   std::vector<gp_Pnt> loop;
+  // Where the fill's curvature across the edge is the support's too (G2): the support, its (u, v), the edge's tangent.
+  std::vector<int>      g2_face;
+  std::vector<gp_Pnt2d> g2_uv;
+  std::vector<gp_Vec>   g2_tangent;
   for (BRepTools_WireExplorer x(W); x.More(); x.Next())
   {
     const TopoDS_Edge& e = x.Current();
@@ -14017,6 +14023,15 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
     for (const auto& [ce, i] : copies)
       if (ce.IsSame(e))
         at = i;
+    // (Edges whose ends aren't shared come back rebuilt on new vertices: the same curve over the same range.)
+    double f0, l0;
+    const occ::handle<Geom_Curve> g = at < 0 ? BRep_Tool::Curve(e, f0, l0) : occ::handle<Geom_Curve>();
+    for (const auto& [ce, i] : copies)
+    {
+      double f1, l1;
+      if (!g.IsNull() && BRep_Tool::Curve(ce, f1, l1) == g && std::abs(f1 - f0) < 1e-12 && std::abs(l1 - l0) < 1e-12)
+        at = i;
+    }
     if (at < 0)
       return std::nullopt;
     const BRepAdaptor_Curve c(e);
@@ -14038,10 +14053,10 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
       // (The loop as the wire runs: a reversed edge from its last point.)
       if (j < k)
         loop.push_back(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (e.Orientation() == TopAbs_REVERSED ? k - j : j) / k));
-      bool ok = false;
+      bool     ok = false;
+      gp_Pnt2d uv;
       if (sa)
       {
-        gp_Pnt2d uv;
         if (!pc.IsNull())
           uv = pc->Value(t);
         else
@@ -14066,6 +14081,12 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
       if (!ok)
         N.push_back(gp_Dir(0, 0, 1));
       tangent.push_back(ok);
+      gp_Pnt pt;
+      gp_Vec tv;
+      c.D1(t, pt, tv);
+      g2_face.push_back(ok && (size_t)at < curvature.size() && curvature[(size_t)at] ? at : -1);
+      g2_uv.push_back(uv);
+      g2_tangent.push_back(tv);
     }
   }
   // The plane through them (least squares), its coordinates scaled so the boundary's box is 8 across.
@@ -14122,111 +14143,179 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
     poly.push_back(to_uv(p));
   // Normal equations: positions and tangency (weighted), plus the bending inside the boundary.
   lap = std::make_unique<KernelTimer>("fill.fair.solve");
-  // Banded: pole (i, j) couples with poles up to (i + 3, j + 3), its three coordinates interleaved.
-  const int           bw = 3 * (3 * nv + 3) + 2;
-  std::vector<double> band((size_t)m * (bw + 1), 0.0); // (r, c), c >= r, at (r - 1) * (bw + 1) + c - r
-  auto                at = [&](int r, int c) -> double& { return band[(size_t)(r - 1) * (bw + 1) + (c - r)]; };
-  auto                add = [&](int r, int c, double v) {
-    if (c >= r)
-      at(r, c) += v;
-  };
-  math_Vector R(1, m, 0.0);
-  // (Weighted as live's fill comes out: within 1e-4 mm of the boundary, 0.1 degree of tangent.)
-  const double wpos = 1e6, wg1 = 1e4;
-  for (size_t k = 0; k < P.size(); ++k)
-  {
-    const gp_Pnt2d uv = to_uv(P[k]);
-    double         fu[3][4], fv[3][4];
-    const int      iu = bu.eval(uv.X(), 1, fu), iv = bv.eval(uv.Y(), 1, fv);
-    const gp_XYZ   target = (P[k].XYZ() - cen) * s;
-    int            idx[16];
-    double         b0[16], bdu[16], bdv[16];
-    for (int a = 0; a < 4; ++a)
-      for (int q = 0; q < 4; ++q)
-      {
-        idx[a * 4 + q] = (iu + a) * nv + (iv + q);
-        b0[a * 4 + q]  = fu[0][a] * fv[0][q];
-        bdu[a * 4 + q] = fu[1][a] * fv[0][q];
-        bdv[a * 4 + q] = fu[0][a] * fv[1][q];
-      }
-    for (int d = 0; d < 3; ++d)
-      for (int x = 0; x < 16; ++x)
-      {
-        R(1 + 3 * idx[x] + d) += wpos * b0[x] * target.Coord(d + 1);
-        for (int y = 0; y < 16; ++y)
-          add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + d, wpos * b0[x] * b0[y]);
-      }
-    if (!tangent[k])
-      continue;
-    for (const double* g : {bdu, bdv})
-      for (int d = 0; d < 3; ++d)
-        for (int x = 0; x < 16; ++x)
-          for (int e = 0; e < 3; ++e)
-            for (int y = 0; y < 16; ++y)
-              add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + e, wg1 * N[k].Coord(d + 1) * g[x] * N[k].Coord(e + 1) * g[y]);
-  }
-  const double gx[4] = {-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526};
-  const double gw[4] = {0.3478548451374538, 0.6521451548625461, 0.6521451548625461, 0.3478548451374538};
-  const double du_ = (bu.b - bu.a) / bu.spans, dv_ = (bv.b - bv.a) / bv.spans;
-  for (int cu = 0; cu < bu.spans; ++cu)
-    for (int cv = 0; cv < bv.spans; ++cv)
+  auto solve = [&](const math_Vector* prev, math_Vector& X) -> bool {
+    // Banded: pole (i, j) couples with poles up to (i + 3, j + 3), its three coordinates interleaved.
+    const int           bw = 3 * (3 * nv + 3) + 2;
+    std::vector<double> band((size_t)m * (bw + 1), 0.0); // (r, c), c >= r, at (r - 1) * (bw + 1) + c - r
+    auto                at = [&](int r, int c) -> double& { return band[(size_t)(r - 1) * (bw + 1) + (c - r)]; };
+    auto                add = [&](int r, int c, double v) {
+      if (c >= r)
+        at(r, c) += v;
+    };
+    math_Vector R(1, m, 0.0);
+    // (Weighted as live's fill comes out: within 1e-4 mm of the boundary, 0.1 degree of tangent.)
+    const double wpos = 1e6, wg1 = 1e4;
+    for (size_t k = 0; k < P.size(); ++k)
+    {
+      const gp_Pnt2d uv = to_uv(P[k]);
+      double         fu[3][4], fv[3][4];
+      const int      iu = bu.eval(uv.X(), 1, fu), iv = bv.eval(uv.Y(), 1, fv);
+      const gp_XYZ   target = (P[k].XYZ() - cen) * s;
+      int            idx[16];
+      double         b0[16], bdu[16], bdv[16];
       for (int a = 0; a < 4; ++a)
         for (int q = 0; q < 4; ++q)
         {
-          const double u = bu.a + du_ * (cu + 0.5 + 0.5 * gx[a]), v = bv.a + dv_ * (cv + 0.5 + 0.5 * gx[q]);
-          const double w = gw[a] * gw[q] * 0.25 * du_ * dv_ * (inside_polygon(poly, u, v) ? 1.0 : 1e-3);
-          double       fu[3][4], fv[3][4];
-          const int    iu = bu.eval(u, 2, fu), iv = bv.eval(v, 2, fv);
-          int          idx[16];
-          double       suu[16], suv[16], svv[16];
-          for (int x = 0; x < 4; ++x)
-            for (int y = 0; y < 4; ++y)
-            {
-              idx[x * 4 + y] = (iu + x) * nv + (iv + y);
-              suu[x * 4 + y] = fu[2][x] * fv[0][y];
-              suv[x * 4 + y] = fu[1][x] * fv[1][y];
-              svv[x * 4 + y] = fu[0][x] * fv[2][y];
-            }
-          for (int x = 0; x < 16; ++x)
-            for (int y = 0; y < 16; ++y)
-            {
-              const double val = w * (suu[x] * suu[y] + 2 * suv[x] * suv[y] + svv[x] * svv[y]);
-              for (int d = 0; d < 3; ++d)
-                add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + d, val);
-            }
+          idx[a * 4 + q] = (iu + a) * nv + (iv + q);
+          b0[a * 4 + q]  = fu[0][a] * fv[0][q];
+          bdu[a * 4 + q] = fu[1][a] * fv[0][q];
+          bdv[a * 4 + q] = fu[0][a] * fv[1][q];
         }
-  // Cholesky of the band (positive definite: the bending plus the weighted conditions), then the two solves.
-  for (int r = 1; r <= m; ++r)
-  {
-    for (int q = std::max(1, r - bw); q < r; ++q)
-    {
-      const double lqr = at(q, r);
-      if (lqr == 0)
+      for (int d = 0; d < 3; ++d)
+        for (int x = 0; x < 16; ++x)
+        {
+          R(1 + 3 * idx[x] + d) += wpos * b0[x] * target.Coord(d + 1);
+          for (int y = 0; y < 16; ++y)
+            add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + d, wpos * b0[x] * b0[y]);
+        }
+      if (!tangent[k])
         continue;
-      for (int c = r; c <= std::min(m, q + bw); ++c)
-        at(r, c) -= lqr * at(q, c);
+      for (const double* g : {bdu, bdv})
+        for (int d = 0; d < 3; ++d)
+          for (int x = 0; x < 16; ++x)
+            for (int e = 0; e < 3; ++e)
+              for (int y = 0; y < 16; ++y)
+                add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + e, wg1 * N[k].Coord(d + 1) * g[x] * N[k].Coord(e + 1) * g[y]);
     }
-    if (!(at(r, r) > 0))
-      return std::nullopt;
-    const double dg = std::sqrt(at(r, r));
-    for (int c = r; c <= std::min(m, r + bw); ++c)
-      at(r, c) /= dg;
-  }
+    // (G2: the curvature across the edge as the support's along the last solution's cross direction, N . S_dd = k |S_d|^2.)
+    const double wg2 = 1e3;
+    if (prev)
+      for (size_t k = 0; k < P.size(); ++k)
+      {
+        if (g2_face[k] < 0)
+          continue;
+        const gp_Pnt2d uv = to_uv(P[k]);
+        double         fu[3][4], fv[3][4];
+        const int      iu = bu.eval(uv.X(), 2, fu), iv = bv.eval(uv.Y(), 2, fv);
+        const gp_Vec   tg = g2_tangent[k];
+        gp_Vec2d       t2(tg.XYZ().Dot(e1.XYZ()), tg.XYZ().Dot(e2.XYZ()));
+        if (t2.Magnitude() < 1e-12)
+          continue;
+        t2.Normalize();
+        const double dx = -t2.Y(), dy = t2.X();
+        int          idx[16];
+        double       cd[16];
+        gp_XYZ       Sd(0, 0, 0);
+        for (int a = 0; a < 4; ++a)
+          for (int q = 0; q < 4; ++q)
+          {
+            const int x = a * 4 + q;
+            idx[x]      = (iu + a) * nv + (iv + q);
+            cd[x]       = dx * dx * fu[2][a] * fv[0][q] + 2 * dx * dy * fu[1][a] * fv[1][q] + dy * dy * fu[0][a] * fv[2][q];
+            const gp_XYZ pole((*prev)(1 + 3 * idx[x]), (*prev)(2 + 3 * idx[x]), (*prev)(3 + 3 * idx[x]));
+            Sd += pole * (dx * fu[1][a] * fv[0][q] + dy * fu[0][a] * fv[1][q]);
+          }
+        if (Sd.Modulus() < 1e-12)
+          continue;
+        // The support's normal curvature along S_d (its tangent plane's direction nearest).
+        const BRepAdaptor_Surface sup(supports[(size_t)g2_face[k]]);
+        gp_Pnt                    q;
+        gp_Vec                    su, sv, suu, svv, suv;
+        sup.D2(g2_uv[k].X(), g2_uv[k].Y(), q, su, sv, suu, svv, suv);
+        const gp_XYZ T  = Sd / Sd.Modulus();
+        const double E = su.Dot(su), F = su.Dot(sv), G = sv.Dot(sv), det = E * G - F * F;
+        if (std::abs(det) < 1e-24)
+          continue;
+        const double tu = T.Dot(su.XYZ()), tv = T.Dot(sv.XYZ());
+        const double ca = (G * tu - F * tv) / det, cb = (E * tv - F * tu) / det;
+        const gp_Vec w = su * ca + sv * cb;
+        if (w.SquareMagnitude() < 1e-24)
+          continue;
+        const gp_XYZ nk     = N[k].XYZ();
+        const double kappa  = nk.Dot((suu * (ca * ca) + suv * (2 * ca * cb) + svv * (cb * cb)).XYZ()) / w.SquareMagnitude();
+        const double target = kappa / s * Sd.SquareModulus();
+        for (int d = 0; d < 3; ++d)
+          for (int x = 0; x < 16; ++x)
+          {
+            R(1 + 3 * idx[x] + d) += wg2 * nk.Coord(d + 1) * cd[x] * target;
+            for (int e = 0; e < 3; ++e)
+              for (int y = 0; y < 16; ++y)
+                add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + e, wg2 * nk.Coord(d + 1) * cd[x] * nk.Coord(e + 1) * cd[y]);
+          }
+      }
+    const double gx[4] = {-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526};
+    const double gw[4] = {0.3478548451374538, 0.6521451548625461, 0.6521451548625461, 0.3478548451374538};
+    const double du_ = (bu.b - bu.a) / bu.spans, dv_ = (bv.b - bv.a) / bv.spans;
+    for (int cu = 0; cu < bu.spans; ++cu)
+      for (int cv = 0; cv < bv.spans; ++cv)
+        for (int a = 0; a < 4; ++a)
+          for (int q = 0; q < 4; ++q)
+          {
+            const double u = bu.a + du_ * (cu + 0.5 + 0.5 * gx[a]), v = bv.a + dv_ * (cv + 0.5 + 0.5 * gx[q]);
+            const double w = gw[a] * gw[q] * 0.25 * du_ * dv_ * (inside_polygon(poly, u, v) ? 1.0 : 1e-3);
+            double       fu[3][4], fv[3][4];
+            const int    iu = bu.eval(u, 2, fu), iv = bv.eval(v, 2, fv);
+            int          idx[16];
+            double       suu[16], suv[16], svv[16];
+            for (int x = 0; x < 4; ++x)
+              for (int y = 0; y < 4; ++y)
+              {
+                idx[x * 4 + y] = (iu + x) * nv + (iv + y);
+                suu[x * 4 + y] = fu[2][x] * fv[0][y];
+                suv[x * 4 + y] = fu[1][x] * fv[1][y];
+                svv[x * 4 + y] = fu[0][x] * fv[2][y];
+              }
+            for (int x = 0; x < 16; ++x)
+              for (int y = 0; y < 16; ++y)
+              {
+                const double val = w * (suu[x] * suu[y] + 2 * suv[x] * suv[y] + svv[x] * svv[y]);
+                for (int d = 0; d < 3; ++d)
+                  add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + d, val);
+              }
+          }
+    // Cholesky of the band (positive definite: the bending plus the weighted conditions), then the two solves.
+    for (int r = 1; r <= m; ++r)
+    {
+      for (int q = std::max(1, r - bw); q < r; ++q)
+      {
+        const double lqr = at(q, r);
+        if (lqr == 0)
+          continue;
+        for (int c = r; c <= std::min(m, q + bw); ++c)
+          at(r, c) -= lqr * at(q, c);
+      }
+      if (!(at(r, r) > 0))
+        return false;
+      const double dg = std::sqrt(at(r, r));
+      for (int c = r; c <= std::min(m, r + bw); ++c)
+        at(r, c) /= dg;
+    }
+    for (int r = 1; r <= m; ++r)
+    {
+      double v = R(r);
+      for (int q = std::max(1, r - bw); q < r; ++q)
+        v -= at(q, r) * X(q);
+      X(r) = v / at(r, r);
+    }
+    for (int r = m; r >= 1; --r)
+    {
+      double v = X(r);
+      for (int c = r + 1; c <= std::min(m, r + bw); ++c)
+        v -= at(r, c) * X(c);
+      X(r) = v / at(r, r);
+    }
+    return true;
+  };
   math_Vector X(1, m);
-  for (int r = 1; r <= m; ++r)
-  {
-    double v = R(r);
-    for (int q = std::max(1, r - bw); q < r; ++q)
-      v -= at(q, r) * X(q);
-    X(r) = v / at(r, r);
-  }
-  for (int r = m; r >= 1; --r)
-  {
-    double v = X(r);
-    for (int c = r + 1; c <= std::min(m, r + bw); ++c)
-      v -= at(r, c) * X(c);
-    X(r) = v / at(r, r);
-  }
+  if (!solve(nullptr, X))
+    return std::nullopt;
+  if (std::any_of(g2_face.begin(), g2_face.end(), [](int f) { return f >= 0; }))
+    for (int pass = 0; pass < 3; ++pass)
+    {
+      const math_Vector prev = X;
+      if (!solve(&prev, X))
+        return std::nullopt;
+    }
   // The surface in the part's units: its parameters the plane's coordinates.
   NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv);
   for (int i = 0; i < nu; ++i)
@@ -14410,18 +14499,21 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
     std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
     return make_result(args, mf.Face(), nullptr);
   }
-  // Tangent or through on every edge, nothing else (Onshape's G1 fill of a setback corner): Parasolid's fill.
+  // Through, tangent or curvature continuous on every edge, nothing else (Onshape's G1 fill of a setback corner, its G2
+  // fill of c2-body-draft-naming's corner): Parasolid's fill.
   if (guides.items.empty() && points.empty() && supports.items.size() == edges.items.size() && !legacy_rim_seams()
-      && std::all_of(orders.begin(), orders.end(), [](int32_t o) { return o == 0 || o == 1; }))
+      && std::all_of(orders.begin(), orders.end(), [](int32_t o) { return o >= 0 && o <= 2; }))
   {
     std::vector<TopoDS_Edge> es;
     std::vector<TopoDS_Face> fs;
+    std::vector<bool>        g2;
     for (size_t i = 0; i < edges.items.size(); ++i)
     {
       es.push_back(as_edge(edges.items[i], "fill boundary edge"));
-      fs.push_back(i < orders.size() && orders[i] == 1 && !supports.items[i].IsNull() ? as_face(supports.items[i], "fill support face") : TopoDS_Face());
+      fs.push_back(i < orders.size() && orders[i] >= 1 && !supports.items[i].IsNull() ? as_face(supports.items[i], "fill support face") : TopoDS_Face());
+      g2.push_back(i < orders.size() && orders[i] == 2);
     }
-    if (const std::optional<TopoDS_Face> f = fair_g1_fill(es, fs, false))
+    if (const std::optional<TopoDS_Face> f = fair_g1_fill(es, fs, false, g2))
     {
       std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
       return make_result(args, *f, nullptr);

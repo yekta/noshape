@@ -439,6 +439,37 @@ fn a_g1_fill_of_a_setback_corner_bends_least_inside_its_boundary() {
     assert!((a - 26.0706).abs() < 0.05, "{a} mm², live 26.0706");
 }
 
+/// A G2 fill matches the support's curvature across each edge, as live's Fill (c2-body-draft-naming's Fill 1 of three
+/// G2 edges): a three-sided hole in a sphere filled G2 to it lies on the sphere (0.3 µm off at r 10 mm); G1 alone, 3x
+/// farther. The edges don't share their ends. T1.
+#[test]
+fn a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere() {
+    set_working_scale(1000.0).unwrap();
+    let r = 0.01;
+    let sphere = make_sphere(&Plane::from_normal(DVec3::ZERO, DVec3::Z), r, 2.0 * PI).unwrap();
+    let face = sphere.faces()[0].clone();
+    let corner = |k: usize| {
+        let (polar, az) = (35f64.to_radians(), 2.0 * PI * k as f64 / 3.0);
+        DVec3::new(polar.sin() * az.cos(), polar.sin() * az.sin(), polar.cos()) * r
+    };
+    let fill = |continuity: Continuity| {
+        let boundary: Vec<FillEdge> = (0..3)
+            .map(|k| {
+                let (a, b) = (corner(k), corner((k + 1) % 3));
+                let pts: Vec<DVec3> = (0..=16).map(|j| a.lerp(b, j as f64 / 16.0).normalize() * r).collect();
+                FillEdge { edge: make_edge_on(&face, &pts).unwrap(), support: Some(face.clone()), continuity }
+            })
+            .collect();
+        let f = fill_surface(&boundary, &[]).unwrap().shape;
+        assert!(f.is_valid());
+        // How far the fill passes from the sphere's top, the farthest point of the hole from its rim.
+        distance(&make_vertex(DVec3::Z * r).unwrap(), &f).unwrap().distance
+    };
+    let (g2, g1) = (fill(Continuity::Curvature), fill(Continuity::Tangent));
+    assert!(g2 < 1e-4 * r, "G2 fill {} mm off the sphere", g2 * 1e3);
+    assert!(g1 > 2.0 * g2, "G1 fill {} mm off the sphere, G2 {}", g1 * 1e3, g2 * 1e3);
+}
+
 /// A B-surface bounded by its parameter box with dense C2 knots (live.igs' cf-spur-gear flanks: cubic, 45 knots; ours
 /// read each 0.4 % short): its area as its fine mesh's.
 #[test]
