@@ -9961,6 +9961,137 @@ static TopoDS_Shape collapse_short_edges(const TopoDS_Shape& out, HHist& hist, c
   return out2;
 }
 
+// A fuse's slits filled: two planar faces facing each other across 1e-7..1e-5 m take the prism between them where they
+// overlap, as live (c2-gamma-imported's Boolean 2: two imported bodies 5 um apart, their faces' tolerances 1e-7; ours
+// left a slit of 121 mm2 of faces and the walls by it in pieces); where a fill's end meets a wall, the step's two
+// vertices across the gap one, as live's. `s` itself where none or the fill fails.
+static TopoDS_Shape without_slits(const TopoDS_Shape& s, HHist& hist)
+{
+  constexpr double most = 1e-5 * (1 + 1e-9), least = 1e-7;
+  struct Flat
+  {
+    TopoDS_Face f;
+    gp_Pln      pl;
+    Bnd_Box     box;
+  };
+  std::vector<Flat> flats;
+  for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+  {
+    Flat a{TopoDS::Face(x.Current()), gp_Pln(), Bnd_Box()};
+    if (!outer_plane(a.f, a.pl))
+      continue;
+    BRepBndLib::Add(a.f, a.box);
+    a.box.Enlarge(most);
+    flats.push_back(a);
+  }
+  if (flats.size() < 2 || flats.size() > 20000)
+    return s;
+  const KernelTimer timer("boolean.slits");
+  // By the planes' direction (one sign) to a micro-radian, along it by place: only planes at most `most` apart compared.
+  std::map<std::array<long long, 3>, std::vector<std::pair<double, size_t>>> along;
+  for (size_t i = 0; i < flats.size(); ++i)
+  {
+    gp_Dir d = flats[i].pl.Axis().Direction();
+    if (d.X() < -1e-6 || (d.X() <= 1e-6 && (d.Y() < -1e-6 || (d.Y() <= 1e-6 && d.Z() < 0))))
+      d.Reverse();
+    along[{std::llround(d.X() * 1e6), std::llround(d.Y() * 1e6), std::llround(d.Z() * 1e6)}].push_back({gp_Vec(d).Dot(gp_Vec(flats[i].pl.Location().XYZ())), i});
+  }
+  // A slit is filled only where it is walled in: each side of the fill on a wall of the result running across it
+  // (live keeps a slit open where it meets a round or an open slot).
+  const auto walled = [&](const TopoDS_Shape& face, const gp_Dir& n0, double g) {
+    for (TopExp_Explorer e(face, TopAbs_EDGE); e.More(); e.Next())
+    {
+      BRepAdaptor_Curve cu(TopoDS::Edge(e.Current()));
+      if (cu.GetType() != GeomAbs_Line)
+        return false;
+      const gp_Pnt m = cu.Value(0.5 * (cu.FirstParameter() + cu.LastParameter())), top = m.Translated(gp_Vec(n0) * g);
+      bool on = false;
+      for (const Flat& w : flats)
+        if (!on && std::abs(w.pl.Axis().Direction().Dot(n0)) <= 1e-9 && w.pl.Distance(m) <= least && w.pl.Distance(top) <= least
+            && !w.box.IsOut(m) && !w.box.IsOut(top))
+          on = true;
+      if (!on)
+        return false;
+    }
+    return true;
+  };
+  ShapeList           prisms;
+  std::vector<gp_Pnt> corners;
+  for (auto& [key, group] : along)
+  {
+    std::sort(group.begin(), group.end());
+    for (size_t gi = 0; gi < group.size(); ++gi)
+    for (size_t gj = gi + 1; gj < group.size() && group[gj].first - group[gi].first <= most; ++gj)
+    {
+      const Flat &a = flats[group[gi].second], &b0 = flats[group[gj].second];
+      const gp_Dir na = a.pl.Axis().Direction(), nb = b0.pl.Axis().Direction();
+      if (a.box.IsOut(b0.box) || !na.IsOpposite(nb, 1e-9))
+        continue;
+      // (Either way round: the one whose outside faces the other first.)
+      const bool  ab = gp_Vec(a.pl.Location(), b0.pl.Location()).Dot(gp_Vec(na)) > 0;
+      const Flat& f0 = ab ? a : b0;
+      const Flat& b  = ab ? b0 : a;
+      const gp_Dir n0 = f0.pl.Axis().Direction();
+      // b in front of f0, across the gap.
+      const double g = gp_Vec(f0.pl.Location(), b.pl.Location()).Dot(gp_Vec(n0));
+      if (g < least || g > most)
+        continue;
+      gp_Trsf back;
+      back.SetTranslation(gp_Vec(n0) * -g);
+      BRepAlgoAPI_Common common(f0.f, BRepBuilderAPI_Transform(b.f, back, true).Shape());
+      if (!common.IsDone() || common.HasErrors())
+        return s;
+      for (TopExp_Explorer c(common.Shape(), TopAbs_FACE); c.More(); c.Next())
+      {
+        GProp_GProps p;
+        BRepGProp::SurfaceProperties(c.Current(), p);
+        if (p.Mass() <= most * most || !walled(c.Current(), n0, g))
+          continue;
+        BRepPrimAPI_MakePrism prism(c.Current(), gp_Vec(n0) * g);
+        if (!prism.IsDone())
+          return s;
+        prisms.Append(prism.Shape());
+        for (TopExp_Explorer v(prism.Shape(), TopAbs_VERTEX); v.More(); v.Next())
+          corners.push_back(BRep_Tool::Pnt(TopoDS::Vertex(v.Current())));
+      }
+    }
+  }
+  if (prisms.IsEmpty())
+    return s;
+  ShapeList args;
+  args.Append(s);
+  BRepAlgoAPI_Fuse fuse;
+  fuse.SetArguments(args);
+  fuse.SetTools(prisms);
+  fuse.SetRunParallel(false);
+  fuse.Build();
+  if (!fuse.IsDone() || fuse.HasErrors())
+    return s;
+  const TopoDS_Shape out = fuse.Shape();
+  int                n0 = 0, n1 = 0;
+  for (TopExp_Explorer x(s, TopAbs_SOLID); x.More(); x.Next())
+    ++n0;
+  for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
+    ++n1;
+  if (out.IsNull() || n1 == 0 || n1 > n0 || !BRepCheck_Analyzer(out).IsValid())
+    return s;
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  hist->Merge(fuse.History());
+  // (The fills' edges across the gap, at a step a fill's end leaves at a wall or along a wall's corner: their ends one,
+  // as live's.)
+  std::vector<TopoDS_Vertex> joined;
+  ShapeIMap                  vs;
+  TopExp::MapShapes(out, TopAbs_VERTEX, vs);
+  for (int i = 1; i <= vs.Extent(); ++i)
+  {
+    const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(vs(i)));
+    if (std::any_of(corners.begin(), corners.end(), [&](const gp_Pnt& c) { return c.Distance(p) <= least; }))
+      joined.push_back(TopoDS::Vertex(vs(i)));
+  }
+  return collapse_short_edges(out, hist, joined);
+}
+
 static TopoDS_Shape without_strips(const TopoDS_Shape& s, HHist& hist)
 {
   static const bool keep = std::getenv("NOSHAPE_BOOL_KEEP_STRIPS") != nullptr;
@@ -10634,6 +10765,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
     {
       out = without_strips(out, h);
+      if (op == 0)
+        out = without_slits(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
     }
   }
@@ -10669,6 +10802,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       return std::nullopt;
     t_bool_path = "glued";
     out = without_strips(out, h);
+    if (op == 0)
+      out = without_slits(out, h);
     return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   };
   if (glue_first)
@@ -10688,6 +10823,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
     {
       out = without_strips(out, h);
+      if (op == 0)
+        out = without_slits(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
     }
   }
@@ -10709,6 +10846,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       // (Its scope and maps not for a result without strips: the whole unify then.)
       const TopoDS_Shape made = out;
       out                     = without_strips(out, h);
+      if (op == 0)
+        out = without_slits(out, h);
       const bool stripped     = !out.IsSame(made);
       if (stripped)
         scope.reset();
@@ -10745,6 +10884,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
     {
       out = without_strips(out, h);
+      if (op == 0)
+        out = without_slits(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
     }
   }
@@ -10829,6 +10970,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
         std::shared_ptr<const UnifyScope> scope;
         const TopoDS_Shape made = out;
         out                     = without_strips(out, h);
+        if (op == 0)
+          out = without_slits(out, h);
         const bool stripped     = !out.IsSame(made);
         if (!stripped && !one_by_one && rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
           scope = rust_unify_scope(*rs[0]);
@@ -10878,6 +11021,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     if (done)
     {
       out = without_strips(out, h);
+      if (op == 0)
+        out = without_slits(out, h);
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
     }
   }
@@ -11008,6 +11153,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     {
       t_bool_path = "trimmed";
       res  = without_strips(res, hist);
+      if (op == 0)
+        res = without_slits(res, hist);
       if (opts.unify)
       {
         const ShapeIMap ins = input_vertices(args, tools);
@@ -11378,6 +11525,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
   }
   if (facets.source.empty())
     res = without_strips(res, hist);
+    if (op == 0)
+      res = without_slits(res, hist);
   res = remesh_facets(res, facets, hist);
   const KernelTimer timer("boolean.result");
   return make_result(inputs, res, hist.get(), &srcs);
