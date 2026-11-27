@@ -2100,11 +2100,16 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
             let to3 = |q: glam::DVec2| cc + ax * q.x + ay * q.y;
             let c3 = to3(c2);
             // Tangent points, and each side's line r past the center face (into the air: the section's top, so the
-            // region doesn't pinch where the arc touches the center face).
+            // region doesn't pinch where the arc touches the center face), or half way to where the sides meet when
+            // they meet sooner (the ridge's slopes 1.4 mm over its top: crossed, the tool cut the part in 3).
             let (t1, t2, tc) = (c3 + n1 * r, c3 + n2 * r, c3 + nc * r);
+            let (a1, a2) = (n2d(n1), n2d(n2));
+            let det = a1.x * a2.y - a1.y * a2.x;
+            let apex = (det.abs() > 1e-12).then(|| (a1.dot(to2(p1)) * a2.y - a2.dot(to2(p2)) * a1.y) / det).filter(|x| *x > 0.0);
+            let h = apex.map_or(r, |x| r.min(x / 2.0));
             let meet = |pi: DVec3, ni: DVec3| -> Option<DVec3> {
                 let n = n2d(ni);
-                (n.y.abs() > 1e-12).then(|| to3(glam::DVec2::new(r, (n.dot(to2(pi)) - n.x * r) / n.y)))
+                (n.y.abs() > 1e-12).then(|| to3(glam::DVec2::new(h, (n.dot(to2(pi)) - n.x * h) / n.y)))
             };
             let (Some(q1), Some(q2)) = (meet(p1, n1), meet(p2, n2)) else { return err(UNSUPPORTED) };
             // Extent along the rib: the center faces' vertices.
