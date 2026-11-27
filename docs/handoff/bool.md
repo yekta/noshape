@@ -19,49 +19,27 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (state 11-27 06:00 UTC; lead 04:0x: impeller early decline, nuts gate, unify, gamma slit fill)
-- STAGE 1 landed (c9a9d4ed0). STAGE 2 landed 2a4ab01fd (gate: replay +0 -0, suite 131 -> 131, speed
-  0.95-1.09x, shells 6 -> 6, crates pass, knurls 0 in all 5; reported with per-family ms 5 vs 66, 41 vs 199, 8 vs 26,
-  11 vs 164). NOSHAPE_BOOL_MARCH=0 turns it off.
-- IMPELLER EARLY DECLINE (core via lead: Fillet 3's final cut 9.3 s in our sections ahead, then OCCT 10 s). Case
-  a7c0bb71d1230b3b (vibex8 ~/tmp/bool/imp/rec, core's cli ~/tmp/core/p0/cli-rfB on c2-impeller-loft, rolled back after
-  Fillet 3): one pair 0.1 x 1.1 takes 9.7 s in IntTools_FaceFace, then pair 0.5 x 1.1's edge phase declines 'a point
-  near two vertices' (add_tol in edge_in_face: an edge running past free-form face 1.1 1.06 mm from its edges, vertex
-  t 1.58e-3 near input vertices 1, 7, 65). Fix = b1024cf4a (worktree bool-early, branch bool-early on main): every
-  pair's edges_in_pair before src.ahead (Ctx::edges_first; face_pair skips them after): 284 ms decline; kernel 617/617,
-  brep pass. Gate unit bool-chain-early (/root/bool-scratch/chain-early.sh) after bool-chain-slits.
-  T1 bool_patterns::impeller_cut_declines_before_the_sections (recording committed, 1 MB .bin) checks k::last_ahead() == 0 (new, brep_bridge). Risk: crossing_hints from earlier nurbs_pair no longer seen by later pairs'
-  edge phase, pool order changes: the full gate decides. Probes: /root/bool-scratch/uv-probes-imp.diff (never commit).
-- NUTS DIVIDER landed 5e42155d5 (gate 44b3ab42e: replay +0 -0, suite 131 -> 132, knurls 0; skasm told) (bool-fb; skasm's exact-cylinder patch inside): cylinder
-  faces going round > a turn divided by iso-u lines, rejoined after. Nuts removes 8.615 (live 8.6), c2-config-parts-nuts
-  17/17 (OCCT only 14/17); kernel 617/617, clippy, GCC 13 ok. Gate after stage 2's, land, tell skasm. bool-fb's
-  brep_replay.rs probes uncommitted (/root/bool-scratch/probes-fb.diff): never commit.
-- UNIFY = cc6effb11 landing 06:00 from bool-ms2 (gate: replay +0 -0, suite 131 -> 133: Rib 1 + nuts better, 0 worse; shells 6;
-  knurls 0) (bool-uv, branch bool-unify-verts; probes in /root/bool-scratch/probes-uv.diff, never
-  commit). OcShape::myInputVertices (op_boolean, !opts.unify); unify_keeping_inputs at every Boolean unify (rust, local,
-  trimmed, OCCT) and op_unify: input vertices the unify removed with no edge of theirs removed -> rerun with
-  t_unify_keep (keep_marked_edges, merge_planar, join_loop_pieces skip them); merge_planar joins one line (old test) or a
-  vertex within 1e-7 m of the far ends' line. Rib 1 73/214/144 = live; T1 boolean_groups::a_fuses_unify_joins_edges_
-  only_at_the_booleans_vertices; kernel 618/618, clippy, GCC 13 ok. (The distance test alone lost 5 joins on the
-  louver's invalid fuse, vertices 0.4 um off: hence both.)
-- GAMMA (live BOOL-GAMMA-B2 capture 11-27: /root/onshape-research/live/bool/gamma-b2-1127/boolean2-faces.json, live
-  884/2405/1344, 699571.086 mm3, 1010073.786 mm2). Ours (rust = OCCT) 889/2403/1344, -2.39 mm3, +121 mm2: the Boolean, not
-  the import. Face match (/root/bool-scratch/gamma-cmp.py, gamma-near.py; ours dump gamma-ours-faces.txt via
-  brep_replay::probe_case_faces, uncommitted, recordings vibex8 ~/tmp/bool/gam/rec, case 317bec683037fff1 = Boolean 2):
-  (1) two imported bodies 5 um apart (L top z 18.386, U bottom 18.391, at x -263.9 and 113.4): live fuses across, ours
-  keeps a slit (2 x 30.4 mm2 x 2 = the +121 mm2) and splits the walls by it (y -26.533: 3 faces for 1, y -206.533: 2 for
-  1) + two 0.01 mm2 slivers at x 114.181: the 5 faces. (2) a hole's two half-cylinders overlapping 50 um (z -7.814 /
-  -7.764): live gives the overlap to the upper body, ours to the lower (count same). Fuzzy 1e-6: 885 but +22 mm3; 1e-5 fails.
-  SLITS = 355f4d68f (bool-uv, branch bool-slits on cc6effb11): without_slits() after without_strips() on fuses (op
-  == 0, 9 sites): planar faces facing each other across 1e-7..1e-5 m, their overlap prismed and fused in, only where
-  walled in (each side of the overlap on a wall of the result: live keeps the 50 um strip by a round open; tolerances
-  there 1e-7, so not a tolerance rule). Boolean 2: 886/area 1010073.89 (live 884/1010073.79); left: the hole's 50 um
-  ownership (count same), two 0.01 mm2 slivers at x 114.181. bool_patterns clips_a_few_micrometres_apart and
-  precise_parts_... now expect OCCT + the 4 fills (+0.3037 mm3, +16 faces, +44 edges unified later). Kernel 618/618,
-  clippy, GCC 13 ok. Probes /root/bool-scratch/probes-slits.diff. Gate unit bool-chain-slits after chain-seq.
-- CHAIN unit bool-chain-seq (/root/bool-scratch/chain-seq.sh -> chain-seq.out): waits for stage 2's gate, knurls
-  (kn-<sha>.out, vibex7), nuts' gate + knurls, unify's gate + knurls. Gate covers all corpora + parity56 + 200-doc
-  suite. Land each on 0 new differences (unify: or each closer to live), report, tell skasm on nuts.
+## NEXT (state 11-27 11:09 UTC; lead 04:0x: impeller early decline, nuts gate, unify, gamma slit fill)
+- LANDED: stage 1 c9a9d4ed0, stage 2 2a4ab01fd, nuts 5e42155d5, unify f95397a1f. SLIT FILL QUEUED 0d6fc6b9 (bool-uv,
+  branch bool-slits; gate 63ecbfdb3: replay +0 -0, knurls 0, crates pass). Lead 11-27 (DECISIONS f50149029): per-face
+  match to live beats document totals; keep it.
+- OPEN ROWS (gamma / wire-clip Boolean 2, case 317bec683037fff1, live capture
+  /root/onshape-research/live/bool/gamma-b2-1127/boolean2-faces.json; score /root/bool-scratch/gamma-score.py on a
+  probe_case_topo face dump, probes /root/bool-scratch/probes-topo.diff, never commit): ours 886/2411/1348, live
+  884/2405/1344. Faces with live's area + edges 681 (main 666); (a) 7 live faces unmatched: the hole's two
+  half-cylinders overlapping 50 um (z -7.814 / -7.764: live gives the overlap to the upper body, ours the lower) + two
+  0.01 mm2 slivers at x 114.181; (b) the 6 extra edges / 4 extra vertices vs live (main's 2403/1344 was cancellation).
+- IMPELLER EARLY DECLINE = 7ae48ba9e (worktree bool-early, branch bool-early): edges_trial() runs every pair's
+  edges_in_pair before src.ahead, then puts back pool (Clone), regroup len, side_cache, in_face_done, pending len,
+  faces' pcurves, face_segs/seg_section/seg_edge_tol lens; keeps only a decline. Case a7c0bb71d1230b3b (Fillet 3's cut):
+  0.16 s decline vs 9.3 s of sections; T1 impeller_cut_declines_before_the_sections (k::last_ahead() == 0); kernel
+  617/617; 5 knurls 0 diff. (b1024cf4a, the mutating pre-pass, made k25-71-12 decline 'a non-manifold result': vertex
+  order changes results.) Lead: design fine, land at 0 worse. GATE 7ae48ba9e CLEAN (11:08): replay +0 -0, suite
+  133 -> 133, speed 1.00-1.01x, shells 6, crates pass, knurls 0. Rebased onto main as ab9ee9b3f (brep_bridge/lib.rs
+  conflict with stage 2's MARCH resolved: AHEAD counted at the top of Occt::ahead, last_ahead next to last_marched).
+  ab9ee9b3f retested 11:23: impeller test 0.18 s, kernel 621/621, brep 68/68; landing (land.sh vibe2).
+- NEXT (lead 11-27): gamma's 7 unmatched faces + 6 extra edges / 4 vertices (OPEN ROWS above).
+- Cleanup after: vibex8 ~/tmp/bool/imp/rec; bool-uv / bool-ms2 / bool-fb targets once landed.
 
 ## NEXT (state 11-26 22:40 UTC)
 - IMPELLER MOVE FACE 1 (core P0 via lead): reported 22:15, NOT ours: the regen records the fuse as path occt, empty; ours
