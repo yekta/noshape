@@ -1784,7 +1784,7 @@ live/feel/recheck-b5b664aaa/). Sketch reach outside sketch mode and the plane-fi
 
 | Row | Ours vs live |
 |---|---|
-| Edge hover reach | lights at 7 px = ; held to 8, lost at 9 (live 9–10) ≠ → fixed (a held edge picks 11 px wide); retake c3d3470d2: lights at 7, held to 9, lost at 10; **live reach-px-1119 (full-page shots): 5 over the background, 7 over its face, no hold: fixed psui 11-19 (3D "Edge")** |
+| Edge hover reach | lights at 7 px = ; held to 8, lost at 9 (live 9–10) ≠ → fixed (a held edge picks 11 px wide); retake c3d3470d2: lights at 7, held to 9, lost at 10; **live reach-px-1119 (full-page shots): 5 over the background, 7 over its face, no hold: fixed psui 11-19 (3D "Edge")**; over a face 6 px straight across, not 7 (live mc-reach-1122 R4; a Ø8 boss's rim 7.26 px off took the top's middle, depth batch 1): psui 11-26 |
 | Default plane row double-clicked | the plane stays selected = |
 | Row tooltip | first visible 150–167 ms after the row lights, opaque ~250 (live 65–100 / 166–209) ≠ → fixed (the fade starts at a fifth, 110 ms) |
 | Alignment on a snap (no rest) | = |

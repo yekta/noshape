@@ -145,12 +145,12 @@ fn a_click_beside_an_edge_selects_what_is_lit(cx: &mut TestAppContext) {
                 .map(|(r, m, n, _)| (r, m, n))
                 .unwrap()
         });
-        // Live reach-px-1119 (full-page shots): an edge lights from 5 px over the background, 7 over a face, slanted
-        // or not, with no hold (lit on the way back to the same distance). Which side is which: a face lit far off (a
-        // plane behind counts as the background).
+        // Live reach-px-1119 (full-page shots): an edge lights from 5 px over the background, slanted or not, with no
+        // hold (lit on the way back to the same distance); over a face 6 px straight across, not 7 (mc-reach-1122 R4).
+        // Which side is which: a face lit far off (a plane behind counts as the background).
         let side_reach = |cx: &mut TestAppContext, side: f64| {
             pointer.move_to(cx, &view, on + across * (side * 14.0));
-            if cx.update(|cx| matches!(view.read(cx).hover, Some(Reference::Face(_)))) { 7.0 } else { 5.0 }
+            if cx.update(|cx| matches!(view.read(cx).hover, Some(Reference::Face(_)))) { 6.5 } else { 5.0 }
         };
         let reaches = [(-1.0, side_reach(cx, -1.0)), (1.0, side_reach(cx, 1.0))];
         let steps = reaches.into_iter().flat_map(|(side, reach)| {
@@ -1277,4 +1277,34 @@ fn clicks_in_3d_add_remove_clear_and_ctrl_opens_the_menu(cx: &mut TestAppContext
     row("hold the side 600 ms", hold(cx, on_side, 600), &[&top]);
     row("hold the top 3 s", hold(cx, on_top, 3000), &[&top]);
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// live depth batch 1 extrude-remove-through-all-boss-ok step 1: at the scenario's 0.275 mm a px a click on the middle of
+/// a Ø8 boss's top (7.26 px from its rim) picks that face (live: Area 50.265 mm²), not its rim; 6 px in from the rim
+/// the rim lights (mc-reach-1122 R4).
+#[gpui::test]
+fn a_click_on_a_boss_tops_middle_picks_the_face(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "boss-top-pick", Some(starts["boss-block"].clone()));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().any(|b| b.kind == noshape_model::display::BodyKind::Solid) && !view.read(cx).ui_busy());
+    cx.update(|cx| view.read(cx).viewport.clone()).update(cx, |vp, cx| {
+        let h = vp.size().y;
+        vp.camera.distance = 0.275365e-3 * h * 0.5 / (vp.camera.fov_y * 0.5).tan();
+        vp.request_frame(cx);
+    });
+    draw(cx, window);
+    let pointer = Pointer::new(cx, window, &view);
+    // The top's middle and its rim's point nearest the viewer (the ellipse's short axis).
+    let (middle, front) = cx.update(|cx| {
+        let vp = view.read(cx).viewport.read(cx);
+        (vp.project(glam::DVec3::new(0.010, 0.0, 0.020)).unwrap(), vp.project(glam::DVec3::new(0.012, -0.002 * 3f64.sqrt(), 0.020)).unwrap())
+    });
+    pointer.move_to(cx, &view, front + (middle - front).normalize() * 6.0);
+    assert!(cx.update(|cx| matches!(view.read(cx).hover, Some(Reference::Edge(_)))), "6 px in from the rim, the rim lights");
+    pointer.move_to(cx, &view, middle);
+    pointer.click(cx, &view, middle);
+    let selection = cx.update(|cx| view.read(cx).selection.clone());
+    assert!(matches!(selection.as_slice(), [Reference::Face(_)]), "the boss's top face, got {selection:?}");
 }

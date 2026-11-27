@@ -368,20 +368,20 @@ impl PickBuffer {
     /// gatherPicksFromPickPass: coverage its share of the square's pixels, distance its nearest pixel's from the centre,
     /// 0 there and 1 at a corner); then the lower id.
     pub fn pick(&self, x: i32, y: i32, radius: i32, priority: impl Fn(u32) -> i32) -> Option<u32> {
-        self.pick_reaching(x, y, radius, radius, |_| PickClass::Other, priority)
+        self.pick_reaching(x, y, radius, f64::from(radius), |_| PickClass::Other, priority)
     }
 
     /// [`Self::pick`] where edges (picked at their drawn width, [`PickClass::Edge`]) are taken by their distance from
     /// the pointer, whatever their slant: within `radius`, `far_radius` while the pointer is over a face
     /// (live reach-px-1119: an edge lights from 5 px over the background and 7 over a face, iso's slanted edges too;
     /// the square's corners reached ~2 px further across them).
-    pub fn pick_reaching(&self, x: i32, y: i32, radius: i32, far_radius: i32, class: impl Fn(u32) -> PickClass, priority: impl Fn(u32) -> i32) -> Option<u32> {
+    pub fn pick_reaching(&self, x: i32, y: i32, radius: i32, far_radius: f64, class: impl Fn(u32) -> PickClass, priority: impl Fn(u32) -> i32) -> Option<u32> {
         let far = |id: u32| class(id) == PickClass::Edge;
         let over = self.id_at(x, y).is_some_and(|c| c != 0 && class(c) == PickClass::Face);
-        let edge_reach = if over { far_radius.max(radius) } else { radius };
+        let edge_reach = if over { far_radius.max(f64::from(radius)) } else { f64::from(radius) };
         // Its drawn pixels' centres within r of the pointer (live measures from the drawn edge pixel).
         let edge_reach2 = edge_reach * edge_reach;
-        let reach = edge_reach.max(radius);
+        let reach = (edge_reach.floor() as i32).max(radius);
         // (id, its priority, pixels hit, nearest squared distance); a few ids under the pointer. Each one's pixels' extent
         // across and down (dx, dy min and max).
         let mut hits: Vec<(u32, i32, u32, i32)> = Vec::new();
@@ -396,7 +396,7 @@ impl PickBuffer {
                 // workflow 36: the face at 7.9 px). Its pixels within ~5.4 px: 7 px off its 5 px band keeps the line at any
                 // slant (live hover-pick-1120), 7.9 px doesn't.
                 let kept = match class(id) {
-                    PickClass::Edge => dx * dx + dy * dy <= edge_reach2,
+                    PickClass::Edge => f64::from(dx * dx + dy * dy) <= edge_reach2,
                     PickClass::Line => dx * dx + dy * dy <= radius * radius + 4,
                     // (Live mc-infer-1122 reach-asm-corner: lit 6 px off, the edge at 10 along the diagonal.)
                     PickClass::Vertex => dx * dx + dy * dy <= radius * radius,

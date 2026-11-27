@@ -165,12 +165,14 @@ fn pick_radius_px(scale: f32) -> i32 {
 /// How far across its axis a manipulator handle grabs, CSS px (live feel/dialogs.json "grabReach": an arrow, 14).
 pub const MANIP_REACH_ACROSS_PX: f64 = 14.0;
 
-/// How far an edge (picked at its drawn width) reaches while the pointer is over a face, CSS px: live reach-px-1119
-/// lights it from 7 px over its face, from 5 over the background ([`pick_radius_px`]).
-const EDGE_OVER_FACE_REACH: f64 = 7.0;
+/// How far an edge (picked at its drawn width) reaches while the pointer is over a face, CSS px: live mc-reach-1122 R4
+/// lights it 6 px straight across over its face, not 7 (a Ø8 boss's rim 7.26 px from the top's middle: the face, depth
+/// batch 1); from 5 over the background ([`pick_radius_px`]).
+const EDGE_OVER_FACE_REACH: f64 = 6.0;
 
-fn edge_reach_px(scale: f32) -> i32 {
-    (EDGE_OVER_FACE_REACH * f64::from(scale)).round() as i32
+/// [`EDGE_OVER_FACE_REACH`] in device px to the edge's drawn pixels' centres, half a pixel further (not 7 at any ratio).
+fn edge_reach_px(scale: f32) -> f64 {
+    EDGE_OVER_FACE_REACH * f64::from(scale) + 0.5
 }
 
 /// Onshape's pre-highlight with "reduce mouse hover highlight" (on for
