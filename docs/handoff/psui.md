@@ -208,8 +208,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
   mistake-extrude-remove-flipped-out ✓ not closing on an INFO. (3) remembered seeds (chamfer 16 mm, fillet 2 mm,
   cbore 9.75, csink 11.2, Metric Tapped M5) for 8 takes.
 - core: DEPTH-EXTRUDE-UP-TO-PART-OVERLAP, DEPTH-PATTERN-REMOVE-OWN-PART (TICKETS 23:0x).
-- Open, mine: extrude-remove-through-all-boss-ok s1 (face [10,0,20] = boss top centre: ours picks its circular EDGE,
-  live the FACE); linear-pattern-second-direction-ok s16 field Distance#1 (after the focus rule); mirror s8 focus text.
+- Boss-top pick FIXED, landing (commit "over a face an edge lights from 6 px"): over a face an edge's reach is 6 CSS px
+  + half a device px to its drawn pixels (viewport.rs EDGE_OVER_FACE_REACH, was 7; live mc-reach-1122 R4: lit 6, face at
+  7; the Ø8 rim is 7.26 px from the top's middle at 0.275 mm/px). T1 a_click_on_a_boss_tops_middle_picks_the_face; render
+  offscreen reach tests now 5 / 6. Scenario rerun not done yet (resp/one.sh ONE=extrude-remove-through-all-boss-ok).
+- Pre-existing red (GPU only, not from this change: same with reach 7): assembly-ui
+  a_re_hovered_second_pick_shows_plain at [5,3,10] hovers Part 1 <1>'s top (occ 0), the test wants the moved part; a
+  commit after 3e5156291 moved it. Mine to fix next.
+- Open, mine: linear-pattern-second-direction-ok s16 field Distance#1 (after the focus rule); mirror s8 focus text.
 - qa verified RUNNER-UNLABELLED-FIELD-INDEX on c444ac1d5 (flow 70, 0 runner errors).
 
 ## NEXT
