@@ -1,6 +1,6 @@
 {
  "scenario": "camera-menu-perspective-view-off",
- "recorded": "2026-11-26T16:39:37.975Z",
+ "recorded": "2026-11-27T04:26:04.053Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "7ecd8b81c80a7f5b194fa549",
+  "element": "12f7f99fbe5566feb62d2067",
   "start": "block",
   "startElement": "d0643b8ab31b96fd21acb45e",
   "runner": "live2 .nstate-uip-4.json"
@@ -104,10 +104,10 @@
     }
    },
    "ok": true,
-   "ti": 24476,
-   "tmove": 24526,
+   "ti": 27179,
+   "tmove": 27307,
    "moves": 1,
-   "tdown": 24820,
+   "tdown": 27638,
    "at": [
     1882,
     232
@@ -125,8 +125,8 @@
       "Isometric",
       "Dimetric",
       "Trimetric",
-      "Graphics preferences…",
-      "Named views…",
+      "Graphics preferences\u2026",
+      "Named views\u2026",
       "Previous view",
       "Zoom to fit",
       "Zoom to window",
@@ -137,7 +137,7 @@
       "Tangent edges visible",
       "View in high quality",
       "Highlight boundary edges",
-      "Section view…"
+      "Section view\u2026"
      ],
      "checked": [
       false,
@@ -244,8 +244,8 @@
     },
     "measure": null
    },
-   "t": 26743,
-   "te": 26743
+   "t": 29788,
+   "te": 29788
   },
   {
    "step": 2,
@@ -255,7 +255,7 @@
     "ms": 400
    },
    "ok": true,
-   "ti": 26743,
+   "ti": 29788,
    "state": {
     "focus": {
      "kind": "none"
@@ -269,8 +269,8 @@
       "Isometric",
       "Dimetric",
       "Trimetric",
-      "Graphics preferences…",
-      "Named views…",
+      "Graphics preferences\u2026",
+      "Named views\u2026",
       "Previous view",
       "Zoom to fit",
       "Zoom to window",
@@ -281,7 +281,7 @@
       "Tangent edges visible",
       "View in high quality",
       "Highlight boundary edges",
-      "Section view…"
+      "Section view\u2026"
      ],
      "checked": [
       false,
@@ -388,8 +388,8 @@
     },
     "measure": null
    },
-   "t": 28935,
-   "te": 28935
+   "t": 32110,
+   "te": 32110
   },
   {
    "step": 3,
@@ -400,10 +400,10 @@
     }
    },
    "ok": true,
-   "ti": 28935,
-   "tmove": 28982,
+   "ti": 32110,
+   "tmove": 32223,
    "moves": 2,
-   "tdown": 30059,
+   "tdown": 33383,
    "at": [
     1793,
     438
@@ -472,19 +472,19 @@
       0
      ],
      "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
+      127.523,
+      -220.877,
+      147.251
      ],
-     "width_mm": 355.772,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
+     "width_mm": null,
+     "height_mm": null,
+     "mmPerPixel": null,
+     "orthographic": false
     },
     "measure": null
    },
-   "t": 31931,
-   "te": 31931
+   "t": 35458,
+   "te": 35458
   },
   {
    "step": 4,
@@ -494,7 +494,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 31931,
+   "ti": 35458,
    "state": {
     "focus": {
      "kind": "none"
@@ -559,19 +559,19 @@
       0
      ],
      "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
+      127.523,
+      -220.877,
+      147.251
      ],
-     "width_mm": 355.772,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
+     "width_mm": null,
+     "height_mm": null,
+     "mmPerPixel": null,
+     "orthographic": false
     },
     "measure": null
    },
-   "t": 34542,
-   "te": 34542
+   "t": 38231,
+   "te": 38232
   },
   {
    "step": 5,
@@ -582,10 +582,10 @@
     }
    },
    "ok": true,
-   "ti": 34542,
-   "tmove": 34580,
+   "ti": 38232,
+   "tmove": 38291,
    "moves": 1,
-   "tdown": 34869,
+   "tdown": 38600,
    "at": [
     1882,
     232
@@ -603,8 +603,8 @@
       "Isometric",
       "Dimetric",
       "Trimetric",
-      "Graphics preferences…",
-      "Named views…",
+      "Graphics preferences\u2026",
+      "Named views\u2026",
       "Previous view",
       "Zoom to fit",
       "Zoom to window",
@@ -615,7 +615,7 @@
       "Tangent edges visible",
       "View in high quality",
       "Highlight boundary edges",
-      "Section view…"
+      "Section view\u2026"
      ],
      "checked": [
       false,
@@ -711,19 +711,19 @@
       0
      ],
      "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
+      127.523,
+      -220.877,
+      147.251
      ],
-     "width_mm": 355.772,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
+     "width_mm": null,
+     "height_mm": null,
+     "mmPerPixel": null,
+     "orthographic": false
     },
     "measure": null
    },
-   "t": 36761,
-   "te": 36761
+   "t": 40750,
+   "te": 40750
   },
   {
    "step": 6,
@@ -733,7 +733,7 @@
     "ms": 400
    },
    "ok": true,
-   "ti": 36761,
+   "ti": 40750,
    "state": {
     "focus": {
      "kind": "none"
@@ -747,8 +747,8 @@
       "Isometric",
       "Dimetric",
       "Trimetric",
-      "Graphics preferences…",
-      "Named views…",
+      "Graphics preferences\u2026",
+      "Named views\u2026",
       "Previous view",
       "Zoom to fit",
       "Zoom to window",
@@ -759,7 +759,7 @@
       "Tangent edges visible",
       "View in high quality",
       "Highlight boundary edges",
-      "Section view…"
+      "Section view\u2026"
      ],
      "checked": [
       false,
@@ -855,19 +855,19 @@
       0
      ],
      "eye_mm": [
-      67.5,
-      -116.913,
-      77.942
+      127.523,
+      -220.877,
+      147.251
      ],
-     "width_mm": 355.772,
-     "height_mm": 243.974,
-     "mmPerPixel": 0.275365,
-     "orthographic": true
+     "width_mm": null,
+     "height_mm": null,
+     "mmPerPixel": null,
+     "orthographic": false
     },
     "measure": null
    },
-   "t": 38952,
-   "te": 38952
+   "t": 43156,
+   "te": 43156
   },
   {
    "step": 7,
@@ -878,10 +878,10 @@
     }
    },
    "ok": true,
-   "ti": 38953,
-   "tmove": 38995,
+   "ti": 43156,
+   "tmove": 43233,
    "moves": 2,
-   "tdown": 40059,
+   "tdown": 44317,
    "at": [
     1793,
     438
@@ -961,8 +961,8 @@
     },
     "measure": null
    },
-   "t": 41954,
-   "te": 41954
+   "t": 46350,
+   "te": 46350
   },
   {
    "step": 8,
@@ -972,7 +972,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 41954,
+   "ti": 46350,
    "state": {
     "focus": {
      "kind": "none"
@@ -1048,8 +1048,8 @@
     },
     "measure": null
    },
-   "t": 44551,
-   "te": 44551
+   "t": 49079,
+   "te": 49079
   },
   {
    "step": 9,
@@ -1060,10 +1060,10 @@
     }
    },
    "ok": true,
-   "ti": 44551,
-   "tmove": 44592,
+   "ti": 49079,
+   "tmove": 49149,
    "moves": 1,
-   "tdown": 44886,
+   "tdown": 49461,
    "at": [
     1882,
     232
@@ -1081,8 +1081,8 @@
       "Isometric",
       "Dimetric",
       "Trimetric",
-      "Graphics preferences…",
-      "Named views…",
+      "Graphics preferences\u2026",
+      "Named views\u2026",
       "Previous view",
       "Zoom to fit",
       "Zoom to window",
@@ -1093,7 +1093,7 @@
       "Tangent edges visible",
       "View in high quality",
       "Highlight boundary edges",
-      "Section view…"
+      "Section view\u2026"
      ],
      "checked": [
       false,
@@ -1200,8 +1200,8 @@
     },
     "measure": null
    },
-   "t": 46814,
-   "te": 46814
+   "t": 51581,
+   "te": 51581
   },
   {
    "step": 10,
@@ -1211,7 +1211,7 @@
     "ms": 400
    },
    "ok": true,
-   "ti": 46815,
+   "ti": 51581,
    "state": {
     "focus": {
      "kind": "none"
@@ -1225,8 +1225,8 @@
       "Isometric",
       "Dimetric",
       "Trimetric",
-      "Graphics preferences…",
-      "Named views…",
+      "Graphics preferences\u2026",
+      "Named views\u2026",
       "Previous view",
       "Zoom to fit",
       "Zoom to window",
@@ -1237,7 +1237,7 @@
       "Tangent edges visible",
       "View in high quality",
       "Highlight boundary edges",
-      "Section view…"
+      "Section view\u2026"
      ],
      "checked": [
       false,
@@ -1344,8 +1344,8 @@
     },
     "measure": null
    },
-   "t": 49035,
-   "te": 49036
+   "t": 53910,
+   "te": 53910
   },
   {
    "step": 11,
@@ -1354,7 +1354,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 49036,
+   "ti": 53910,
    "pointer": {
     "at": [
      1881,
@@ -1363,7 +1363,7 @@
     "hover": [],
     "element": "div.view-cube-menu-layer"
    },
-   "tdown": 49046,
+   "tdown": 53919,
    "state": {
     "focus": {
      "kind": "none"
@@ -1439,9 +1439,9 @@
     },
     "measure": null
    },
-   "t": 52456,
-   "te": 52456
+   "t": 57454,
+   "te": 57454
   }
  ],
- "t0_epoch_ms": 1795711158884
+ "t0_epoch_ms": 1795753543452
 }
