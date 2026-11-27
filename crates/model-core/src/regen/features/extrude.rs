@@ -12,6 +12,8 @@ use noshape_kernel as k;
 enum End {
     Distance(f64),
     UpTo(k::Shape),
+    /// Up to part: the part, and the plane past its far side along the direction where the profile passes it by.
+    UpToPart(k::Shape, k::Shape),
     UpToPoint(DVec3),
 }
 
@@ -225,7 +227,9 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
             let Some(r) = ev.query(body_id).first() else { return err_at(&[body_id], "Select a part to terminate the extrude.") };
             let bi = *ev.resolve_bodies(std::slice::from_ref(r)).first().ok_or_else(|| crate::regen::eval::FeatureError::at(&[body_id], "Select a part to terminate the extrude."))?;
             let s = ev.ctx.bodies[bi].shape.clone();
-            Ok(End::UpTo(if off != 0.0 { s.translated(-dir * off)? } else { s }))
+            let far = far_side(&s, dir, ev.model_extent() * 4.0)?;
+            let shift = |s: k::Shape| if off != 0.0 { s.translated(-dir * off) } else { Ok(s) };
+            Ok(End::UpToPart(shift(s)?, shift(far)?))
         }
         "UP_TO_NEXT" => {
             require_parts(ev)?;
@@ -239,6 +243,17 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
         }
         other => err(format!("Unsupported end type {other}")),
     }
+}
+
+/// The plane past which no point of `part` lies along `dir`, as a face `ext` across.
+fn far_side(part: &k::Shape, dir: DVec3, ext: f64) -> FResult<k::Shape> {
+    let dir = dir.normalize();
+    let b = part.bounding_box(false)?;
+    let past = b.center() + dir * b.diagonal().max(1e-3);
+    let x = dir.any_orthonormal_vector();
+    let probe = k::make_plane_face(&k::Plane::new(past, dir, x), -ext, ext, -ext, ext)?;
+    let gap = k::distance(part, &probe)?.distance;
+    Ok(k::make_plane_face(&k::Plane::new(past - dir * gap, dir, x), -ext, ext, -ext, ext)?)
 }
 
 /// A point of the starting offset entity at its height above the profile
@@ -313,6 +328,12 @@ fn one_side(profile: &k::Shape, dir: DVec3, end: End, draft: f64) -> FResult<k::
         End::Distance(depth) if draft == 0.0 => k::extrude(profile, dir * depth)?,
         End::Distance(depth) => k::extrude_between(profile, DVec3::ZERO, dir * depth, draft)?,
         End::UpTo(target) => k::extrude_up_to(profile, dir, &target, 0.0)?,
+        // Where the part covers only some of the profile, the rest goes to its far side (live depth batch 1
+        // extrude-up-to-part-overlap-ok: a block's top face up to a smaller part standing in it makes a third part).
+        End::UpToPart(part, far) => match k::extrude_up_to(profile, dir, &part, 0.0) {
+            Err(e) if e.to_string().contains("does not fully bound") => k::extrude_up_to(profile, dir, &k::Shape::compound(&[part, far]), 0.0)?,
+            r => r?,
+        },
         End::UpToPoint(pt) => k::extrude_up_to_point(profile, dir, pt)?,
     })
 }

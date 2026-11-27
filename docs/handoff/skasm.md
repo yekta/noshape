@@ -1,12 +1,17 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-26 23:58 UTC. Read docs/DECISIONS.md
+Updated 2026-11-27 01:03 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## PATTERN-AFTER-INSERTED-CHAMFER (lead 11-26 23:5x): already fixed by core 6a8e411db (11-19)
-The flow replayed through ops on green f186b320 rebuilds everything (29505.03 mm3 / 30273.90 mm2 as live). Added the
-ops e2e e2e::a_chamfer_inserted_before_a_feature_pattern_rebuilds_it (T1 was core's engine.rs test); ticket and
-interaction-feel row closed.
+## NOW (11-27): psui's depth tickets taken from core (lead)
+- DEPTH-EXTRUDE-UP-TO-PART-OVERLAP: extrude.rs End::UpToPart: where the part leaves some of the profile unbounded
+  ("does not fully bound"), retried up to the part plus the plane at its far side (far_side). Inferred from dx's
+  behaviours 11-04 rule (first face per point; a start on the body goes to its far side): live's Part 3 volume not
+  captured (the take has only the parts list).
+- DEPTH-PATTERN-REMOVE-OWN-PART: pattern.rs part_pattern: Remove / Intersect seeds are always tools, targets = scope
+  less the seeds (std subfeatureToolsTargets; before, a seed inside the scope stayed a target). Corpus A/B:
+  abp.sh pr.patch on vibex7.
+- PATTERN-AFTER-INSERTED-CHAMFER landed as an ops e2e (fixed by core 6a8e411db).
 
 ## NOW (11-26 23:35 UTC)
 - 09cb32fd's failure was the land slot's link (mold undefined hashbrown symbol in noshape-ops), not ours; the Split 4

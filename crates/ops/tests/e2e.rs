@@ -12694,3 +12694,46 @@ fn a_chamfer_inserted_before_a_feature_pattern_rebuilds_it() {
     let mass = call(&mut ctx, "query_mass_properties", json!({}));
     assert!((num(&mass["volume"]) - 29505.03).abs() < 0.01 && (num(&mass["surface_area"]) - 30273.90).abs() < 0.01, "{mass}");
 }
+
+/// A New block on Top from `a` to `b`, `depth` high; returns its part id.
+fn top_block(ctx: &mut Ctx, a: [f64; 2], b: [f64; 2], depth: &str) -> Value {
+    let sk = call(ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [a, b] }));
+    let r = call(ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].clone();
+    let x = call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [r], "depth": depth, "operationType": "NEW" } }));
+    let id = x["feature"].as_str().unwrap().to_string();
+    call(ctx, "query_parts", json!({}))["parts"].as_array().unwrap().iter().find(|p| p["id"].as_str().unwrap().contains(&id)).unwrap_or_else(|| panic!("{x}"))["id"].clone()
+}
+
+/// psui DEPTH-EXTRUDE-UP-TO-PART-OVERLAP (live depth batch 1 extrude-up-to-part-overlap-ok): Part 1's top face (40 × 30
+/// at z 10) extruded New up to Part 2 (20 × 10 × 15, standing in Part 1's right edge): a third part, to Part 2's top.
+#[test]
+fn up_to_a_part_standing_in_the_face_makes_a_third_part() {
+    let mut ctx = Ctx::new();
+    let path = scratch("up-to-part-overlap");
+    let _ = std::fs::remove_file(format!("{}.noshape", path.display()));
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    top_block(&mut ctx, [0.0, 0.0], [40.0, 30.0], "10 mm");
+    let p2 = top_block(&mut ctx, [30.0, 10.0], [50.0, 20.0], "15 mm");
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "at": [[10, 5, 10]] }))["faces"][0]["id"].clone();
+    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [top], "operationType": "NEW", "endBound": "UP_TO_BODY", "endBoundEntityBody": [p2] } }));
+    assert_eq!(x["feature_status"]["status"], "Ok", "{x}");
+    let parts = call(&mut ctx, "query_parts", json!({}));
+    let p3 = parts["parts"].as_array().unwrap().iter().find(|p| p["name"] == "Part 3").unwrap_or_else(|| panic!("{parts}"));
+    assert!((num(&p3["volume"]) - 6000.0).abs() < 1e-3, "{p3}");
+}
+
+/// psui DEPTH-PATTERN-REMOVE-OWN-PART (live depth batch 2 mistake-linear-pattern-remove-own-part): a Linear pattern of
+/// the only part, Remove, Merge with all: "No merge scope selected." on the merge scope, as live.
+#[test]
+fn a_remove_pattern_of_the_only_part_says_no_merge_scope() {
+    let mut ctx = Ctx::new();
+    let path = scratch("pattern-remove-own-part");
+    let _ = std::fs::remove_file(format!("{}.noshape", path.display()));
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let part = top_block(&mut ctx, [0.0, 0.0], [40.0, 30.0], "10 mm");
+    let x = call(&mut ctx, "query_entities", json!({ "kind": "edges", "at": [[10, 0, 0]] }))["edges"][0]["id"].clone();
+    let p = call(&mut ctx, "feature_add", json!({ "type": "linearPattern", "params": { "patternType": "PART", "entities": [part], "directionOne": [x], "distance": "20 mm", "instanceCount": 2, "operationType": "REMOVE", "defaultScope": true } }));
+    assert_eq!((&p["feature_status"]["status"], &p["feature_status"]["message"]), (&json!("Error"), &json!("No merge scope selected.")), "{p}");
+    assert_eq!(p["feature_status"]["faulty_params"], json!(["booleanScope"]), "{p}");
+}

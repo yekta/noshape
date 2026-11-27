@@ -2203,3 +2203,40 @@ fn a_counterbored_hole_on_a_bore_already_there_cuts_its_counterbore() {
     let ring = std::f64::consts::PI * (36.0 - 9.0) * 4.0;
     assert!((removed - ring).abs() < 1e-3, "{removed} mm³, the ring {ring}");
 }
+
+/// psui DEPTH-EXTRUDE-UP-TO-PART-OVERLAP (live depth batch 1 extrude-up-to-part-overlap-ok): a 40 × 30 × 10 block and a
+/// 20 × 10 × 15 one standing in its right edge; the first's top face extruded New up to the second: live makes a third
+/// part, the face up to the second's top (its far side, where it doesn't stand over the face). Ours failed ("Failed to
+/// extrude selections, check input.").
+#[test]
+fn up_to_a_part_over_some_of_the_face_goes_to_its_far_side() {
+    let mut t = T::new();
+    let (_, x1) = t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+    let (_, x2) = t.block(0.03, 0.01, 0.05, 0.02, "15 mm");
+    let r = t.ok();
+    let p1 = r.context.bodies.iter().find(|b| b.id.feature == x1).unwrap();
+    let top = p1.shape.faces().iter().position(|f| (f.centroid().unwrap().z - 0.01).abs() < 1e-9).expect("top face");
+    let p2 = r.context.bodies.iter().find(|b| b.id.feature == x2).unwrap();
+    let up = t.add("extrude", &[("entities", q(vec![Reference::Face((*p1.faces[top]).clone())])), ("operationType", en("NEW")), ("endBound", en("UP_TO_BODY")), ("endBoundEntityBody", q(vec![Reference::Body(p2.id.clone())]))]);
+    let r = t.ok();
+    assert_eq!(r.context.bodies.len(), 3);
+    let p3 = r.context.bodies.iter().find(|b| b.id.feature == up).expect("Part 3");
+    let (v, bb) = (p3.shape.volume().unwrap(), p3.shape.bounding_box(false).unwrap());
+    assert!(near(v, 0.04 * 0.03 * 0.005, 1e-6) && (bb.min.z - 0.01).abs() < 1e-6 && (bb.max.z - 0.015).abs() < 1e-6, "{v} {bb:?}");
+}
+
+/// psui DEPTH-PATTERN-REMOVE-OWN-PART (live depth batch 2 mistake-linear-pattern-remove-own-part): a block, a Linear
+/// pattern of it (its only part), Remove, ☑ Merge with all: live's pattern is in error "No merge scope selected." (std
+/// subfeatureToolsTargets: the merge scope less the seeds); ours cut the copy out of the block.
+#[test]
+fn a_remove_pattern_of_the_only_part_has_no_merge_scope() {
+    let mut t = T::new();
+    let (_, x1) = t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+    let r = t.ok();
+    let part = Reference::Body(r.context.bodies.iter().find(|b| b.id.feature == x1).unwrap().id.clone());
+    let p = t.add("linearPattern", &[("patternType", en("PART")), ("entities", q(vec![part])), ("directionOne", q(vec![Reference::Plane(DatumPlane::Right)])), ("distance", e("20 mm")), ("instanceCount", e("2")), ("operationType", en("REMOVE")), ("defaultScope", b(true))]);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|f| f.id == p).unwrap();
+    assert_eq!((st.status, st.message.as_deref(), st.faulty.clone()), (FeatureStatus::Error, Some("No merge scope selected."), vec!["booleanScope".to_string()]));
+    assert!(near(total_volume(&r.context), 0.04 * 0.03 * 0.01, 1e-9), "the block as it was");
+}
