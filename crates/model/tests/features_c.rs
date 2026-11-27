@@ -5374,7 +5374,9 @@ fn a_conic_round_of_a_blades_long_top_edges_as_live() {
 
 /// c2-surf-workshop-knifehandle's Chamfer 1 on the Blade as Move face 2 leaves it (live 6/12/8, 10679.728 mm³): OFFSET_ANGLE
 /// 1.5 mm at 26 deg on the two bottom edges (247.649 mm, the flanks meeting the narrow bottom face). Live: 7/15/10,
-/// 10423.841 mm³, each flank's edge bevelled.
+/// 10423.841 mm³, each flank's edge bevelled; the bevels run on up the curving tip onto its round, which keeps 1.847 mm²
+/// (run on straight: 2.045), the bevels 319.341 / 319.363 mm². Then Fillet 2 (live 11/27/18, the tip's faces 0.595 x 2
+/// and 0.653 mm²).
 #[test]
 fn an_offset_angle_chamfer_of_a_blades_bottom_edges_as_live() {
     let brep = include_str!("data/knifehandle-chamfer1-input.brep").to_string();
@@ -5405,7 +5407,31 @@ fn an_offset_angle_chamfer_of_a_blades_bottom_edges_as_live() {
     let counts = (shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count());
     let after = volume(&r, 0) * 1e9;
     assert_eq!(counts, (7, 15, 10), "{before} -> {after} mm³");
-    assert!((before - after - 255.887).abs() < 1.0, "{before} -> {after} mm³ (live 10679.728 -> 10423.841)");
+    // (This input, ours, is 0.57 mm³ under live's; the bevels at 96 sections take 257.23.)
+    assert!((before - after - 255.887).abs() < 1.5, "{before} -> {after} mm³ (live 10679.728 -> 10423.841)");
+    let areas: Vec<f64> = shape.faces().iter().map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).collect();
+    let tip: Vec<f64> = areas.iter().copied().filter(|a| *a < 5.0).collect();
+    let bevels: Vec<f64> = areas.iter().copied().filter(|a| (a - 319.35).abs() < 2.0).collect();
+    assert!(tip.len() == 1 && (tip[0] - 1.847).abs() < 0.1, "the tip's round {tip:?} mm² (live 1.847)");
+    assert!(bevels.len() == 2 && bevels.iter().all(|a| (a - 319.352).abs() < 0.2), "bevels {bevels:?} mm² (live 319.341 / 319.363)");
+    // Fillet 2 after it (see a_conic_round_of_a_blades_long_top_edges_as_live): its run-on rounds over this tip as live's.
+    let b = &r.context.bodies[0];
+    let picks: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| e.edge_info().is_ok_and(|i| near(i.length, mm(235.892), mm(0.01)))).map(|(k, _)| Reference::Edge((*b.edges[k]).clone())).collect();
+    assert_eq!(picks.len(), 2, "the top face's long edges");
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picks));
+        p.set("crossSection", en("CONIC"));
+        p.set("nonCircularRadius", expr("0.6 mm"));
+        p.set("rho", expr("0.5"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    let shown = shape.shown_topology().unwrap();
+    assert_eq!((shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (11, 27, 18));
+    let mut small: Vec<f64> = shape.faces().iter().map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).filter(|a| *a < 1.0).collect();
+    small.sort_by(f64::total_cmp);
+    let live = [0.595, 0.595, 0.653];
+    assert!(small.len() == 3 && small.iter().zip(live).all(|(a, l)| (a - l).abs() < 0.05), "the tip's faces {small:?} mm² (live {live:?})");
 }
 
 /// asm-isaac-ball's e54410 Chamfer 1 (feature 51) on its part as Extrude 22 leaves it: TWO_OFFSETS 2 / 5 mm on the R 10.5

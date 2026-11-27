@@ -271,9 +271,10 @@ std::vector<std::pair<gp_Pnt, gp_Vec>> lies_on_samples(const TopoDS_Face& t)
 
 // Whether a free-form face (its lies_on_samples `ts`: a lofted tool's side) lies on part face `g` where it covers it: of
 // its sample points over `g` near its surface (within 50 atol: farther ones are other parts of the face), at least three
-// and every one within `atol`, normals within 0.02 rad (a loft's side spans a wall's planes and cylinders, each only
-// approximately: c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off). Its largest distance in
-// `dev`. (`gbox`: `g`'s box; points off it are not projected. `pg`: a projector onto `g`'s surface, `in_g` its
+// and every one within `atol`, normals within 0.05 rad (a loft's side spans a wall's planes and cylinders, each only
+// approximately: c2-variable-fillet-faceblend's held face blend, ~0.005 mm and ~0.009 rad off; a ball's side lofted over
+// a small round's tight curve, c2-surf-workshop-knifehandle's Fillet 2 on the tip's round, 0.0014 mm and 0.04 rad off).
+// Its largest distance in `dev`. (`gbox`: `g`'s box; points off it are not projected. `pg`: a projector onto `g`'s surface, `in_g` its
 // classifier, each made here when null. `taken`: the points found on a part face before, skipped (no other face holds
 // them; c2-hunting-knife's Fillet 5 classified a side's points on its own face against the next cylinder, 2 ms); the
 // points on `g` added when it lies on it.)
@@ -308,7 +309,7 @@ bool lies_on(const std::vector<std::pair<gp_Pnt, gp_Vec>>& ts, const TopoDS_Face
     gp_Vec dug, dvg;
     sg->D1(ug, vg, qg, dug, dvg);
     const gp_Vec ng = dug.Crossed(dvg);
-    if (pr.LowerDistance() > atol || nt.Magnitude() < 1e-300 || ng.Magnitude() < 1e-300 || !gp_Dir(nt).IsParallel(gp_Dir(ng), 0.02))
+    if (pr.LowerDistance() > atol || nt.Magnitude() < 1e-300 || ng.Magnitude() < 1e-300 || !gp_Dir(nt).IsParallel(gp_Dir(ng), 0.05))
       return false;
     dev = std::max(dev, pr.LowerDistance());
     on.push_back(k);

@@ -1571,8 +1571,9 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         let section = if spec.reference.is_some() { section_face } else { section_wire };
         let mut jobs = Vec::new();
         for (pi, &(plo, phi, ci)) in pieces.iter().enumerate() {
-            // (A chamfer as sections: a ruled face, fewer sections; its cut took most of its time.)
-            let total_n = if spec.reference.is_some() { 24 } else { N };
+            // (A chamfer as sections: a ruled face, fewer sections; its cut took most of its time. At 24 a long curved
+            // chain's loft strayed: c2-surf-workshop-knifehandle's mirrored chamfer faces 319.00 / 319.48 mm², live 319.35.)
+            let total_n = if spec.reference.is_some() { 48 } else { N };
             let total_n = if held && pieces.len() > 1 { total_n.max(24 * pieces.len()) } else { total_n };
             let n = if pieces.len() > 1 { ((total_n as f64 * (phi - plo) / (hi - lo)).ceil() as usize).max(6) } else { total_n };
             // (A folding piece's sections twice as dense: at the usual count its side on a curved face left slivers there.)
@@ -1652,19 +1653,47 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     }
                     None => face,
                 };
-                let past = match run_on {
-                    Some(v) => Some((section(p + v, &fr, &here, side1_first)?.0, corner + v)),
-                    None => None,
+                // A chamfer's run-on bends with its edge's turn at the end (c2-surf-workshop-knifehandle's Chamfer 1 runs on
+                // up the blade's curving tip onto its round as live's; straight on, it met the round 0.36 mm short).
+                let past: Vec<(Shape, DVec3)> = match run_on {
+                    Some(v) => {
+                        let out = v.normalize();
+                        let turn = match spec.reference.is_some() {
+                            true => {
+                                let h = ((phi - plo) / n as f64).min(v.length());
+                                let inside = if k == 0 { -station((plo + h).min(phi))?.3 } else { station((phi - h).max(plo))?.3 };
+                                (out - inside) / h
+                            }
+                            false => DVec3::ZERO,
+                        };
+                        match turn.length() * v.length() > 1e-4 {
+                            true => (1..=3)
+                                .map(|j| {
+                                    let s = v.length() * j as f64 / 3.0;
+                                    let q = glam::DQuat::from_rotation_arc(out, (out + turn * s).normalize());
+                                    let at = p + out * s + turn * (0.5 * s * s);
+                                    let bent = Frame { u: [q * fr.u[0], q * fr.u[1]], m: [q * fr.m[0], q * fr.m[1]], extent: fr.extent, air: fr.air };
+                                    Ok((section(at, &bent, &here, side1_first)?.0, at + q * (corner - p)))
+                                })
+                                .collect::<FResult<Vec<_>>>()?,
+                            false => vec![(section(p + v, &fr, &here, side1_first)?.0, corner + v)],
+                        }
+                    }
+                    None => Vec::new(),
                 };
-                if k == 0 && let Some((f, q)) = &past {
-                    secs.push(f.clone());
-                    starts.push(*q);
+                if k == 0 {
+                    for (f, q) in past.iter().rev() {
+                        secs.push(f.clone());
+                        starts.push(*q);
+                    }
                 }
                 secs.push(face);
                 starts.push(corner);
-                if k != 0 && let Some((f, q)) = past {
-                    secs.push(f);
-                    starts.push(q);
+                if k != 0 {
+                    for (f, q) in past {
+                        secs.push(f);
+                        starts.push(q);
+                    }
                 }
             }
             jobs.push((pi, ci, secs, starts, convex));

@@ -1879,11 +1879,28 @@ std::unique_ptr<OcShape> reface_on(const OcShape& in, uint32_t index, const OcSh
   if (const auto t = occ::down_cast<Geom_RectangularTrimmedSurface>(own); !t.IsNull())
     own = t->BasisSurface();
   const bool same = own == surf && floc.IsEqual(loc);
+  // (Or its surface extended at its bounds only: an edge's curve on it holds where the new surface passes through the old
+  // one's points along it. Projected again, c2-surf-workshop-knifehandle's Fillet 2 bevel's ridge strayed 8 um and the
+  // face's wire crossed itself.)
+  const auto holds = [&](const TopoDS_Edge& e) {
+    double     a, b;
+    const auto c = BRep_Tool::CurveOnSurface(e, f, a, b);
+    if (c.IsNull())
+      return false;
+    for (int k = 0; k <= 16; ++k)
+    {
+      const gp_Pnt2d uv = c->Value(a + (b - a) * k / 16.0);
+      const gp_Pnt   p  = own->Value(uv.X(), uv.Y()).Transformed(floc.Transformation());
+      if (p.Distance(surf->Value(uv.X(), uv.Y()).Transformed(loc.Transformation())) > 0.1 * tol)
+        return false;
+    }
+    return true;
+  };
   for (TopExp_Explorer ex(g, TopAbs_EDGE); ex.More(); ex.Next())
   {
     const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
     double             a, b;
-    if (same && !BRep_Tool::IsClosed(e, f) && !BRep_Tool::CurveOnSurface(e, f, a, b).IsNull())
+    if ((same || holds(e)) && !BRep_Tool::IsClosed(e, f) && !BRep_Tool::CurveOnSurface(e, f, a, b).IsNull())
     {
       B.UpdateEdge(e, BRep_Tool::CurveOnSurface(e, f, a, b), g, BRep_Tool::Tolerance(e));
       B.Range(e, g, a, b);
