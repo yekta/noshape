@@ -1932,7 +1932,20 @@ pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, refe
     let z = match align {
         Reference::Face(_) => {
             let (bi, fi) = *ev.resolve_faces(std::slice::from_ref(align)).first()?;
-            ev.face_shape(bi, fi).ok()?.normal_at_point(frame.origin).ok()?
+            let face = ev.face_shape(bi, fi).ok()?;
+            // An edge's midpoint on a curved side runs the way the side's loop does (live spline-fillet-asm: the
+            // spline's bottom edge +y, the fillet's edge along its top -y).
+            if let Reference::Implicit { on, inference: Inference::Midpoint } = reference
+                && matches!(face.face_surface(), Ok(noshape_kernel::Surface::Bezier { .. } | noshape_kernel::Surface::BSpline { .. } | noshape_kernel::Surface::Extrusion { .. }))
+                && let Some(&(be, ei)) = ev.resolve_edges(std::slice::from_ref(&**on)).first()
+                && let Ok(edge) = ev.edge_shape(be, ei)
+                && let Ok(i) = edge.edge_info()
+                && let Ok([_, d, ..]) = edge.derivatives_at((i.first_param + i.last_param) * 0.5)
+            {
+                let reversed = face.edge_orientation_in(&edge).ok()? == noshape_kernel::Orientation::Reversed;
+                return Some(connector_frame(frame.origin, if reversed { -d } else { d }.normalize()));
+            }
+            face.normal_at_point(frame.origin).ok()?
         }
         Reference::Edge(_) => {
             let (bi, ei) = *ev.resolve_edges(std::slice::from_ref(align)).first()?;
@@ -2152,7 +2165,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                             if matches!(info.curve, noshape_kernel::Curve::Circle { .. }) {
                                 refs.push((implicit(&edge_ref, Inference::CenterRim), None));
                             }
-                            refs.push((implicit(&edge_ref, Inference::Midpoint), None));
+                            refs.push((implicit(&edge_ref, Inference::Midpoint), Some(on.clone())));
                             if info.closed {
                                 continue;
                             }

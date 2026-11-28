@@ -2628,7 +2628,11 @@ fn spline_face_inferences_are_its_edges_points() {
     assert_eq!(pts.iter().filter(|p| p.frame.origin.distance(end.frame.origin) < 1e-7).count(), 1, "the corner once: {:#?}", show());
     // The natural spline's end tangent: (-18, 15) per unit of its parameter.
     assert!(end.frame.z().dot(DVec3::new(-18.0, 15.0, 0.0).normalize()) > 1.0 - 1e-6, "{:#?}", end.frame.z());
-    assert!(pts.iter().any(|p| (p.frame.origin - DVec3::new(0.052, 0.015, 0.0)).length() < 2e-4), "the bottom edge's midpoint: {:#?}", show());
+    // Edge midpoints run the way the side's loop does (live spline-fillet-asm: bottom +y, top -y).
+    for (z, y) in [(0.0, 1.0), (0.02, -1.0)] {
+        let mid = pts.iter().find(|p| (p.frame.origin - DVec3::new(0.052, 0.015, z)).length() < 2e-4).unwrap_or_else(|| panic!("the midpoint at z {z}: {:#?}", show()));
+        assert!(mid.frame.z().dot(DVec3::Y * y) > 1.0 - 1e-6, "z {z}: {:#?}", mid.frame.z());
+    }
 }
 
 #[test]
