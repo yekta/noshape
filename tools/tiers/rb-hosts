@@ -1,6 +1,7 @@
 # rb.sh's build host per worktree: the first line whose bash glob matches the worktree's directory name wins.
 # Hosts (lead 11-27; vibex6 is gone): vibe2 (16 cores, 30 GB: the land queue + psui's builds), vibex7 (main's watcher, core's
-# builds, qa's 02:00-04:05 speed window), vibex8 (bool, skasm, qa's suites, nightly T2) (8 cores, 29 GB each, 2 slots). The user's Mac (12 cores) takes half: 2 slots of 3 jobs at nice 19 (user 11-21:
+# builds, qa's 02:00-04:05 speed window), vibex8 (bool, qa's suites, nightly T2) (8 cores, 29 GB each, 2 slots); skasm's
+# builds and crate tests on the Mac's gated slot (11-28), its replays still on vibex8 via ~/bin/slot. The user's Mac (12 cores) takes half: 2 slots of 3 jobs at nice 19 (user 11-21:
 # "half is fine"). Heavy one-off probes: NOSHAPE_RB_HOST=<the idlest host>.
 bool2*    vibex8
 bool*     vibex8
@@ -8,7 +9,7 @@ core*     vibex7
 blend*    vibex7
 dev*      vibex7
 psui*     vibe2
-skasm*    vibex8
+skasm*    mac
 dx*       vibe2
 asm*      vibex8
 studios*  vibex7
