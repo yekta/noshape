@@ -7081,9 +7081,9 @@ impl PartStudioView {
             let configure_name = feature_name.clone();
             let configure_input = first_config_input.clone();
             // With a Checkbox input first, live names it (config-checkbox-suppression: "Configure suppression with Thick").
-            let configure_label = view.read(cx).studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| Some(&i.id) == configure_input.as_ref()).cloned())
+            let configure_with = view.read(cx).studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| Some(&i.id) == configure_input.as_ref()).cloned())
                 .filter(|i| matches!(i.kind, noshape_model::configuration::ConfigInputKind::Checkbox { .. }))
-                .map_or_else(|| "Configure suppression".to_string(), |i| format!("Configure suppression with {}", i.name));
+                .map(|i| format!("Configure suppression with {}", i.name));
             let configure = move |m: crate::os_menu::OsMenu| {
                 if suppression_configured {
                     return m.item(item("Unconfigure suppression", Box::new(move |this, _, cx| {
@@ -7095,14 +7095,18 @@ impl PartStudioView {
                 let Some(input) = configure_input.clone() else { return m };
                 // Configure suppression adds the feature to the configuration table.
                 let name = configure_name.clone();
-                m.item(item(&configure_label, Box::new(move |this, _, cx| {
+                let action: ViewAction = Box::new(move |this, _, cx| {
                     this.add_configured(id, noshape_model::configuration::SUPPRESSED_PARAM, &input, cx);
                     this.right_panel = Some(config_panel::RightPanel::Configurations);
                     // Live feature-menu-configure-suppression: "Extrude 1 suppression configured in Configuration".
                     let input_name = this.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone())).unwrap_or_else(|| input.clone());
                     this.message = Some((FeatureStatus::Info, format!("{name} suppression configured in {input_name}")));
                     cx.notify();
-                })))
+                });
+                m.item(match &configure_with {
+                    None => item("Configure suppression", action),
+                    Some(label) => item(label, action),
+                })
             };
             // A suppressed feature, by hand or by its expression, and a rolled
             // back one (live qa4 r5 s8 (3), ui 10-25 c (2), s2 rollback
