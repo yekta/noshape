@@ -6299,10 +6299,14 @@ impl PartStudioView {
         let all_curves = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_some())));
         let only_endpoints = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_none() && !d.sketch.users_of_point(*e).is_empty())));
         let has_clip = Self::clipboard_has_sketch_entities(cx);
-        // Live (spline-image-1125): a selected spline's menu starts with Insert spline points; an image's (its edge
-        // selected, or nothing hit on the picture) has Edit image and Switch to <its file tab> after Confirm.
+        // Live (spline-image-1125): a selected spline's menu starts with Insert spline points (not a used one's: live
+        // sketch-used-rclick-menu-spline s81); an image's (its edge selected, or nothing hit on the picture) has Edit
+        // image and Switch to <its file tab> after Confirm.
         let (spline_sel, image_menu) = self.sketch_data(cx).zip(self.sketch.as_ref()).map(|(d, ed)| {
-            let spline = n == 1 && !tool_active && matches!(d.sketch.kind(ed.selection[0]), Some(noshape_sketch::EntityKind::FitSpline | noshape_sketch::EntityKind::BSpline));
+            let spline = n == 1
+                && !tool_active
+                && matches!(d.sketch.kind(ed.selection[0]), Some(noshape_sketch::EntityKind::FitSpline | noshape_sketch::EntityKind::BSpline))
+                && d.sketch.entity(ed.selection[0]).is_some_and(|e| !e.external);
             let image = if n == 0 { image_at_cursor.filter(|_| hovered.is_none() && dim.is_none()) } else { ed.selection.iter().find_map(|e| d.image_of_entity(*e)) };
             let image = image.filter(|_| !tool_active).and_then(|id| {
                 let name = d.images.iter().find(|i| i.id == id)?.name.clone();

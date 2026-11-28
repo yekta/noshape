@@ -6733,7 +6733,8 @@ fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
-/// Live skasm spline-image-1125 (3), (9): a selected spline's menu starts with Insert spline points; an image's edge,
+/// Live skasm spline-image-1125 (3), (9): a selected spline's menu starts with Insert spline points (a used one's
+/// doesn't); an image's edge,
 /// or the picture with nothing hit, has Edit image and Switch to <its file tab> after Confirm (no plane items); Edit
 /// image's pick replaces the picture in its box.
 #[gpui::test]
@@ -6782,6 +6783,11 @@ fn spline_and_image_menus_as_lives(cx: &mut TestAppContext) {
     };
     let got = menu(cx, Some(spline), vec![spline], DVec2::new(-0.03, 0.01));
     assert_eq!(got[..2], ["Insert spline points", "Confirm Sketch 1"], "{got:?}");
+    // A used spline isn't the sketch's to edit (live sketch-used-rclick-menu-spline s81: no Insert spline points).
+    cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| data.sketch.set_external(spline, true).unwrap()))).unwrap();
+    let got = menu(cx, Some(spline), vec![spline], DVec2::new(-0.03, 0.01));
+    assert_eq!(got.first().map(String::as_str), Some("Confirm Sketch 1"), "a used spline's menu: {got:?}");
+    cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| data.sketch.set_external(spline, false).unwrap()))).unwrap();
     let got = menu(cx, Some(edge), vec![edge], DVec2::new(0.03, 0.01));
     assert_eq!(got[..3], ["Confirm Sketch 1", "Edit image", "Switch to pic.png"], "{got:?}");
     let got = menu(cx, None, vec![], DVec2::new(0.03, 0.02));

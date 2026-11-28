@@ -4652,7 +4652,7 @@ impl SketchEditor {
                     }
                     _ => None,
                 };
-                let (Some(ka), Some(kb)) = (kind(*a), kind(*b)) else { return Vec::new() };
+                let (Some(ka), Some(kb)) = (kind(*a), kind(*b)) else { return line_meets_curve(sk, *a, *b, units).or_else(|| line_meets_curve(sk, *b, *a, units)).unwrap_or_default() };
                 let min_max_center = |(min, max): (f64, f64), center: f64| vec![("Min dist".into(), len(min)), ("Max dist".into(), len(max)), ("Center dist".into(), len(center))];
                 match (ka, kb) {
                     (Pick::Point(p), Pick::Point(q)) => one("Min dist", len((q - p).length())),
@@ -10113,6 +10113,17 @@ struct Round {
     sweep: f64,
 }
 
+/// A line and a spline (or another free curve) that meet at one of the line's ends: live reads only the angle there
+/// (sketch-used-click-then-empty s80, a used line and the used spline at its end: "Intersection angle 12.979 deg").
+fn line_meets_curve(sk: &Sketch, line: EntityId, other: EntityId, units: &UnitPrefs) -> Option<Vec<(String, String)>> {
+    let Some(Curve2::Line { a, b }) = sk.curve(line) else { return None };
+    let c = sk.curve(other).filter(|c| !matches!(c, Curve2::Line { .. } | Curve2::Circle { .. } | Curve2::Arc { .. }))?;
+    let d = (b - a).try_normalize()?;
+    let t = [a, b].into_iter().map(|p| c.closest(p)).find(|&(_, _, dist)| dist < 1e-7)?.0;
+    let ang = d.dot(c.tangent(t).try_normalize()?).abs().clamp(0.0, 1.0).acos();
+    Some(vec![("Intersection angle".into(), format!("{} deg", noshape_units::to_fixed(ang.to_degrees(), units.angle_precision)))])
+}
+
 fn segment_distance(p: DVec2, l0: DVec2, l1: DVec2) -> f64 {
     let d = l1 - l0;
     let t = if d.length_squared() > 0.0 { ((p - l0).dot(d) / d.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
@@ -11405,6 +11416,8 @@ mod tests {
         let a3 = d.sketch.add_arc_angles(mm(8.0, 8.0), 0.008, PI, 1.5 * PI);
         let l2 = d.sketch.add_line(mm(8.0, 0.0), mm(52.0, 0.0));
         let l3 = d.sketch.add_line(mm(-30.0, 0.0), mm(30.0, 0.0));
+        // A spline leaving l2's end at 45 degrees (its first control leg).
+        let s1 = d.sketch.add_bspline(&[mm(52.0, 0.0), mm(62.0, 10.0), mm(72.0, 10.0), mm(82.0, 0.0)], 3).unwrap();
         let readout = |sel: [EntityId; 2]| {
             let text = |sel: &[EntityId]| {
                 let mut ed2 = SketchEditor::new(ed.feature, ed.frame);
@@ -11420,6 +11433,9 @@ mod tests {
         assert_eq!(readout([l1, a1]), "Min dist 53.151 | Max dist 170.242 | Center dist 40.000");
         assert_eq!(readout([l2, a3]), "Intersection angle 0.000 deg | Min dist 0.000 | Center dist 8.000 | Max dist 52.612");
         assert_eq!(readout([l3, c1]), "Intersection angle 90.000 deg | Min dist 0.000 | Center dist 0.000 | Max dist 55.000");
+        // Live sketch-used-click-then-empty s80: a line and the spline at its end read only the angle there; apart, nothing.
+        assert_eq!(readout([l2, s1]), "Intersection angle 45.000 deg");
+        assert_eq!(readout([l1, s1]), "");
         assert_eq!(readout([c1, a1]), "Center dist 70.000 | Max dist 110.000 | Min dist 30.000");
         assert_eq!(readout([a1, a2]), "Center dist 50.000 | Max dist 75.000 | Min dist 50.249");
         assert_eq!(readout([c1, c3]), "Center dist 0.000 | Max dist 31.000 | Min dist 19.000");
