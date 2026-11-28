@@ -2137,9 +2137,17 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                     {
                         let fi = b.find_faces(n)[0] as u32;
                         let vertex_edges = b.shape.vertex_edges().unwrap_or_default();
-                        for (ei, faces) in edge_faces.iter().enumerate() {
-                            let Some(en) = b.edges.get(ei).filter(|_| faces.contains(&fi)) else { continue };
-                            let Some(info) = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei).ok().and_then(|e| e.edge_info().ok()) else { continue };
+                        let mut edges: Vec<(usize, noshape_kernel::EdgeInfo)> = edge_faces
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, faces)| faces.contains(&fi))
+                            .filter_map(|(ei, _)| Some((ei, b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei).ok()?.edge_info().ok()?)))
+                            .collect();
+                        // A corner once, Z along its curved edge (live: the spline's end, not the straight side's).
+                        edges.sort_by_key(|(_, info)| matches!(info.curve, noshape_kernel::Curve::Line { .. }));
+                        let mut corners: HashSet<usize> = HashSet::new();
+                        for (ei, info) in edges {
+                            let Some(en) = b.edges.get(ei) else { continue };
                             let edge_ref = Reference::Edge((**en).clone());
                             if matches!(info.curve, noshape_kernel::Curve::Circle { .. }) {
                                 refs.push((implicit(&edge_ref, Inference::CenterRim), None));
@@ -2151,6 +2159,7 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                             for (vi, edges) in vertex_edges.iter().enumerate() {
                                 if edges.contains(&(ei as u32))
                                     && let Some(vn) = b.vertices.get(vi)
+                                    && corners.insert(vi)
                                 {
                                     refs.push((implicit(&Reference::Vertex((**vn).clone()), Inference::Vertex), Some(edge_ref.clone())));
                                 }

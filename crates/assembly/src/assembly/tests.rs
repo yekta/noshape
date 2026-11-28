@@ -2625,8 +2625,9 @@ fn spline_face_inferences_are_its_edges_points() {
     assert!(pts.iter().all(|p| !matches!(&p.reference, Reference::Implicit { inference: Inference::Centroid, .. })), "{:#?}", show());
     let end = pts.iter().find(|p| p.frame.origin.distance(DVec3::new(0.04, 0.03, 0.0)) < 1e-7).unwrap_or_else(|| panic!("the spline's end: {:#?}", show()));
     assert!(matches!(end.align, Some(Reference::Edge(_))) && matches!(&end.reference, Reference::Implicit { inference: Inference::Vertex, .. }));
+    assert_eq!(pts.iter().filter(|p| p.frame.origin.distance(end.frame.origin) < 1e-7).count(), 1, "the corner once: {:#?}", show());
     // The natural spline's end tangent: (-18, 15) per unit of its parameter.
-    assert!(end.frame.z().cross(DVec3::new(-18.0, 15.0, 0.0).normalize()).length() < 1e-3, "{:#?}", end.frame.z());
+    assert!(end.frame.z().dot(DVec3::new(-18.0, 15.0, 0.0).normalize()) > 1.0 - 1e-6, "{:#?}", end.frame.z());
     assert!(pts.iter().any(|p| (p.frame.origin - DVec3::new(0.052, 0.015, 0.0)).length() < 2e-4), "the bottom edge's midpoint: {:#?}", show());
 }
 
