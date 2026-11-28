@@ -1,4 +1,14 @@
 # Core modelling (agent "core"): current state
+P0s FROM LEAD 09:21, state 09:40:
+ (1) britatap Fillet 1 (qa compat c2650a9a): NOT a Delete face regression. qa's corpus copy is from 11-18 (stale
+     translation: Side blend curve "start and end points must be distinct", Bridge patches and Fills error, in 0.4.74
+     too). Delete face 2 on it: 0.4.74 1/4/4, now 3/10/8 = live's 3/10/8 (area 0.017565); Fillet 1 then gets a
+     different (also non-live) body. Fresh parity save (pbt/save 08:16): Fillet 1 OK 12/21/11 (live 14/25/13).
+     Asked the lead: qa re-saves the corpus doc from a fresh parity save once 36683ed85a + 3a62fc14 + a69fe8e0 land.
+ (2) 96b23e35 FAILED (vibe2 log): feature-studio-ui the_completion_list_shows_230_ms_after_the_key: fs_complete.rs timed
+     LIST_DELAY with std Instant against gpui's fake clock (loaded queue host: >20 ms wall -> list open at 210 ms fake).
+     Fix: executor clock (cx.background_executor().now()). Commit + land next.
+ Then the Side blend curve (below). NORMAL_TO_PROFILE WIP set aside: /root/core-scratch/ntp-wip.patch (git apply).
 
 Updated 11-28 07:32 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
@@ -19,14 +29,29 @@ WIP UNCOMMITTED core-uip3 (kernel change: Mac run .mk.sh needed): bshared.rs joi
 k::merge_coincident_revolutions (NEW boolean.cpp op_merge_coincident_revolutions: neighbouring torus / revolution faces
 whose surface coincides (uv_onto: a rigid (u, v) map, shift or mirror, 9 points, onto the group's UNTRIMMED surface) put
 on one surface, pcurves mapped, loops reversed where mirrored, whole-period shift to meet a placed neighbour, seams
-across the period; unify of only those edges) then k::unify_same_domain (cylinders). britatap Fill - Top 9/17/8 = live
-(was 13/31/18); head 11944.27 vs live 11934.85; Fill - Pipe end builds; Fill - Bottom "Select laminar edges" (stale
-refs in the 07:02 save? re-save). T1 features_b::a_surface_add_merges_the_faces_of_one_revolved_surface (half ellipse
-revolved +-90 deg, Add: 1 face, area 2 x half; fails without: 2 faces; a circle's arc doesn't: OCCT merges tori).
-LANDING 08:12: "core: a surface Add merges faces of one revolved surface, torus or cylinder" (merge_coincident_revolutions,
-called from join_surface; no general unify there: live keeps coplanar planes apart, c2-surf-intro-mutualtrim). Checks:
-britatap Fill - Top 9 faces, kernel 624/0, model 673/0, g++-13 ok, corpus ALL-SAME, Mac kernel 617/1 (only the G2
-sphere test, fixed by queued bc95a9cf). Log /root/core-scratch/land-mcr.log.
+across the period; unify of only those edges); cylinders too, no general unify (live keeps coplanar planes apart:
+c2-surf-intro-mutualtrim). T1 features_b::a_surface_add_merges_the_faces_of_one_revolved_surface (half ellipse and a
+line along the axis revolved +-90 deg, Add: 1 face each). QUEUED a69fe8e0 08:16 (kernel 624/0, model 673/0, g++-13 ok,
+corpus ALL-SAME, Mac kernel 617/1: only the G2 test, fixed by queued bc95a9cf).
+britatap re-saved 08:16 (pbt/save, 600): Fill - Top 9/17/8, Fill - Bottom 10/17/8, Fill - Pipe end 11/17/8 = live.
+Fillet 1 (conic, rho 0.5, 3.5 mm, on face Jbi = Fill - Top's plane: its 3 edges, a closed chain) 12/21/11, live 14/25/13:
+live one face per edge (1380.65 along the head, 134.66/134.68 along the bridge patches). CAUSE UPSTREAM (blend
+change tried + reverted): our plane is bounded by ONE closed edge with the head (277 mm); our top bridge patches meet the
+head from (91.08, 0, 335.81), ~4 mm below the plane's loop at (91.07, 0, 339.67), so they never touch it. Live's top
+patches DON'T reach the plane either (box max z 335.8): live's fillet runs onto them where the head strip is thin and
+splits there (2 x 134 mm2) = blend's run-over-an-edge split, not core (note for blend). Core gap: Bridge patch - Top
+(vCondition NORMAL_TO_PROFILE unheld -> warning "Boundary conditions are not applied yet"): top patch 2040.8 vs live
+2083.05. WIP (uncommitted, surfaces.rs, model 673/0): NORMAL_TO_PROFILE = Tangent to the piece extruded along the
+profile's plane normal (plane_normal): warning gone, area UNCHANGED 2040.8 (needs a T1 + corpus before landing).
+REAL CAUSE: Side blend curve (#14, bridgingCurve via std bridgingCurve.fs on our FS host; G3 both ends, CONTROL_POINTS,
+edge params 0.5, faces, tangency angles 0 deg): live Curve 1 length 58.910 mm, mid (91.755, -19.770, 296.483), bbox y max
+-15.741; ours 58.93, mid (90.791, -22.565, 296.241); same ends. Next: which FS builtin (face curvature / derivatives for
+G3) differs; std bridgingCurve.fs computeG3ControlForFace (line ~838) takes evFaceCurvature + evFaceCurvatureDerivative
+(std evaluate.fs:849 -> our evFaceCurvatureDerivatives, crates/custom/src/custom/host/evaluate.rs:951: central
+difference of the 2nd form, 1e-5 m step) and evFaceTangentPlane at the edge param 0.5 with tangency angle 0. Check those
+on the head / pipe faces at the side points against analytic values (G2 alone: set match to CURVATURE in a copy and
+compare the curve's change); NOSHAPE_BRIDGE_NATIVE=1 forces the native (tangency-only) path for comparison.
+(Also: top bridge-patch faces 2040.8 vs live 2083.58 after Fill - Top; the parity's first diff is still #12 Extrude 1.)
 Probe: vibex7 ~/tmp/core/pbt/{cli, save/ (britatap re-saved 07:02 with the trim, 600)}, ~/tmp/core/lib (fq.py faces
 after features with type/area, parts.py, bp.py, fg.py). Live data: vibex7 ~/parity/models/c2-surf-workshop-britatap.
 Cleanup when done: vibex7 ~/tmp/core/pbt, vibex8 ~/tmp/core/bt, worktrees core-g2mac/core-g2mac2 after their lands.
