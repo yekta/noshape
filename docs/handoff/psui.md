@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 08:5x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 09:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,26 +35,27 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 08:3x (start here)
-- QUEUED eb48c0df 06:1x, 4562f16f 07:2x: both FAIL part-studio-ui's the_feature_list_matrix_matches_live (rows
-  "menu / configured suppression", "rolled back under Sketch 1": their Checkbox-only setup got the new "Configure
-  suppression with Checkbox 1" label). Fixed in the test setup (live's cov-dm-config: List first; Mac run passes);
-  LANDING 08:3x with everything above it. Lead told 08:1x.
+## STATE 11-28 09:2x (start here)
+- QUEUED (lead reports; never poll): eb48c0df, 4562f16f (both fail the list matrix), 826ae5fe (list matrix setup fix),
+  b1d690ee (test memory), then 09:2x the Section view Items fix (fd74228711). Each carries the earlier ones.
+- Section view (fd74228711): dialog fields are ui-script `field:` targets; a Parts list row goes into Items when
+  active (selected till ✓), ignored with Section planes active; T1 a_part_row_goes_into_the_section_dialogs_items_field.
+  ps78: section-view-exclude-part, -include-tab-part 7/8 (left: s2 hint, REQUESTS 07:1x); SECTION-VIEW-NEXT-FIELD ticked.
+- Crate tests now on the Mac slot (NOSHAPE_RB_HOST=mac, /root/psui-scratch/resp/ps75.sh pattern); replays on vibe2.
 - 4562f16f's content: Export remembers individual files; Measure panel reported to ui-parity; no-material notice once
   per measured set; flash_seq toast timers (ps68 rerun 30/30, 124/124; tickets ticked).
 - ps69 maker set: 7/13 match; the 6 that differ all have TICKETS rows (SKETCH-COINCIDENT-FREE-LINE-SLIDES,
   SKETCH-TANGENT-ARC-SPAN (skasm), SKETCH-DIM-CIRCLE-RIM-TOP (psui, waits REQUESTS 11-27 20:4x), UIP-COMPARE-*,
   extrude-offset-ring recorder owner). Nothing new.
 - TEST MEMORY (P2; earlyoom killed part-studio-ui tests at 5.2-5.4 GB on vibe2 11-27): ps70 whole binary maxrss
-  3.75 GB; the 4 heaviest tests kept a window per case alive. LANDING 08:5x: close_windows(cx) per case: dimension-tool
+  3.75 GB; the 4 heaviest tests kept a window per case alive. QUEUED b1d690ee: close_windows(cx) per case: dimension-tool
   hover 3.2 -> 0.83 GB, dialogs matrix 1.4 -> 0.41, sketch tools matrix 1.2 -> 0.52, line-end dot 1.2 -> 0.80 (ps73).
   Next heaviest are single-window GPU tests ~0.8-0.9 GB each (lavapipe targets); median 0.22 GB.
 - Export left open: Apply export rules live off (REQUESTS 05:3x/06:0x), EXPORT-REMEMBERED-START (Millimeter),
   export-step-spline-part s4 derived tolerances (same remembered class), import toast timing (REQUESTS 04:1x).
 - Section view hint after the plane pick: kept in the overlap takes, cleared in block's; parked, REQUESTS "psui 11-28 07:1x".
-- NEXT: ps69 (/root/psui-scratch/resp/ps69.sh: build + the 13 maker-* takes = "the maker set"; earlier survey: maker-
-  select-tangent-connected-used s8, maker-select-used-click-shift s11-12 "Confirm Sketch 2"), test-memory P2,
-  remaining batch 8/9 rows.
+- NEXT: the open psui rows: EXPORT-N-PARTS-DIALOG (left: Apply export rules default, live), PICK-FACE-OVER-NEAR-EDGE
+  (held for REQUESTS 11-27 08:46), the "fixed, to verify" rows (replay each row's takes), next heaviest test memory.
 - Verified before: ps55 config 7/19; ps56 33/50 681/828; ps57 export 30/38; ps60 custom-deviation, chordal-zero,
   file-name-blank, stl-download match. Left for live: REQUESTS "psui 11-28 01:5x", "04:1x", "05:3x";
   EXPORT-REMEMBERED-START (Units Meter vs live's remembered Millimeter).
