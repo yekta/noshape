@@ -1505,6 +1505,18 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 }
                 Ok(())
             }
+            // An arc's offset (live's slot on an arc: its sides): concentric, its radius `side` times d from the master's.
+            (kc, km) if kc.is_circular() && km.is_circular() => {
+                let (rc, rm) = (self.radius(curve)?, self.radius(master)?);
+                self.lin(Lin::new().rad(side, &rc).rad(-side, &rm).rad(-1.0, &d));
+                let centre = |id: EntityId| self.sk.entity(id).and_then(|e| e.center()).ok_or_else(|| format!("{id} has no center"));
+                if !self.lk.same(centre(curve)?, centre(master)?) {
+                    let (cc, cm) = (self.center(curve)?, self.center(master)?);
+                    self.lin(Lin::new().p(1.0, cc[0]).p(-1.0, cm[0]));
+                    self.lin(Lin::new().p(1.0, cc[1]).p(-1.0, cm[1]));
+                }
+                Ok(())
+            }
             (kc, km) => Err(format!("offset not supported between {kc:?} and {km:?}")),
         }
     }

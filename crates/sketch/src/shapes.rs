@@ -356,28 +356,35 @@ impl Sketch {
                 }
             }
             crate::entities::Geometry::Arc { center, start, end } => {
+                // Live slot-on-arc: as on a line: the caps on their own centre points, each joint a COINCIDENT, 4
+                // TANGENT, 3 OFFSET from the arc (both sides and the start cap, by the end cap's radius).
                 let (c, s, en) = (self.point(center).unwrap(), self.point(start).unwrap(), self.point(end).unwrap());
                 let r = (s - c).length();
                 if r - h <= 1e-12 {
                     return Err(SketchError::InvalidGeometry("slot is wider than the arc".into()));
                 }
-                let us = (s - c).normalize();
-                let ue = (en - c).normalize();
-                let os = self.add_point(c + us * (r + h));
-                let is = self.add_point(c + us * (r - h));
-                let oe = self.add_point(c + ue * (r + h));
-                let ie = self.add_point(c + ue * (r - h));
-                let outer = self.add_arc_between(center, os, oe)?;
-                let inner = self.add_arc_between(center, is, ie)?;
-                // caps run CCW around their centers, bulging away from the arc
-                let cap_s = self.add_arc_between(start, is, os)?;
-                let cap_e = self.add_arc_between(end, oe, ie)?;
-                out.points = vec![os, is, oe, ie];
+                let (us, ue) = ((s - c).normalize(), (en - c).normalize());
+                let (c0, c1, oc, ic) = (self.add_point(s), self.add_point(en), self.add_point(c), self.add_point(c));
+                let (os, is) = (self.add_point(c + us * (r + h)), self.add_point(c + us * (r - h)));
+                let (oe, ie) = (self.add_point(c + ue * (r + h)), self.add_point(c + ue * (r - h)));
+                let (cos, cis) = (self.add_point(c + us * (r + h)), self.add_point(c + us * (r - h)));
+                let (coe, cie) = (self.add_point(c + ue * (r + h)), self.add_point(c + ue * (r - h)));
+                let outer = self.add_arc_between(oc, os, oe)?;
+                let inner = self.add_arc_between(ic, is, ie)?;
+                // Caps run CCW round their centres, bulging away from the arc.
+                let cap_s = self.add_arc_between(c0, cis, cos)?;
+                let cap_e = self.add_arc_between(c1, coe, cie)?;
+                out.points = vec![c0, c1, oc, ic, os, is, oe, ie, cos, cis, coe, cie];
                 out.curves = vec![outer, cap_e, inner, cap_s];
+                for (a, b) in [(c0, start), (c1, end), (cos, os), (cis, is), (coe, oe), (cie, ie)] {
+                    self.c(&mut out, ConstraintKind::Coincident { a, b });
+                }
                 for (a, b) in [(outer, cap_s), (inner, cap_s), (outer, cap_e), (inner, cap_e)] {
                     self.c(&mut out, ConstraintKind::Tangent { a, b });
                 }
-                self.c(&mut out, ConstraintKind::Equal { a: cap_s, b: cap_e });
+                for (curve, master, side) in [(outer, id, 1.0), (inner, id, -1.0), (cap_s, start, 1.0)] {
+                    self.c(&mut out, ConstraintKind::Offset { reference: cap_e, curve, master_ref: end, master, side });
+                }
             }
             crate::entities::Geometry::FitSpline { .. } | crate::entities::Geometry::BSpline { .. } => {
                 // Live slot-on-spline: as on a line, the sides the spline's offsets (free splines: the solver holds no

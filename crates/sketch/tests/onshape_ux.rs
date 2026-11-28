@@ -127,24 +127,37 @@ fn a_slot_on_a_spline_wraps_it() {
     assert_eq!(sk.regions().len(), 1);
 }
 
-/// The Slot tool on a free arc (qa SKETCH-SLOT-ON-ARC: "Ø0" and no slot): the caps are the two on its ends, not
-/// its offset sides (which share its centre); the width dimension and Equal then keep the slot whole.
+/// Live slot-on-arc: the Slot tool on a free arc builds it as on a line: the caps on their own centre points, 6
+/// COINCIDENT, 4 TANGENT and 3 OFFSET (both sides from the arc, the start cap by the end cap's radius); only the end
+/// cap carries the width, whose Ø then drives the whole slot.
 #[test]
-fn a_slot_on_an_arc_dimensions_its_end_caps_only() {
+fn a_slot_on_an_arc_is_held_by_offsets_as_live() {
     let mut sk = Sketch::new();
     let a = sk.add_arc(v(0.0, 0.0), v(0.0227, 0.0), v(0.0, 0.0227));
+    let before = sk.constraints().count();
     let (_, caps) = sk.slot_chains(&[a], 0.02).unwrap();
-    assert_eq!(caps.len(), 2);
-    let ends = sk.endpoints(a).unwrap();
-    assert!(caps.iter().all(|c| sk.entity(*c).and_then(|e| e.center()).is_some_and(|ctr| ctr == ends.0 || ctr == ends.1)));
-    sk.add_constraint(ConstraintKind::Diameter { curve: caps[0], value: 0.02 }).unwrap();
-    sk.add_constraint(ConstraintKind::Equal { a: caps[0], b: caps[1] }).unwrap();
+    assert_eq!(caps.len(), 1);
+    let count = |sk: &Sketch, k: fn(&ConstraintKind) -> bool| sk.constraints().skip(before).filter(|c| k(&c.kind)).count();
+    let kinds = (
+        count(&sk, |k| matches!(k, ConstraintKind::Coincident { .. })),
+        count(&sk, |k| matches!(k, ConstraintKind::Tangent { .. })),
+        count(&sk, |k| matches!(k, ConstraintKind::Offset { .. })),
+        count(&sk, |k| matches!(k, ConstraintKind::Equal { .. })),
+    );
+    assert_eq!(kinds, (6, 4, 3, 0), "(COINCIDENT, TANGENT, OFFSET, EQUAL)");
+    let d = sk.add_constraint(ConstraintKind::Diameter { curve: caps[0], value: 0.02 }).unwrap();
     assert!(sk.solve().is_solved());
-    let regions = sk.regions();
-    assert_eq!(regions.len(), 1);
-    let (ro, ri) = (0.0327f64, 0.0127f64);
-    let expect = std::f64::consts::PI / 4.0 * (ro * ro - ri * ri) + std::f64::consts::PI * 0.01 * 0.01;
-    assert!((regions[0].area() - expect).abs() < 1e-8, "{} vs {expect}", regions[0].area());
+    let area = |sk: &Sketch, w: f64| {
+        let (ro, ri) = (0.0227 + w / 2.0, 0.0227 - w / 2.0);
+        let expect = std::f64::consts::PI / 4.0 * (ro * ro - ri * ri) + std::f64::consts::PI * w * w / 4.0;
+        let regions = sk.regions();
+        assert_eq!(regions.len(), 1);
+        (regions[0].area() - expect).abs()
+    };
+    assert!(area(&sk, 0.02) < 1e-8, "20 mm wide");
+    sk.set_dimension_value(d, 0.01).unwrap();
+    assert!(sk.solve().is_solved());
+    assert!(area(&sk, 0.01) < 1e-8, "Ø10 makes the whole slot 10 mm wide");
 }
 
 #[test]
