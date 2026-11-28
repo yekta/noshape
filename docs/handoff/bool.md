@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-28 04:20 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-28 05:05 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -27,7 +27,7 @@ wire-clip-imported 2.87 -> 3.42 s (+19 %): under the human-scale bar (>= 2x); lo
   deg off its end cap): OCCT's section pcurve on the torus a turn up in v (2pi + pi/2), judged outside the face -> cut
   face a slit. FIXED 96623e8260 (section pcurves on a periodic free-form face moved by whole turns into its uvbox; T1
   bool_patterns::a_half_space_through_a_revolves_axis_beside_its_torus_end, recorded 9b6188a28c438ccf, fails without;
-  bool_patterns 179, brep 68). LANDING 04:20 (gate 96623e826: replay +0 -0, decline
+  bool_patterns 179, brep 68). LANDED 757f6388ad (gate 96623e826: replay +0 -0, decline
   reasons 0, suite 138 = 138 (its 2 changed docs = the lens already on main), shells 6 = 6, crates pass; knurls 5/5 0).
 - 1247 "an internal face": left to OCCT (Draft's defeaturing leaves 2 INTERNAL faces; OCCT's common keeps them).
 - 1256 "no clean ray": no longer reached (path changes at step 36).
@@ -35,8 +35,8 @@ wire-clip-imported 2.87 -> 3.42 s (+19 %): under the human-scale bar (>= 2x); lo
   tolerance; a hyperbola edge's curve starts 4.4 um off its vertex, a 133 um sliver loop's area sign flips, no ray finds
   its inside. Needs a tolerant arrangement: left to OCCT for now.
 - 21 OTHER-OP rerun on green 291923892 (nfrecheck-green.out): all still OTHER-OP (path build-dependent). Seen elsewhere in
-  the run: 1192 non-manifold x4 (fixed above), 1192 "an edge on another argument's free-form face" x2 (its dumped cut
-  dump1192/decl0 is ours and valid with default options on bool-fb, OCCT's invalid: recheck with a CLI of the 1192 fix: NEXT),
+  the run: 1192 non-manifold x4 (fixed above), 1192 "an edge on another argument's free-form face" x2: GONE with the fix (04:40, CLI of
+  9f4faa38: step 24's Fillet Ok with fallback 0 and 1, no decline; before it failed both ways),
   2282 "OCCT's section failed" x1 (OCCT's). The other 18 not reached by their seeds.
 - core's IMPELLER-FILLET-FAILS-SLOWER (P2; c2-impeller-loft "Extrude Bohrungssitz Ansaugflansch" 2.9 s vs 0.5 s): real
   run's fuse (1 + 9) declines "a face's vertex off its plane": feature 43 "Fillet Flansch zum Stroemungskanal" leaves 6
@@ -44,10 +44,10 @@ wire-clip-imported 2.87 -> 3.42 s (+19 %): under the human-scale bar (>= 2x); lo
   after its tightening failed; core now rejects one with a vertex looser than the radius). Case vibex8 ~/tmp/bool/imp/rec/37856d1eca7a031b; tools /root/bool-scratch/bin/plane_vertices.py (a .brep's
   plane faces' vertex distances), imp-vx.py / imp-tol.py (per-feature rollback + query).
 - Probe tools (never commit): probe diffs /root/bool-scratch/probe-nm-1192.diff, probe-nm2-1192.diff (brep),
-  probe-test-1192.diff (bool_replay probe_decl_pairs); dump CLI /root/bool-scratch/nf/cli-nf (catch(...) decline dump,
-  NOSHAPE_PROBE_DECLINE_DUMP=<dir>, stderr "PROBE decl<n> op <0 fuse|1 cut|2 common>").
-- Cleanup: /root/bool-scratch/nf/cli-nf, cli-green; vibex8 ~/tmp/bool/{d1234,d1192,rec1192}, cmp/cli-nf; vibex7
-  ~/tmp/bool/kn4 after the knurls.
+  probe-test-1192.diff (bool_replay probe_decl_pairs). The decline-dump CLI (NOSHAPE_PROBE_DECLINE_DUMP, fallback 0 only)
+  is deleted and its source wasn't kept; for a real run's decline use NOSHAPE_RECORD_BOOLEANS with a plain CLI, then
+  bool_replay::bool_corpus_replay --ignored with NOSHAPE_BOOL_CORPUS=<dir> (prints each case's path and reason).
+- Cleanup: vibex8 ~/tmp/bool/{d1234,rec1192} if present; vibex7 ~/tmp/bool/kn4, kn5 (knurl copies).
 
 ## Order (lead 11-21)
 P0 impeller speed (c2-impeller-loft, blend measures per feature); P1 asm's SPEED-ASM-OPEN (infento). Gates + knurls
@@ -75,7 +75,31 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   133 -> 133, speed 1.00-1.01x, shells 6, crates pass, knurls 0. Rebased onto main as ab9ee9b3f (brep_bridge/lib.rs
   conflict with stage 2's MARCH resolved: AHEAD counted at the top of Occt::ahead, last_ahead next to last_marched).
   ab9ee9b3f retested 11:23: impeller test 0.18 s, kernel 621/621, brep 68/68; landing (land.sh vibe2).
-- NEXT (lead 11-27): gamma's 7 unmatched faces + 6 extra edges / 4 vertices (OPEN ROWS above).
+- GAMMA EDGES (11-28 06:09): main 884/2409/1348 vs live 884/2405/1344 = 4 degree-2 vertices (probe dump
+  /root/bool-scratch/gamma-topo-before.txt). (1)+(2) x 47.765 y -35.533/-29.533: 52 mm line + 20 um of a 12 mm circle
+  between two planes -> FIX COMMITTED b037dba73 (worktree bool-uv, branch bool-gline on main 176b711a5; merge_planar's
+  line_of takes a curve within 1e-7 m of its chord; T1 boolean_groups::a_round_twenty_microns_under_a_flat_top_joins_its_line,
+  fails without the fix; GCC 13 ok). GATE RUNNING: unit bool-gate-b037dba73 (vibex8, /root/bool-hat-scratch/
+  chain-b037dba73.out; restarted 06:15); then knurls: bash /root/bool-scratch/kn-after8.sh b037dba73 kn6; Mac kernel tests
+  (DECISIONS 11-28): DONE 618/619, the one failure surfacing::a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere
+  (5.836 % off) also without b037dba73 (Mac-only, not ours). When all clean: land from bool-uv (this handoff commit on top), report.
+  (3) x 132.031 y 294.267 z -7.764: two 2 mm collinear lines between plane x 132.03 and a quarter cylinder USD merged
+  from two; probe (env NOSHAPE_PROBE_V): neither kept nor input; OCCT USD (even edges-only, again) won't join them:
+  IsMergingPossible checks the chain's chord against the first piece's direction within Precision::Angular 1e-12 rad,
+  and the lines are 1e-12 m apart (2.5e-10 rad over 4 mm). FIX COMMITTED 032db5675c in worktree bool-fb (branch
+  bool-probe3 on b037dba73; brep_replay.rs there holds an uncommitted probe: never commit): join_collinear_lines(s,
+  hist) in boolean.cpp, run at the end of unify_faces_in on rest()'s result always (also when rest changed nothing:
+  reversed profiles merge their faces earlier) and in the shared branch. Gamma probe: vertex (3) gone. T1
+  boolean_groups::stacked_rounded_blocks_unify_as_one_block (upper block 1e-12 m off) passes with, fails without
+  (/root/bool-scratch/jl-t1.sh); GCC 13 ok (/root/bool-scratch/gcc13-fb.sh). NEXT: after b037dba73 lands, cherry-pick
+  onto bool-uv, gate + knurls + Mac kernel tests, land.
+  (4) x -281.969: 2.5 um edge + 1.95 mm edge at an angle: two plates overlapping 50 um in z (-7.8136..-7.7636), each
+  with an r 4 quarter round, axes 2.5 um apart in y (path rust; input tolerances all 1e-7). Live (KIuD upper 2 mm,
+  KISF lower 1.95 mm) gives the overlap to the upper and puts the lower round's line at the upper's y (KISF box min y
+  294.264587 = upper's): a 2.5 um snap past the inputs' 1e-7. Ours keeps both lines and a 2.5 um step. To lead as
+  "decision needed: chase a 2.5 um snap?" with the b037dba73 report. Probe: probe_case_topo PROBE_SWAP (bool-fb,
+  uncommitted); case copy Mac ~/noshape-host/bool-keep/gam-rec (700).
+  Probe build: /root/bool-scratch/gv3.sh via rb.sh vibex7 from bool-fb (kt-gv3, case vibex7 ~/tmp/bool/gam-rec).
 - Cleanup after: vibex8 ~/tmp/bool/imp/rec; bool-uv / bool-ms2 / bool-fb targets once landed.
 
 ## NEXT (state 11-26 22:40 UTC)
