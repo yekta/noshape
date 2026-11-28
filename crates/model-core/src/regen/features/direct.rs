@@ -7,7 +7,7 @@ use crate::naming::{Name, ShapeNames};
 use crate::reference::{Reference, Role, TopoName};
 use crate::regen::context::{Body, LookupKind};
 use crate::regen::eval::{EvalCtx, FResult, err};
-use glam::{DMat4, DVec3};
+use glam::{DMat4, DVec2, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
 use std::collections::{BTreeMap, BTreeSet};
@@ -18,9 +18,10 @@ use std::sync::Arc;
 
 /// Fillet faces next to the selection, recognised from the geometry (live
 /// L11: also on imported parts): a cylinder, torus, sphere or B-spline
-/// (rolling-ball) face that is tangent to a deleted face along their edge and
-/// to another face along another edge. Fillets tangent to fillets found this
-/// way follow (a fillet chain). Faces our Fillet feature made count too.
+/// (rolling-ball) face that is tangent to a deleted face along one of its rails
+/// (not across its curve) and to another face along another. Fillets tangent to
+/// fillets found this way follow (a fillet chain). Faces our Fillet feature made
+/// count too.
 fn adjacent_fillets(body: &Body, faces: &BTreeSet<usize>) -> Vec<usize> {
     let all = body.shape.faces();
     let Ok(ef) = body.shape.edge_faces() else { return Vec::new() };
@@ -37,6 +38,40 @@ fn adjacent_fillets(body: &Body, faces: &BTreeSet<usize>) -> Vec<usize> {
             (Some((_, na)), Some((_, nb))) => na.normalize().dot(nb.normalize()) > 1.0 - 1e-6,
             _ => false,
         }
+    };
+    // Whether edge e runs along face f's flatter way (a fillet's rail), not across its curve: a pipe's pieces meet across
+    // their sections (c2-surf-workshop-britatap's Delete face 2: live deletes the one face, not the bends next to it).
+    // A face curved alike both ways (a sphere, a plane) has no such way: any edge.
+    let rail = |e: usize, f: usize| -> bool {
+        let Some((m, d)) = edges.get(e).and_then(|x| {
+            let i = x.edge_info().ok()?;
+            let t = (i.first_param + i.last_param) * 0.5;
+            Some((x.point_at(t).ok()?, x.tangent_at(t).ok()?.normalize_or_zero()))
+        }) else {
+            return true;
+        };
+        let Some([su, sv, suu, suv, svv, n]) = all[f].project_point(m).ok().and_then(|pr| all[f].d2_at_uvs(&[DVec2::new(pr.u, pr.v)]).ok()).map(|v| v[0]) else {
+            return true;
+        };
+        let n = n.normalize_or_zero();
+        let (e1, f1, g1) = (su.dot(su), su.dot(sv), sv.dot(sv));
+        let (l, mm, nn) = (suu.dot(n), suv.dot(n), svv.dot(n));
+        let det = e1 * g1 - f1 * f1;
+        if det <= 0.0 {
+            return true;
+        }
+        // Principal curvatures: k^2 det - k (E N + G L - 2 F M) + (L N - M^2) = 0.
+        let (h, k) = ((e1 * nn + g1 * l - 2.0 * f1 * mm) / (2.0 * det), (l * nn - mm * mm) / det);
+        let disc = (h * h - k).max(0.0).sqrt();
+        let (k1, k2) = (h + disc, h - disc);
+        let kmax = if k1.abs() >= k2.abs() { k1 } else { k2 };
+        if (k1 - k2).abs() <= 1e-3 * k1.abs().max(k2.abs()) {
+            return true;
+        }
+        // The most curved way: (L - k E) du + (M - k F) dv = 0 (else the other row).
+        let (a, b) = if (l - kmax * e1).abs() + (mm - kmax * f1).abs() >= (mm - kmax * f1).abs() + (nn - kmax * g1).abs() { (-(mm - kmax * f1), l - kmax * e1) } else { (nn - kmax * g1, -(mm - kmax * f1)) };
+        let across = (su * a + sv * b).normalize_or_zero();
+        d.dot(across).abs() < 0.5
     };
     // (neighbour, edge) pairs of a face.
     let neighbours = |f: usize| -> Vec<(usize, usize)> {
@@ -58,8 +93,12 @@ fn adjacent_fillets(body: &Body, faces: &BTreeSet<usize>) -> Vec<usize> {
                 if seeds.contains(&f) || out.contains(&f) || found.contains(&f) || !blend_like(f) || !tangent(e, s, f) {
                     continue;
                 }
-                // Tangent to something else too (a fillet joins two faces).
-                if neighbours(f).into_iter().any(|(g, e2)| g != s && e2 != e && tangent(e2, f, g)) {
+                // (From a picked face along a rail; from a fillet either way: a chain's next fillet meets it across.)
+                if faces.contains(&s) && !rail(e, f) {
+                    continue;
+                }
+                // Tangent to something else too, along a rail (a fillet joins two faces).
+                if neighbours(f).into_iter().any(|(g, e2)| g != s && e2 != e && tangent(e2, f, g) && rail(e2, f)) {
                     found.push(f);
                 }
             }

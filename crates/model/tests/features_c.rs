@@ -3323,6 +3323,31 @@ fn delete_face_removes_fillets_by_geometry_as_live() {
     assert!((v - filleted_block).abs() < 1e-3, "imported: {v} vs {filleted_block}");
 }
 
+/// A pipe's straight piece deleted with its fillets (c2-surf-workshop-britatap's Delete face 2): the bend tangent to it
+/// meets it across the pipe, not along a rail, so it's no fillet and stays (live deletes the one face).
+#[test]
+fn delete_face_keeps_a_pipe_bend_tangent_across_it() {
+    use noshape_kernel as k;
+    let m = |x: f64, y: f64, z: f64| DVec3::new(mm(x), mm(y), mm(z));
+    let disk = |c: DVec3, axis: DVec3| k::make_face_from_wire(&k::make_wire(&[k::make_circle(c, axis, mm(5.0)).unwrap()]).unwrap(), true).unwrap();
+    let a = k::extrude(&disk(m(0.0, 0.0, 0.0), DVec3::Z), m(0.0, 0.0, 20.0)).unwrap().shape;
+    let bend = k::revolve(&disk(m(0.0, 0.0, 20.0), DVec3::Z), m(15.0, 0.0, 20.0), DVec3::Y, PI / 2.0).unwrap().shape;
+    let b = k::extrude(&disk(m(15.0, 0.0, 35.0), DVec3::X), m(20.0, 0.0, 0.0)).unwrap().shape;
+    let tube = k::fuse(&k::fuse(&a, &bend).unwrap().shape, &b).unwrap().shape;
+    assert_eq!(tube.faces().len(), 5);
+    let brep = String::from_utf8(tube.to_brep_bytes().unwrap()).unwrap();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let straight = face_at(&r, 0, m(0.0, 0.0, 10.0));
+    s.add("deleteFace", move |p| {
+        p.set("deleteFaces", ParamValue::Query(vec![straight]));
+        p.set("healType", en("VOID"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies[0].shape.faces().len(), 4);
+}
+
 /// Live L27: Tangency on a row of sketch curves builds the fill anyway, as
 /// a WARNING "Could not meet tangency constraints at highlighted points.".
 #[test]
