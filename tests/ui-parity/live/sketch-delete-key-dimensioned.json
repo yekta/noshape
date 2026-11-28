@@ -1,0 +1,3312 @@
+{
+ "scenario": "sketch-delete-key-dimensioned",
+ "recorded": "2026-11-28T13:36:01.422Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 5ca3cf24 + live2 2026-11-28.9"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "7976ca842c4b1cda5158bfed",
+  "start": "empty",
+  "startElement": "2490137255f656eeab93562a",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": "Default geometry"
+  },
+  "parts": [],
+  "partsHeading": "Parts (0)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Sketch"
+    }
+   },
+   "ok": true,
+   "ti": 30168,
+   "tmove": 30283,
+   "moves": 2,
+   "tdown": 30611,
+   "at": [
+    155,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "error",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "error",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Select a sketch plane \u00d7 Close",
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": null,
+     "constraints": null,
+     "dimensions": null,
+     "error": "sketch model not reached"
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34007,
+   "te": 34007
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "plane": "Top"
+    }
+   },
+   "ok": true,
+   "ti": 34007,
+   "tmove": 34082,
+   "moves": 2,
+   "tdown": 35240,
+   "at": [
+    1083,
+    568
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37690,
+   "te": 37690
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 37690,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 40424,
+   "te": 40424
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "l"
+   },
+   "ok": true,
+   "ti": 40424,
+   "pointer": {
+    "at": [
+     1082,
+     568
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 40434,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Line",
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 42429,
+   "te": 42429
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      0,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 42429,
+   "tmove": 42474,
+   "moves": 2,
+   "hover": [
+    "IB"
+   ],
+   "tdown": 45312,
+   "tup": 45447,
+   "at": [
+    1083,
+    519
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Line",
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 47602,
+   "te": 47603
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      30,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 47603,
+   "tmove": 47662,
+   "moves": 2,
+   "hover": [],
+   "tdown": 53409,
+   "tup": 53509,
+   "at": [
+    1177,
+    546
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Line",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 55930,
+   "te": 55930
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 55930,
+   "pointer": {
+    "at": [
+     1177,
+     546
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 55938,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 59442,
+   "te": 59442
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 59442,
+   "pointer": {
+    "at": [
+     1177,
+     546
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 59448,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 62888,
+   "te": 62888
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "d"
+   },
+   "ok": true,
+   "ti": 62889,
+   "pointer": {
+    "at": [
+     1177,
+     546
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 62897,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Dimension",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 65007,
+   "te": 65007
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      15,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 65007,
+   "tmove": 65124,
+   "moves": 2,
+   "hover": [
+    "JFB"
+   ],
+   "tdown": 67079,
+   "tup": 67179,
+   "at": [
+    1130,
+    533
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Dimension",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Length",
+       "value": "29.952",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 69662,
+   "te": 69662
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      15,
+      -8
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 69662,
+   "tmove": 69757,
+   "moves": 2,
+   "hover": [],
+   "tdown": 75030,
+   "tup": 75133,
+   "at": [
+    1115,
+    545
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "29.95213 mm",
+     "selection": [
+      0,
+      11
+     ],
+     "all": true
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Dimension",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.952128,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 77148,
+   "te": 77148
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 600
+   },
+   "ok": true,
+   "ti": 77148,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "29.95213 mm",
+     "selection": [
+      0,
+      11
+     ],
+     "all": true
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Dimension",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.952128,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 79610,
+   "te": 79610
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 79610,
+   "pointer": {
+    "at": [
+     1115,
+     545
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "tdown": 79616,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Dimension",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.952128,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 81509,
+   "te": 81509
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 81509,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Dimension",
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.952128,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 84223,
+   "te": 84223
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 84223,
+   "pointer": {
+    "at": [
+     1115,
+     545
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 84231,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.952128,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 87599,
+   "te": 87599
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 87599,
+   "pointer": {
+    "at": [
+     1115,
+     545
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 87603,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.952128,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 91001,
+   "te": 91002
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      15,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 91002,
+   "tmove": 91092,
+   "moves": 2,
+   "hover": [
+    "JFB"
+   ],
+   "tdown": 92724,
+   "tup": 92821,
+   "at": [
+    1130,
+    533
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "line"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.952128,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "line",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         29.9521,
+         0
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Length",
+       "value": "29.952",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 95104,
+   "te": 95104
+  },
+  {
+   "step": 18,
+   "do": {
+    "do": "key",
+    "key": "Delete"
+   },
+   "ok": true,
+   "ti": 95104,
+   "pointer": {
+    "at": [
+     1130,
+     533
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 95109,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 96996,
+   "te": 96996
+  },
+  {
+   "step": 19,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 96996,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 99658,
+   "te": 99658
+  },
+  {
+   "step": 20,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 300
+   },
+   "ok": true,
+   "ti": 99658,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 101780,
+   "te": 101780
+  },
+  {
+   "step": 21,
+   "do": {
+    "do": "shot",
+    "name": "deleted"
+   },
+   "ok": true,
+   "ti": 101780,
+   "shot": "/root/live-scratch/uipshots/sketch-delete-key-dimensioned-deleted.png",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 103823,
+   "te": 103823
+  }
+ ],
+ "t0_epoch_ms": 1795872937865
+}

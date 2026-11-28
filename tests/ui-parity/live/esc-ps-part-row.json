@@ -1,0 +1,676 @@
+{
+ "scenario": "esc-ps-part-row",
+ "recorded": "2026-11-28T13:19:53.751Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 5ca3cf24 + live2 2026-11-28.9"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "1ae693b5df20ac4fc1e4c525",
+  "start": "block",
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "ti": 26976,
+   "tmove": 27336,
+   "moves": 1,
+   "tdown": 27649,
+   "at": [
+    112,
+    690
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 29783,
+   "te": 29783
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 300
+   },
+   "ok": true,
+   "ti": 29783,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 31980,
+   "te": 31980
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "shot",
+    "name": "row"
+   },
+   "ok": true,
+   "ti": 31980,
+   "shot": "/root/live-scratch/uipshots/esc-ps-part-row-row.png",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34108,
+   "te": 34108
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 34108,
+   "pointer": {
+    "at": [
+     112,
+     690
+    ],
+    "hover": [
+     "JHD"
+    ],
+    "element": "span.os-part-list-name.os-list-item-name"
+   },
+   "tdown": 34118,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37585,
+   "te": 37585
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 300
+   },
+   "ok": true,
+   "ti": 37585,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 39834,
+   "te": 39834
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "shot",
+    "name": "esc1"
+   },
+   "ok": true,
+   "ti": 39834,
+   "shot": "/root/live-scratch/uipshots/esc-ps-part-row-esc1.png",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41936,
+   "te": 41936
+  }
+ ],
+ "t0_epoch_ms": 1795871972329
+}

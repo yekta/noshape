@@ -1,0 +1,911 @@
+{
+ "scenario": "view-cube-corner-top-front-right",
+ "recorded": "2026-11-28T13:57:25.685Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 5ca3cf24 + live2 2026-11-28.9"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "f868dc0e7bb12c7ef5903d57",
+  "start": "block",
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "key",
+    "key": "shift+7"
+   },
+   "ok": true,
+   "ti": 24903,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
+   "tdown": 24908,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.57735,
+      0.57735,
+      -0.57735
+     ],
+     "up": [
+      -0.408248,
+      0.408248,
+      0.816497
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      90,
+      -90,
+      90
+     ],
+     "width_mm": 485.654,
+     "height_mm": 257.196,
+     "mmPerPixel": 0.290289,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 26781,
+   "te": 26782
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "ti": 26782,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.57735,
+      0.57735,
+      -0.57735
+     ],
+     "up": [
+      -0.408248,
+      0.408248,
+      0.816497
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      90,
+      -90,
+      90
+     ],
+     "width_mm": 485.654,
+     "height_mm": 257.196,
+     "mmPerPixel": 0.290289,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 29785,
+   "te": 29785
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "hover",
+    "on": {
+     "px": [
+      1830,
+      165
+     ]
+    },
+    "ms": 900
+   },
+   "ok": true,
+   "ti": 29785,
+   "tmove": 29826,
+   "moves": 1,
+   "at": [
+    1830,
+    165
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.57735,
+      0.57735,
+      -0.57735
+     ],
+     "up": [
+      -0.408248,
+      0.408248,
+      0.816497
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      90,
+      -90,
+      90
+     ],
+     "width_mm": 485.654,
+     "height_mm": 257.196,
+     "mmPerPixel": 0.290289,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 32356,
+   "te": 32356
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 300
+   },
+   "ok": true,
+   "ti": 32356,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.57735,
+      0.57735,
+      -0.57735
+     ],
+     "up": [
+      -0.408248,
+      0.408248,
+      0.816497
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      90,
+      -90,
+      90
+     ],
+     "width_mm": 485.654,
+     "height_mm": 257.196,
+     "mmPerPixel": 0.290289,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34452,
+   "te": 34452
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "shot",
+    "name": "hover"
+   },
+   "ok": true,
+   "ti": 34452,
+   "shot": "/root/live-scratch/uipshots/view-cube-corner-top-front-right-hover.png",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.57735,
+      0.57735,
+      -0.57735
+     ],
+     "up": [
+      -0.408248,
+      0.408248,
+      0.816497
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      90,
+      -90,
+      90
+     ],
+     "width_mm": 485.654,
+     "height_mm": 257.196,
+     "mmPerPixel": 0.290289,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 36451,
+   "te": 36451
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "px": [
+      1830,
+      165
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 36451,
+   "tmove": 36478,
+   "moves": 2,
+   "tdown": 37037,
+   "tup": 37136,
+   "at": [
+    1830,
+    165
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 39016,
+   "te": 39016
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "ti": 39016,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 42174,
+   "te": 42174
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 300
+   },
+   "ok": true,
+   "ti": 42174,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 44254,
+   "te": 44254
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "shot",
+    "name": "after"
+   },
+   "ok": true,
+   "ti": 44254,
+   "shot": "/root/live-scratch/uipshots/view-cube-corner-top-front-right-after.png",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 46238,
+   "te": 46238
+  }
+ ],
+ "t0_epoch_ms": 1795874225871
+}

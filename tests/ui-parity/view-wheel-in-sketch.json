@@ -1,0 +1,81 @@
+{
+ "name": "view-wheel-in-sketch",
+ "about": "in a sketch on Top with a line, the wheel 3 notches up over the line's end",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wheel",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   },
+   "dy": -120,
+   "times": 3
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "in"
+  }
+ ]
+}

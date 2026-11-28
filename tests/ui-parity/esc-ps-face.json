@@ -1,0 +1,54 @@
+{
+ "name": "esc-ps-face",
+ "about": "Esc with the top face selected: once, then again",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc1"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc2"
+  }
+ ]
+}

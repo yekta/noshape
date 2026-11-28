@@ -1,0 +1,60 @@
+{
+ "name": "view-cube-arrow-right",
+ "about": "Shift+7 (Isometric), then the view cube at its arrow right (live's pixel, from a hover scan of the isometric cube): hovered, then clicked",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+7"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1895,
+     165
+    ]
+   },
+   "ms": 900
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1895,
+     165
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "after"
+  }
+ ]
+}

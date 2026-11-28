@@ -1,0 +1,40 @@
+{
+ "name": "view-cube-same-face-twice",
+ "about": "click the view cube's Top, then Top again",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view_cube": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_cube": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "again"
+  }
+ ]
+}

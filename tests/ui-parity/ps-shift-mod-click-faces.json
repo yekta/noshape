@@ -1,0 +1,79 @@
+{
+ "name": "ps-shift-mod-click-faces",
+ "about": "click the top face, Shift+click the front, mod+click the top, Shift+click the front again",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "two"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   },
+   "mods": "mod"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "mod-top"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "shift-front-again"
+  }
+ ]
+}

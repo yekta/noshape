@@ -1,0 +1,116 @@
+{
+ "name": "esc-sketch-line-midstroke",
+ "about": "in a sketch, Line: first click, move, then Esc, Esc, Esc (what each one drops)",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     20,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "rubber"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc1"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     25,
+     15
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "moved1"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc2"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc3"
+  }
+ ]
+}

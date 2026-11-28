@@ -1,0 +1,48 @@
+{
+ "name": "esc-ps-face-and-row",
+ "about": "the top face, then Shift+click Extrude 1's row; Esc",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "both"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc1"
+  }
+ ]
+}

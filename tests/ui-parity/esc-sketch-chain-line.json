@@ -1,0 +1,115 @@
+{
+ "name": "esc-sketch-chain-line",
+ "about": "in a sketch, Line: three clicks (two chained lines), Esc, then a click (a new line or nothing?)",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     15
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "chain"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc1"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     25
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     10,
+     30
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "after-click"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

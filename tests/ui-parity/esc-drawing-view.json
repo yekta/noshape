@@ -1,0 +1,37 @@
+{
+ "name": "esc-drawing-view",
+ "about": "drawing: click the Front view, Esc",
+ "area": "drawing",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view": "Front"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "view"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc1"
+  }
+ ]
+}

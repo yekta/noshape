@@ -1,0 +1,62 @@
+{
+ "name": "view-key-shift-number-in-sketch",
+ "about": "a sketch on Top, Shift+1 (Front), then Shift+7 (Isometric)",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "shift+1"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "front"
+  },
+  {
+   "do": "key",
+   "key": "shift+7"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "iso"
+  }
+ ]
+}

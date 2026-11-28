@@ -1,0 +1,50 @@
+{
+ "name": "esc-asm-instance",
+ "about": "assembly: click Part 2 <1>'s row in the instance list, Esc, Esc",
+ "area": "assembly",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "row"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc1"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "esc2"
+  }
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "name": "view-mod-right-drag",
+ "about": "mod+right-drag 100 px right (pan?)",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "empty": true
+   },
+   "to": {
+    "rel_px": [
+     100,
+     0
+    ]
+   },
+   "button": "right",
+   "mods": "mod"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "after"
+  }
+ ]
+}

@@ -1,0 +1,127 @@
+{
+ "name": "sketch-delete-key-dimensioned",
+ "about": "in a sketch, a line with a 30 mm dimension: the line selected, Delete (the dimension goes with it?)",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     -8
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "deleted"
+  }
+ ]
+}

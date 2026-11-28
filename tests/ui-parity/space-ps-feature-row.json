@@ -1,0 +1,33 @@
+{
+ "name": "space-ps-feature-row",
+ "about": "Extrude 1's row selected, Space",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Space"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "space"
+  }
+ ]
+}

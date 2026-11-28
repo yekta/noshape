@@ -1,0 +1,61 @@
+{
+ "name": "view-key-f-in-sketch",
+ "about": "a sketch on Top, zoomed in (Shift+Z \u00d73), then f",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "shift+z"
+  },
+  {
+   "do": "key",
+   "key": "shift+z"
+  },
+  {
+   "do": "key",
+   "key": "shift+z"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "f"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "fit"
+  }
+ ]
+}

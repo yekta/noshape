@@ -152,6 +152,8 @@ take's placement) carries the same control by name for ours, which runs `ours_on
   `"interval_ms"` (30) between moves; a right or middle drag lets go right after its last move (a flick), a left one
   waits the interval first, as live's runner. `"hold": true` leaves the button down (the step's shot is taken while
   held); `{"do": "release"}` lets it go where the drag ended.
+- `{"do": "wheel", "on": TARGET, "dy": 120, "times": 3}` turns the mouse wheel over the target `times` notches: `dy`
+  -120 a notch up (zooms in), 120 a notch down (live 11-28, batch 13).
 - `{"do": "pick_files", "files": ["uip-asm.step"]}`: answers the file dialog the step before opened with files of
   `files/` (no dialog shows on either side: live's runner intercepts the browser's, ours the app's while a scenario
   runs); the step fails with "no file dialog is open" when none waits. Ours imports at once, live's upload takes seconds:
@@ -248,6 +250,23 @@ clicks on them are `px` targets (ours shows constraints by default). Live: a gly
 #ffa90a, selected and hovered as selected; over-defined curves are red (#cc0000 core, a #de979b halo), a hovered
 over-defined circle the hover band over a #f49d6a core;
 Shift+click on a second dimension replaces the selection.
+
+Live 11-28 (depth batch 13, keyboard and view as makers use them: `esc-*`, `space-*`, `sketch-*key*`, `ps-*`, `view-*`,
+`view-cube-*`). Esc never clears a selection (Part Studio faces, feature and part rows, sketch entities, assembly
+instances: the shots before and after are pixel-identical); Space clears it in each; Esc in a feature dialog closes it and
+drops the selection. In a sketch a click on empty canvas adds the sketch plane to the selection (a Part Studio one
+clears); a plain click adds to the selection and a click on a selected entity drops it; Ctrl+click opens the context
+menu; mod+A selects nothing; Enter does nothing; Delete and Backspace delete the selected sketch entities (a dimension
+on them goes too) and, in a Part Studio, Delete with a face selected deletes its feature. mod+Y redoes; Shift+mod+Z
+doesn't (Linux). mod+Z in the Line tool undoes the last line and leaves the tool; a second l turns the tool off; c
+mid-line switches to Circle. Esc chains: in Line, the first Esc drops the rubber band and the tool. View: n turns normal
+to the face, n again to its back; the view cube's face clicked twice turns to the opposite face; the isometric cube's
+corners turn to trimetric views of that corner, its outline next to a hidden face turns to that face, and its arrows
+turn about 15° (up / down / right) or roll about the view direction. A right-drag rotates (100 px ≈ 57-69°, 200 px ≈ 114°), a 3 px one also
+opens the context menu; a middle drag and Ctrl+right-drag pan; Shift+right-drag rotates; a left drag on empty canvas
+box-selects (no rotate). The wheel zooms about the pointer: 3 notches up = width × 0.841, down × 1.189. `view-cube-*`
+corner, outline and arrow cells click live's pixel of the isometric cube (`px`: ours needs those cells at the same
+pixel); `view-wheel-*` use the `wheel` step.
 
 ### Part Studio panels, picks and in context (psui, 11-07)
 

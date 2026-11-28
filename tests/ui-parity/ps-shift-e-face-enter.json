@@ -1,0 +1,54 @@
+{
+ "name": "ps-shift-e-face-enter",
+ "about": "the top face selected, Shift+E, then Enter (commits the extrude?)",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "dialog"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "after"
+  }
+ ]
+}

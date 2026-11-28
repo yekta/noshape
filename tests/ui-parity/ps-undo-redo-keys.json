@@ -1,0 +1,138 @@
+{
+ "name": "ps-undo-redo-keys",
+ "about": "a sketch on Top with a line, OK, then mod+Z (undoes the sketch), mod+Y, mod+Z, Shift+mod+Z",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     30
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     30
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "made"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "undo"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "redo"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "shift+mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "redo2"
+  }
+ ]
+}

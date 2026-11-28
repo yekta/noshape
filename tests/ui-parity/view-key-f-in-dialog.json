@@ -1,0 +1,40 @@
+{
+ "name": "view-key-f-in-dialog",
+ "about": "Shift+E (Extrude) open, then f: fits the view, or types in a field?",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "f"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "after"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

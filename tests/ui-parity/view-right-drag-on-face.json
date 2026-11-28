@@ -1,0 +1,40 @@
+{
+ "name": "view-right-drag-on-face",
+ "about": "right-drag 100 px right starting on the top face (rotate; the face stays unselected?)",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   },
+   "to": {
+    "rel_px": [
+     100,
+     0
+    ]
+   },
+   "button": "right"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "after"
+  }
+ ]
+}

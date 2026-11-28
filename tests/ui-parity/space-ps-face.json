@@ -1,0 +1,62 @@
+{
+ "name": "space-ps-face",
+ "about": "the top face selected, Space (clears the selection?), then the front face selected and a click on empty canvas",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Space"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "space"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "empty-click"
+  }
+ ]
+}

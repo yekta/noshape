@@ -1,0 +1,97 @@
+{
+ "name": "sketch-key-l-twice",
+ "about": "in a sketch, l then l again: the tool toggles off?",
+ "area": "part-studio",
+ "source": "live depth batch 13 (keyboard and view as makers use them; lead 11-28)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "l1"
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "l2"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "clicks"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
