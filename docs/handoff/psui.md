@@ -35,7 +35,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 09:3x (start here)
+## STATE 11-28 10:1x (start here)
+- NOT LANDED (land next, after 654fc768's result; origin/main..HEAD still holds the whole queued stack): 70cdee1dc9,
+  a4a3377bed (ps79 rest filed), f77dee71b3 (runner: per-format export memory + toast copy name; tools/tests/docs only).
+  Mac T1s for render + feel:: ran green on the tree (ps81; renderer change reverted after). Then: next-heaviest test memory,
+  Apply export rules (waits REQUESTS 05:3x), Realign retake (REQUESTS 09:3x).
 - QUEUED 654fc768 09:2x (lead reports; never poll): carries eb48c0df, 4562f16f, 826ae5fe (list matrix setup fix),
   b1d690ee (test memory) and fd74228711 (Section view Items).
 - Section view (fd74228711): dialog fields are ui-script `field:` targets; a Parts list row goes into Items when
