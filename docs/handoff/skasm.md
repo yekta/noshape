@@ -1,16 +1,22 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 07:00 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 07:50 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 07:00 UTC)
-- RUNNING (Mac, 07:00): full assembly-ui lib tests for dd0fa834 (bg baco4x8wb, greps AUIDONE). A failure there is a
-  fix-forward before dd0fa834's land result.
-- QUEUED dd0fa834 (07:00; skasm, rebased: tickets d232510a + dd0fa834 "a new mate's row hoverable by name while its
-  dialog is open" = ASM-MATE-ERROR-ROW, ui_script::wrap "mate:<name>" in assembly_view.rs new_mate row; clippy clean on
-  Mac). Earlier QUEUED: 75280e34 (skasm: Q construction, refused dim, alignment hold 8 px =
-  HORIZONTAL-RANGE), 3bb2265e + 643348c2 (skasm-main: spline-face corner = straight side's end, Inference::VertexEnd,
-  "Edge of", Z +z; ops CONNECTOR_DOC/AGENT_API list vertex_end). No results yet.
+## NOW (11-28 07:50 UTC)
+- QUEUED ff59d97f (07:48; 11 commits, includes the still-pending 75280e34 / dd0fa834 / 8728537c): a slot on an arc held
+  as on a line (caps on own centres, 6 COINCIDENT + 4 TANGENT + 3 OFFSET; equations.rs offset() takes arc-arc,
+  concentric + radius side*d = SKETCH-SLOT-CONSTRAINTS), 8728537c the 3 point arc's semicircle reach measured on screen
+  (7.9 px; iso view 7.8 px = SKETCH-3PT-ARC-SEMICIRCLE-SNAP), dd0fa834 ASM-MATE-ERROR-ROW (assembly-ui lib 241/241 on
+  the Mac). skasm-main: 3bb2265e + 643348c2 VertexEnd (assembly + model-core lib + ops refs green on the Mac). No land
+  results yet; the handoff commits ride with ff59d97f.
+- TICKETS: batch 6 (97e1a807, on main) already fixed DELETE-CORNER, RECT-ZERO-SIZE, SLOT-ON-CIRCLE-REFUSED,
+  CHAMFER-CORNER-POINT, DIM-SAME-ARC-TWICE, DIM-ZERO-ACCEPTED, CIRCLE-RIM-ON-LINE-TANGENT: marked "to verify by replay".
+- Live REQUESTS (skasm 11-28 06:5x, items 1-5): offset open-chain 2nd click, batch-6 COINCIDENT entities, spline top
+  corners' Z, (4) linear pattern white-space click with 2 pre-selected entities keeps the tool (pre-selection or two
+  entities?), (5) Mirror about a point: copy lands ON the original (horizontal axis or plain copy?).
+- Open, not started: SKETCH-ARC-ENDPOINT-ORDER (P3, live's caps listed start/end swapped: likely a comparator
+  convention), SLOT-ON-SPLINE's 3 OFFSET (needs spline-spline OFFSET in the solver).
 - REPLAY queued on vibex8 slot (bg bso2gs426, uipr.sh): rclick-line-circle-menu, horizontal/vertical-key, 19 sketch-used
   retakes (out ~/tmp/skasm/uip). After the lands: asm replay from a rebased skasm (both fixes) incl.
   mistake-asm-spline-mate-same-part and the asm-mc-on-spline-face takes (13/21 before).
