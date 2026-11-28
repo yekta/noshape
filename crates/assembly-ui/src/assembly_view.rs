@@ -5922,9 +5922,11 @@ impl AssemblyView {
         let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some() && !d.same_instance(), d.a.is_some() || d.b.is_some(), d.same_instance(), d.regen_error(cx).is_some()));
         if let Some((id, mate_type, name, complete, _, same, red)) = new_mate.clone() {
             let message = if same { Some(crate::assembly_mate_dialog::SAME_INSTANCE.to_string()) } else { (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()) };
+            let target = format!("mate:{name}");
             // Live errors-1123 mates: red with its "!" while its title is (bad limits while creating).
             let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete && !red, inactive: false, suppressed: false, message, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
-            mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
+            // (Hoverable as the list's other mates: live mistake-asm-spline-mate-same-part s7 hovers it in error.)
+            mate_rows.push(crate::ui_script::wrap(div().bg(pal.accent_soft).child(row).into_any_element(), move || target));
             mate_ids.push(id);
         }
         // Live (asm-mate-connector-on-face): a new mate connector's row ("Mate connector 1", selected, red until its
