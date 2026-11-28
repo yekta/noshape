@@ -62,6 +62,10 @@ use noshape_ops::tool_search::{SKETCH_CONSTRAINT_TOOLS as CONSTRAINT_TOOLS, SKET
 
 pub(super) use noshape_ops::tool_search::all_sketch_tools;
 
+/// How far from an edge's midpoint (px) a Use click makes a point there (live skasm use-mid-1128: 11.4 px did, 11.7
+/// px didn't).
+const USE_MIDPOINT_REACH_PX: f64 = 11.5;
+
 /// Live Onshape's default two-row S toolbar, in reading order.
 pub(super) const SKETCH_SHORTCUT_TOOLS: [Tool; 10] = [Tool::Line, Tool::CornerRect, Tool::CenterRect, Tool::Circle, Tool::Arc3, Tool::Spline, Tool::Point, Tool::Use, Tool::Trim, Tool::Dimension];
 
@@ -1639,12 +1643,24 @@ impl PartStudioView {
                     // beats a sketch region behind it (qa sketch-used-*: a hole's rim clicked in iso, Sketch 1's circle
                     // region lit through the hole: "That geometry can't be used"), not a lit face (a shelled box's
                     // 7 px rim uses its loop, qa FLOW-USE-OWN-FACE-REFUSED).
+                    let on_glyph = self.sketch.as_ref().and_then(|s| s.hover_constraint).is_some_and(|c| crate::sketch_mode::use_glyph_entity(c).is_some());
                     if matches!(self.hover, None | Some(Reference::SketchRegion { .. })) {
                         if let Some(edge) = self.model_edge_at(*position, cx) {
                             self.hover = Some(edge);
                         } else if self.hover.is_none() {
                             self.hover = self.model_face_at(*position, cx);
                         }
+                    }
+                    // Live (skasm use-mid-1128): within ~11.5 px of an edge's midpoint Use makes a point there, though
+                    // only the edge lights (a line 11.4 px off: the point, 11.7 px: the line; an arc 24.8 px: the arc).
+                    // A used edge's lit glyph uses the edge again (sketch-tools-1123).
+                    if !on_glyph
+                        && let Some(edge @ Reference::Edge(_)) = self.hover.clone()
+                        && let Some(m) = self.edge_midpoint(&edge).and_then(|m| vp.read(cx).project(m))
+                        && m.distance(vp.read(cx).pointer_position()) <= USE_MIDPOINT_REACH_PX
+                    {
+                        self.use_reference(Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint }, window, cx);
+                        return true;
                     }
                     self.use_hovered(window, cx);
                     return true;

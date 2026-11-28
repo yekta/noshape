@@ -48,6 +48,16 @@ impl Model<'_> {
         }
     }
 
+    /// The midpoint of open edge `r` (model coordinates), as regeneration resolves it: at its middle parameter.
+    pub fn edge_midpoint(&self, r: &Reference) -> Option<DVec3> {
+        let edge = self.shapes(r).into_iter().next()?;
+        let info = edge.edge_info().ok()?;
+        if info.start.distance(info.end) <= 1e-9 {
+            return None;
+        }
+        edge.point_at(0.5 * (info.first_param + info.last_param)).ok()
+    }
+
     pub fn curved_face(&self, r: &Reference) -> bool {
         self.shapes(r).first().is_some_and(|f| !f.is_planar())
     }
@@ -164,6 +174,8 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
     }
     let made = if matches!(r, Reference::Origin) {
         Made::Point(frame.to_local(DVec3::ZERO))
+    } else if let Reference::Implicit { on, inference: Inference::Midpoint } = r {
+        Made::Point(frame.to_local(model.edge_midpoint(on)?))
     } else if let Reference::Implicit { on, .. } = r {
         Made::Point(frame.to_local(model.circle_center(on)?))
     } else if let Some(pl) = model.reference_plane(r).filter(|_| !matches!(r, Reference::Face(_)) || !model.curved_face(r)) {
@@ -222,8 +234,8 @@ pub fn use_reference(data: &mut SketchData, model: Model, world_per_px: f64, cur
         Reference::Origin | Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::SketchEntity { .. } | Reference::Edge(_) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         // A circular edge's centre (live: a point Use on a hole's centre, bracket03-mattie's Sketch 2).
         Reference::Implicit { on, inference: Inference::Center | Inference::CenterRim | Inference::CenterOutward } if matches!(**on, Reference::Edge(_)) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
-        // Live (behaviours "Use (U) on model edges": the midpoint dot lights with its edge; a click projects the edge).
-        Reference::Implicit { on, inference: Inference::Midpoint } if matches!(**on, Reference::Edge(_)) => use_reference(data, model, world_per_px, cursor, on),
+        // Live (skasm use-mid-1128): Use within an edge's midpoint reach makes a point there, not the edge.
+        Reference::Implicit { on, inference: Inference::Midpoint } if matches!(**on, Reference::Edge(_)) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) if model.curved_face(r) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) => {
             // Live (behaviours "Use (u) on the face projected only its 4 outer edges"): the outer loop, not the holes.

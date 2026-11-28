@@ -856,6 +856,12 @@ fn sketch_use_intersection_and_model_references() {
     let p = created(&used, "point");
     assert!(p.len() == 1 && p[0]["external"] == true && created(&used, "line").is_empty(), "{used}");
     assert!((num(&p[0]["at"][0]).abs() - 10.0).abs() < 1e-6 && (num(&p[0]["at"][1]).abs() - 10.0).abs() < 1e-6, "{used}");
+    // An edge's midpoint used: a point there, not the edge (live skasm use-mid-1128).
+    let top_edge = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }))["edges"].as_array().unwrap().iter().find(|e| num(&e["direction"][0]).abs() > 0.99 && (num(&e["start"][2]) - 10.0).abs() < 1e-6).unwrap()["id"].as_str().unwrap().to_string();
+    let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [format!("implicit:midpoint:{top_edge}")] }));
+    let p = created(&used, "point");
+    assert!(p.len() == 1 && p[0]["external"] == true && created(&used, "line").is_empty(), "{used}");
+    assert!(num(&p[0]["at"][0]).abs() < 1e-6 && (num(&p[0]["at"][1]).abs() - 10.0).abs() < 1e-6, "{used}");
     // A boss's centre used (a circular edge's implicit centre): a point there, linked to it.
     let s5 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Boss" }))["sketch"].as_str().unwrap().to_string();
     call(&mut ctx, "sketch_draw", json!({ "sketch": s5, "tool": "circle", "points": [[3, 4], [5, 4]] }));
