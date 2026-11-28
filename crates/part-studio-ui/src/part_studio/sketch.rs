@@ -2209,7 +2209,10 @@ impl PartStudioView {
         }
         // Live (workflow 22 s11): Esc ending a chain leaves its end point plain under the still pointer.
         let mid_shape = self.sketch.as_ref().is_some_and(|s| s.tool.draws() && !s.clicks_empty());
-        let cancelled = self.sketch.as_mut().map(|s| s.cancel()).unwrap_or(false);
+        // Live sketch-dim-typed-text: past the Esc that emptied the Dimension tool's box ("0 mm", unfocused), the next
+        // one is the tool's: the box goes with the tool.
+        let leave_dimension = self.dim_input.is_some() && self.ui.dim_box_typed && self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Dimension && s.dim_edit.is_some());
+        let cancelled = self.sketch.as_mut().map(|s| s.cancel() && (!leave_dimension || s.cancel())).unwrap_or(false);
         if cancelled && mid_shape {
             self.hold_sketch_hover(self.viewport.read(cx).pointer_position());
         }
@@ -2502,6 +2505,10 @@ impl PartStudioView {
                 self.open_dim_create_variable(cid, dim, name, window, cx);
             } else {
                 self.ui.dim_invalid = true;
+                // Live sketch-dim-typed-text: the text stays in the box, all of it selected.
+                if let Some((_, st, _)) = self.dim_input.as_ref().filter(|(c, _, _)| *c == cid) {
+                    st.clone().update(cx, |s, cx| s.select_all(window, cx));
+                }
             }
             cx.notify();
             return;

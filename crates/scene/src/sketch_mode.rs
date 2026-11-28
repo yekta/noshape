@@ -740,6 +740,9 @@ pub struct SketchEditor {
     /// second distance; live: Enter goes from distance 1 to distance 2).
     value_box_next: Option<ConstraintId>,
     pub construction: bool,
+    /// `construction` came from `q` on a selection: the button follows the selection, and the next drawing tool keeps
+    /// the mode only while the selection is still there.
+    construction_from_selection: bool,
     /// Show every constraint glyph (toolbar toggle).
     pub show_constraints: bool,
     /// Show dimension expressions.
@@ -1610,6 +1613,7 @@ impl SketchEditor {
             dim_edit: None,
             value_box_next: None,
             construction: false,
+            construction_from_selection: false,
             show_constraints: opened_options.show_constraints,
             show_expressions: opened_options.show_expressions,
             show_errors: opened_options.show_errors,
@@ -1744,6 +1748,9 @@ impl SketchEditor {
         // Insert spline points too (live sketch-spline-insert-points s14: the right-clicked spline unselected).
         let left_pattern = self.tool != previous && matches!(previous, Tool::LinearPattern | Tool::CircularPattern);
         if self.tool.draws() || matches!(self.tool, Tool::Dimension | Tool::SplinePoint) || left_pattern {
+            if std::mem::take(&mut self.construction_from_selection) && self.selection.is_empty() {
+                self.construction = false;
+            }
             self.selection.clear();
             self.selected_constraints.clear();
         }
@@ -6802,23 +6809,23 @@ impl SketchEditor {
     pub fn toggle_construction(&mut self, data: &mut SketchData) -> bool {
         if self.selection.is_empty() {
             self.construction = !self.construction;
+            self.construction_from_selection = false;
             return false;
         }
-        let mut now = None;
-        for id in &self.selection {
-            // (A spline's handle arm stays construction.)
-            if is_point(&data.sketch, *id) || data.sketch.entity(*id).is_some_and(|e| e.handle_of.is_some()) {
-                continue;
-            }
-            let cur = data.sketch.entity(*id).is_some_and(|e| e.construction);
-            let _ = data.sketch.set_construction(*id, !cur);
-            now = Some(now.unwrap_or(true) && !cur);
+        // (A spline's handle arm stays construction.)
+        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(&data.sketch, *id) && data.sketch.entity(*id).is_some_and(|e| e.handle_of.is_none())).collect();
+        if curves.is_empty() {
+            return true;
         }
-        // Live 1853 addendum: the next curve drawn is construction after
-        // `q` turned a selection into construction.
-        if let Some(c) = now {
-            self.construction = c;
+        // Live sketch-construction-mixed-selection: any solid curve in the selection turns all of it construction.
+        let now = curves.iter().any(|id| data.sketch.entity(*id).is_some_and(|e| !e.construction));
+        for id in curves {
+            let _ = data.sketch.set_construction(id, now);
         }
+        // Live 1853 addendum: the next curve drawn is construction after `q` turned a selection into construction;
+        // deselected first, it isn't (sketch-construction-mixed-selection: the button off after an empty click).
+        self.construction = now;
+        self.construction_from_selection = true;
         true
     }
 
@@ -6831,7 +6838,7 @@ impl SketchEditor {
         // a line's end doesn't: sketch-dim-hv-two-points.)
         // (Construction mode shows with Select or a drawing tool, not with Dimension: live
         // mistake-sketch-dimension-construction, a line made construction with q, Escape, d: Dimension.)
-        if self.construction && (self.tool == Tool::Select || self.tool.draws()) {
+        if self.construction && !self.construction_from_selection && (self.tool == Tool::Select || self.tool.draws()) {
             return true;
         }
         // (A lone sketch point counts as a solid entity: live sketch-constraint-refusals, a point and a circle's centre
@@ -14664,11 +14671,30 @@ mod tests {
         assert!(ed.construction_shown(&d.sketch), "a construction line selected alone");
         // (Live mistake-sketch-dimension-construction: q on it, Escape, d: Dimension shown, the mode kept for a curve.)
         ed.construction = true;
-        ed.selection.clear();
         ed.set_tool(Tool::Dimension);
         assert!(!ed.construction_shown(&d.sketch), "Dimension shown, not Construction");
         ed.set_tool(Tool::Line);
         assert!(ed.construction_shown(&d.sketch), "the next line construction");
+    }
+
+    /// Live sketch-construction-mixed-selection: `q` on a solid and a construction line makes both construction; an
+    /// empty click then leaves the Construction button off and the next line solid.
+    #[test]
+    fn q_on_a_mixed_selection_makes_it_all_construction() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_line(v(0.0, 0.0), v(0.02, 0.0));
+        let b = d.sketch.add_line(v(0.0, 0.01), v(0.02, 0.01));
+        d.sketch.set_construction(a, true).unwrap();
+        ed.selection = vec![a, b];
+        assert!(ed.toggle_construction(&mut d));
+        assert!([a, b].iter().all(|id| d.sketch.entity(*id).unwrap().construction));
+        assert!(ed.construction_shown(&d.sketch));
+        ed.selection.clear();
+        assert!(!ed.construction_shown(&d.sketch), "deselected: the button off");
+        ed.set_tool(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.03));
+        click(&mut ed, &mut d, v(0.02, 0.03));
+        assert!(d.sketch.entities().any(|e| e.kind() == EntityKind::Line && !e.construction && e.id != a && e.id != b), "the next line solid");
     }
 
     /// Live (ui-parity revolve-dialog-axis): a Line clicked over a rectangle's

@@ -2072,8 +2072,8 @@ fn a_dimension_between_a_lines_ends_clicked_quickly_reads_their_distance(cx: &mu
 
 /// Live2 11-17 sketch-dim-sel: with the Dimension tool a pick previews the dimension at once (the line kept selected);
 /// the placement click creates it and opens its box, the measured value with its unit pre-selected; Esc in the box
-/// keeps the dimension, the tool on; "1abc" Enter keeps the box (invalid), the first Esc restores the measured text
-/// with the box open, the second closes it; Esc after a pick drops it and ends the tool; Delete on a rectangle side
+/// keeps the dimension, the tool on; "1abc" Enter keeps the box (invalid), the first Esc empties it with the box open,
+/// the second closes it and ends the tool; Esc after a pick drops it and ends the tool; Delete on a rectangle side
 /// takes the line and every constraint on it, the rest staying.
 #[gpui::test]
 fn the_dimension_tool_flow_as_lives(cx: &mut TestAppContext) {
@@ -2127,8 +2127,10 @@ fn the_dimension_tool_flow_as_lives(cx: &mut TestAppContext) {
     keys(cx, window, &["escape"]);
     assert_eq!(input(cx).map(|t| t.0).as_deref(), Some("0 mm"), "the first Esc empties the box to 0 mm, the box open (live dimbox-esc-1125)");
     keys(cx, window, &["escape"]);
-    assert!(input(cx).is_none() && dims(cx) == 2 && tool(cx) == Some(Tool::Dimension), "the second Esc closes it, the dimension kept");
+    // (Live sketch-dim-typed-text: the second Esc ends the tool too.)
+    assert!(input(cx).is_none() && dims(cx) == 2 && tool(cx) == Some(Tool::Select), "the second Esc closes it, the dimension kept");
     // Esc after a pick: dropped, the tool off.
+    keys(cx, window, &["d"]);
     click(cx, window, &view, mids[2]);
     keys(cx, window, &["escape"]);
     assert!(dims(cx) == 2 && tool(cx) == Some(Tool::Select), "Esc before placing: nothing added, the tool off: {:?}", tool(cx));
@@ -2810,6 +2812,25 @@ fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
     keys(cx, window, &["escape"]);
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()));
     assert!(near(&dimensions(cx, &view), &measured), "{:?}", dimensions(cx, &view));
+}
+
+/// Live sketch-dim-typed-text: "abc" + Enter in a new dimension's box keeps the text, all of it selected; Esc empties
+/// the box, the next Esc leaves the Dimension tool with it.
+#[gpui::test]
+fn a_refused_new_dimension_selects_its_text_and_two_escapes_leave_the_tool(cx: &mut TestAppContext) {
+    let (window, view) = line_then_dimension_tool(cx, "dim-abc");
+    click(cx, window, &view, (570., 380.));
+    click(cx, window, &view, (570., 330.));
+    keys(cx, window, &["a", "b", "c", "enter"]);
+    let boxed = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| (d.1.read(cx).value().to_string(), d.1.read(cx).selected_range())));
+    assert_eq!(boxed, Some(("abc".into(), 0..3)), "refused: the text kept, all selected");
+    let tool = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().map(|s| s.tool));
+    keys(cx, window, &["escape"]);
+    assert_eq!(tool(cx), Some(Tool::Dimension));
+    keys(cx, window, &["escape"]);
+    assert_eq!(tool(cx), Some(Tool::Select), "the second Esc leaves Dimension");
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()));
+    assert_eq!(dimensions(cx, &view).len(), 1, "the new dimension stays");
 }
 
 /// Live sketch-edit-feel-1122 S1: the dimension box applies only on Enter. A click on empty canvas keeps it open,
