@@ -132,6 +132,14 @@ fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
     cx.run_until_parked();
 }
 
+/// Closes every open window, so a test that opens one per case frees each case's GPU targets as it goes.
+fn close_windows(cx: &mut TestAppContext) {
+    for window in cx.update(|cx| cx.windows()) {
+        cx.update_window(window, |_, w, _| w.remove_window()).ok();
+    }
+    cx.run_until_parked();
+}
+
 /// Draws until `done` holds (a regeneration on the background threads), at most 30 s (a loaded land server takes
 /// seconds; it returns as soon as `done` holds).
 fn wait_until(cx: &mut TestAppContext, window: AnyWindowHandle, done: impl Fn(&gpui_kit::App) -> bool) {

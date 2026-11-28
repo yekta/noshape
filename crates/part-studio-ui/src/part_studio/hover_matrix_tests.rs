@@ -1314,6 +1314,7 @@ fn the_line_end_dot_lies_under_the_lit_target(cx: &mut TestAppContext) {
         let blue = near_centre(&c, 2.0).filter(|q| close(*q, 0x449ccd, 30)).count();
         let under = near_centre(&c, 1.0).filter(|q| close(*q, if name == "point" { 0xc3b89c } else { 0xd6bd95 }, 30)).count();
         assert!(blue == 0 && under >= 1, "{name}: {blue} #449ccd px on top, {under} px of the dot under the lit target");
+        close_windows(cx);
     }
 }
 

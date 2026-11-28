@@ -222,6 +222,7 @@ fn the_dimension_tool_takes_the_hovered_line(cx: &mut TestAppContext) {
             draw(cx, window);
             let picks = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().tool_picks());
             assert_eq!(picks.contains(&line), lit, "scale {scale}: the click {off} px off takes the line: {picks:?}");
+            close_windows(cx);
         }
     }
 }

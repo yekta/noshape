@@ -645,6 +645,7 @@ fn the_sketch_tools_matrix_matches_live(cx: &mut TestAppContext) {
     let mut moved = Vec::new();
     for r in &rows {
         let res = (r.check)(cx);
+        close_windows(cx);
         let ok = res.is_ok();
         report.push(format!("{} {} (live: {}){}", if ok { "=" } else { "≠" }, r.id, r.live, res.err().map(|e| format!("\n    {e}")).unwrap_or_default()));
         if ok == r.gap {

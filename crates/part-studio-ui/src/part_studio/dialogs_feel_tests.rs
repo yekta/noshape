@@ -1261,6 +1261,7 @@ fn the_dialogs_matrix_matches_live(cx: &mut TestAppContext) {
     let mut moved = Vec::new();
     for r in rows.iter().filter(|r| only.as_ref().is_none_or(|o| r.id.contains(o.as_str()))) {
         let res = (r.check)(cx);
+        close_windows(cx);
         let ok = res.is_ok();
         report.push(format!("{} {} (live: {}){}", if ok { "=" } else { "≠" }, r.id, r.live, res.err().map(|e| format!("\n    {e}")).unwrap_or_default()));
         if ok == r.gap {
