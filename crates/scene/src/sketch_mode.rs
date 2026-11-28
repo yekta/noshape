@@ -9775,6 +9775,7 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
     place_second_line(sk, c, ids);
     level_lines(sk, c, ids);
     carry_text_box(sk, c, ids);
+    carry_free_line(sk, c, ids);
     mirror_second_line(sk, c, ids);
     let light = if centers.is_empty() { what_moves(sk, c, ids) } else { centers };
     let report = sk.solve_with(&noshape_sketch::SolveOptions { light, ..Default::default() });
@@ -9840,15 +9841,58 @@ fn carry_text_box(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
         return;
     }
     let Some(at) = sk.point(corner) else { return };
-    let to = match (sk.point(target), sk.curve(target)) {
-        (Some(q), _) => q,
-        // (On a line: its whole line, as the Coincident holds it.)
-        (None, Some(Curve2::Line { a, b })) if (b - a).length_squared() > 0.0 => a + (b - a) * ((at - a).dot(b - a) / (b - a).length_squared()),
-        (None, Some(curve)) => curve.closest(at).1,
-        _ => return,
-    };
+    let Some(to) = coincident_target(sk, at, target) else { return };
     let shift = to - at;
     for p in corners {
+        if let Some(q) = sk.point(p) {
+            let _ = sk.set_point(p, q + shift);
+        }
+    }
+}
+
+/// Where a point at `at` lands made coincident with `target`: the point itself, the foot on a line's whole line (as the
+/// Coincident holds it), the nearest point of a curve.
+fn coincident_target(sk: &Sketch, at: DVec2, target: EntityId) -> Option<DVec2> {
+    match (sk.point(target), sk.curve(target)) {
+        (Some(q), _) => Some(q),
+        (None, Some(Curve2::Line { a, b })) if (b - a).length_squared() > 0.0 => Some(a + (b - a) * ((at - a).dot(b - a) / (b - a).length_squared())),
+        (None, Some(curve)) => Some(curve.closest(at).1),
+        _ => None,
+    }
+}
+
+/// A lone free line's end made coincident with what can't move (a used edge, a fixed point): the whole line is carried
+/// there, its length and direction kept (live maker-coincident-to-used s16: the end (40.19, 6.09) onto the used bottom
+/// line y 0 moved both ends 6.09 mm down; the solve alone moved only that end).
+fn carry_free_line(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) {
+    let [a, b] = ids else { return };
+    if c != ConstraintTool::Coincident {
+        return;
+    }
+    let pinned = |e: EntityId| sk.entity(e).is_some_and(|x| x.external) || sk.constraints().any(|k| k.kind == ConstraintKind::Fix { entity: e });
+    let (end, target) = if is_point(sk, *a) && pinned(*b) { (*a, *b) } else if is_point(sk, *b) && pinned(*a) { (*b, *a) } else { return };
+    if pinned(end) {
+        return;
+    }
+    let ends = |e: EntityId| sk.endpoints(e).filter(|(s, en)| *s == end || *en == end);
+    let Some((line, (s, e))) = sk.entities().filter(|x| x.kind() == EntityKind::Line && !x.external).find_map(|x| ends(x.id).map(|p| (x.id, p))) else { return };
+    // Lone: no other entity on its points, and nothing but the new Coincident ties it to the rest (its own Horizontal
+    // or length go along).
+    if sk.entities().any(|x| x.id != line && sk.endpoints(x.id).is_some_and(|(p, q)| [p, q].iter().any(|v| *v == s || *v == e))) {
+        return;
+    }
+    let own = [line, s, e];
+    let ties = sk.constraints().filter(|k| {
+        let on = k.kind.entities();
+        on.iter().any(|x| own.contains(x)) && !on.iter().all(|x| own.contains(x))
+    });
+    if ties.count() != 1 {
+        return;
+    }
+    let Some(at) = sk.point(end) else { return };
+    let Some(to) = coincident_target(sk, at, target) else { return };
+    let shift = to - at;
+    for p in [s, e] {
         if let Some(q) = sk.point(p) {
             let _ = sk.set_point(p, q + shift);
         }
@@ -13908,6 +13952,37 @@ mod tests {
     }
 
     /// Live2 mirror-sym-1118: Symmetric on two lines and an axis: one mirror of the lines, the second line onto the
+    /// Live maker-coincident-to-used s16: a free line's end (40.19, 6.09) made coincident with the used bottom line y 0:
+    /// the whole line moves 6.09 mm down, its length and direction kept. A line tied to another keeps the least change:
+    /// only its end moves.
+    #[test]
+    fn a_free_lines_end_coincident_with_a_used_line_carries_the_line() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let line_ends = |sk: &Sketch, l: EntityId| match sk.curve(l) {
+            Some(Curve2::Line { a, b }) => (a, b),
+            _ => panic!("a line"),
+        };
+        let coincide = |tied: bool| {
+            let mut sk = Sketch::new();
+            let used = *sk.use_external(&Curve2::Line { a: mm(0.0, 0.0), b: mm(52.0, 0.0) }).unwrap().created.last().unwrap();
+            let l = sk.add_line(mm(20.09, 19.86), mm(40.19, 6.09));
+            if tied {
+                let other = sk.add_line(mm(0.0, 30.0), mm(20.09, 19.86));
+                let (s, _) = sk.endpoints(l).unwrap();
+                sk.add_constraint(ConstraintKind::Coincident { a: sk.endpoints(other).unwrap().1, b: s }).unwrap();
+            }
+            let (_, end) = sk.endpoints(l).unwrap();
+            let ids = [end, used];
+            assert!(apply_constraint(&mut sk, ConstraintTool::Coincident, &ids).is_ok_and(|n| n > 0));
+            assert!(solve_after_constraint(&mut sk, ConstraintTool::Coincident, &ids));
+            line_ends(&sk, l)
+        };
+        let (a, b) = coincide(false);
+        assert!((a - mm(20.09, 13.77)).length() < 1e-9 && (b - mm(40.19, 0.0)).length() < 1e-9, "carried down whole: {a:?} {b:?}");
+        let (a, b) = coincide(true);
+        assert!((a - mm(20.09, 19.86)).length() < 1e-9 && b.y.abs() < 1e-9, "tied: only the end moves: {a:?} {b:?}");
+    }
+
     /// first's mirror image with its length and place kept; shortening the first then leaves the second as it is.
     #[test]
     fn symmetric_lines_mirror_the_lines_with_their_ends_free() {
