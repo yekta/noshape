@@ -114,6 +114,44 @@ fn sheet_point(piece: &Shape, centre: DVec3, tool: &Shape) -> DVec3 {
     on.into_iter().chain(ends).chain(mids).map(|p| (away(&p), p)).max_by(|a, b| a.0.total_cmp(&b.0)).map_or(centre, |(_, p)| p)
 }
 
+/// Signed side of a sheet piece relative to the tool (positive = front): its [`sheet_point`]'s, unless that point lies
+/// past the tool's edge (its nearest tool point on the boundary), then the way the piece leaves the tool from a cut
+/// edge (c2-surf-workshop-britatap's Split 3: a 43 mm extruded sheet notches the head, both pieces' far points beyond
+/// its ends).
+fn sheet_side(tool: &Tool, piece: &Shape, centre: DVec3) -> f64 {
+    let p = sheet_point(piece, centre, &tool.shape);
+    if tool.plane.is_some() {
+        return side_of(tool, p);
+    }
+    let square = tool.shape.faces().iter().filter_map(|f| face_normal_near(f, p)).min_by(|a, b| p.distance(a.0).total_cmp(&p.distance(b.0))).is_none_or(|(q, n)| (p - q).dot(n).abs() >= 0.9 * p.distance(q));
+    if square {
+        return side_of(tool, p);
+    }
+    cut_side(tool, piece).unwrap_or_else(|| side_of(tool, p))
+}
+
+/// The side a sheet piece leaves the tool to, from the middle of an edge it has on the tool: the tool's normal there
+/// against the way into the piece's face.
+fn cut_side(tool: &Tool, piece: &Shape) -> Option<f64> {
+    let on_tool = |m: DVec3| k::make_vertex(m).ok().and_then(|v| k::distance(&v, &tool.shape).ok()).is_some_and(|d| d.distance < 1e-7);
+    for f in piece.faces() {
+        for e in f.edges() {
+            let Some(m) = edge_mid(&e).filter(|m| on_tool(*m)) else { continue };
+            let i = e.edge_info().ok()?;
+            let t = e.tangent_at((i.first_param + i.last_param) * 0.5).ok()?.normalize_or_zero();
+            let w = f.normal_at_point(m).ok()?.cross(t).normalize_or_zero();
+            let (_, n) = tool.shape.faces().iter().filter_map(|g| face_normal_near(g, m)).min_by(|a, b| m.distance(a.0).total_cmp(&m.distance(b.0)))?;
+            let step = 1e-5;
+            let inward = f.project_point(m + w * step).is_ok_and(|pr| pr.distance < 0.1 * step);
+            let side = n.dot(if inward { w } else { -w });
+            if side.abs() > 0.1 {
+                return Some(side);
+            }
+        }
+    }
+    None
+}
+
 /// Signed side of a point relative to the tool (positive = front).
 fn side_of(tool: &Tool, p: DVec3) -> f64 {
     if let Some(pl) = &tool.plane {
@@ -316,7 +354,7 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
             .into_iter()
             .map(|p| {
                 let c = piece_center(&p.shape);
-                let side = if target.kind == BodyKind::Surface { side_of(&tool, sheet_point(&p.shape, c, &tool.shape)) } else { side_of(&tool, c) };
+                let side = if target.kind == BodyKind::Surface { sheet_side(&tool, &p.shape, c) } else { side_of(&tool, c) };
                 (side, c, p)
             })
             .collect();

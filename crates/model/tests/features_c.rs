@@ -3348,6 +3348,46 @@ fn delete_face_keeps_a_pipe_bend_tangent_across_it() {
     assert_eq!(r.context.bodies[0].shape.faces().len(), 4);
 }
 
+/// Split keeps one side of a sheet cut by a curved sheet whose ends it reaches round (c2-surf-workshop-britatap's Split
+/// 3: Keep front, the head kept but for its notch, as live): a U-shaped plane cut by a half cylinder, the far corner of
+/// its outer piece behind the cylinder between its ends. That corner put both pieces behind, the sheet gone.
+#[test]
+fn split_keeps_the_front_of_a_sheet_reaching_round_the_tool() {
+    use noshape_kernel as k;
+    let m = |x: f64, y: f64, z: f64| DVec3::new(mm(x), mm(y), mm(z));
+    let corners = [(5.0, -30.0), (60.0, -30.0), (60.0, 30.0), (-90.0, 30.0), (-90.0, 0.0), (-80.0, 0.0), (-80.0, 22.0), (5.0, 22.0)];
+    let edges: Vec<_> = (0..corners.len()).map(|i| {
+        let (a, b) = (corners[i], corners[(i + 1) % corners.len()]);
+        k::make_line(m(a.0, a.1, 0.0), m(b.0, b.1, 0.0)).unwrap()
+    }).collect();
+    let sheet = k::make_face_from_wire(&k::make_wire(&edges).unwrap(), true).unwrap();
+    let arc = k::make_arc(m(0.0, 0.0, -10.0), DVec3::Z, DVec3::X, mm(20.0), -PI / 2.0, PI / 2.0).unwrap();
+    let tool = k::extrude(&arc, m(0.0, 0.0, 20.0)).unwrap().shape;
+    let mut s = Studio::new();
+    for shape in [sheet, tool] {
+        let brep = String::from_utf8(shape.to_brep_bytes().unwrap()).unwrap();
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    }
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    let (target, tool) = (r.context.bodies[0].id.clone(), r.context.bodies[1].id.clone());
+    let outward = r.context.bodies[1].shape.faces()[0].normal_at_point(m(20.0, 0.0, 0.0)).unwrap().x > 0.0;
+    s.add("splitPart", move |p| {
+        p.set("targets", ParamValue::Query(vec![Reference::Body(target)]));
+        p.set("tool", ParamValue::Query(vec![Reference::Body(tool)]));
+        p.set("keepBothSides", ParamValue::Bool(false));
+        p.set("keepFront", ParamValue::Bool(true));
+        p.set("keepTools", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1, "one piece of the sheet");
+    // The cap the half cylinder cuts off: a 20 mm circle's segment 5 mm from its centre; the rest of 4280 mm².
+    let cap = 400.0 * 0.25f64.acos() - 5.0 * 375f64.sqrt();
+    let area = r.context.bodies[0].shape.area().unwrap() * 1e6;
+    let want = if outward { 4280.0 - cap } else { cap };
+    assert!((area - want).abs() < 1e-3, "{area} mm², want {want}");
+}
+
 /// Live L27: Tangency on a row of sketch curves builds the fill anyway, as
 /// a WARNING "Could not meet tangency constraints at highlighted points.".
 #[test]
