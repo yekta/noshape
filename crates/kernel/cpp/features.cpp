@@ -8271,6 +8271,19 @@ static bool loose_vertices_overlap(const TopoDS_Shape& input, const TopoDS_Shape
   return false;
 }
 
+// The loosest vertex `r` has that `input` hasn't.
+static double new_vertex_tolerance(const TopoDS_Shape& input, const TopoDS_Shape& r)
+{
+  ShapeIMap old, all;
+  TopExp::MapShapes(input, TopAbs_VERTEX, old);
+  TopExp::MapShapes(r, TopAbs_VERTEX, all);
+  double worst = 0;
+  for (int i = 1; i <= all.Extent(); ++i)
+    if (!old.Contains(all(i)))
+      worst = std::max(worst, BRep_Tool::Tolerance(TopoDS::Vertex(all(i))));
+  return worst;
+}
+
 // A blend's new faces finished: approximated ones made analytic, then a full round's two faces on one cylinder one
 // face (B-spline blends of a full round too: the analytic step first), a corner's two sphere patches one. A studio
 // saved before (legacy_blend_finish) keeps the old order: the merges first.
@@ -8397,7 +8410,10 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
       join_split_lines(input, r, h);
       // OCCT's corners far off whose loose vertices take in others (a user's dock: R 0.8 over a 0.1 mm step, corners
       // 0.5 mm off, a self-intersecting body): the working scale's blend instead.
-      if (std::isfinite(tighten_new_tolerances(input, r, accurate(input))) || !loose_vertices_overlap(input, r))
+      // Nor where a corner is looser than the round is big (c2-impeller-loft's Fillet Flansch zum Stroemungskanal,
+      // 0.8 mm: corners 0.4 mm off the floor they end on, 1.14 mm tolerance, which every later Boolean of ours declines).
+      if ((std::isfinite(tighten_new_tolerances(input, r, accurate(input))) || !loose_vertices_overlap(input, r)) &&
+          new_vertex_tolerance(input, r) <= size)
         return as_is.finish(r, h);
     }
   }
