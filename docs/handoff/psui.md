@@ -33,19 +33,21 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 05:4x (start here)
-- QUEUED 0868ddd7 05:3x (8 commits: batch 10 code, export caret fixes, TICKETS ticks, handoff). Never poll --status;
-  the lead reports. Lead + qa told (qa re-scores batches 8/9/10 once green).
-- UNCOMMITTED (since 0868ddd7): "Apply export rules to contents": ops ExportSettings/SolidExportPrefs `apply_rules`
-  (default true, remembered in keep/give; T1 apply_export_rules_starts_on_and_is_remembered), op param
-  `apply_export_rules` (ops/export.rs), dialog row ex-apply-rules under a ticked individual-files box with an
-  export_rules_link (export.rs; OPTION_CHECKS now 4), run.py strips live's " View export rules" from checkbox labels.
-  The effect on the zip's entry names is NOT implemented: asked in REQUESTS "psui 11-28 05:3x".
-- RUNNING ps62 (bg, vibe2, log /root/psui-scratch/resp/ps62.log): clippy pss+ops, ops --lib export, UPDATE_DOCS=1
-  coverage:: (regenerates docs/AGENT_API.md ON THE HOST: scp vibe2:agents/psui/src/docs/AGENT_API.md back into the
-  worktree before committing), pss --lib export, build, replay export-parts-three-individual-files, -two-selected,
-  export-stl-download into ~/tmp/psui/ps62. Then commit "psui: Export's Apply export rules to contents (on,
-  remembered, op apply_export_rules)", handoff last, land.
+## STATE 11-28 06:2x (start here)
+- QUEUED 0868ddd7 (batch 10 code, export caret fixes, TICKETS ticks); landing now on top of it: 8578e2519f (Configure
+  suppression's literal label: 0868ddd7's format! label broke ops coverage::every_menu_item_is_listed, "stale
+  partStudio:Configure suppression") and 573dfc35e8 (Apply export rules to contents: ops `apply_rules` default on,
+  remembered, op param `apply_export_rules`, dialog row under ticked individual files + View export rules link; entry
+  names unchanged until live answers REQUESTS "psui 11-28 05:3x"). ps64: clippy, coverage, export, config tests ok.
+- ps62 replays: export-stl-download match; export-parts-three-individual-files: live reopens Export with "individual
+  files" STILL ticked (s16/17) against DECISIONS 11-27 "not remembered" (our T1
+  export_remembers_its_choices_but_not_individual_files cites this very take); live's Apply export rules starts off
+  there (account remembered?). Asked REQUESTS "psui 11-28 06:0x"; decision needed from the lead before changing.
+  export-parts-two-selected: Millimeter vs Meter = EXPORT-REMEMBERED-START.
+- NEXT: ps65 (/root/psui-scratch/resp/ps65.sh: build + replay measure-panel-spline-face (MEASURE-BRACKET-KEY: Part
+  Studio has a MeasureTool handler toggling ui.measure_pinned, yet the take's `[` opened nothing), mistake-section-view-
+  pick-edge (live: an edge click in Section planes gives "Section plane 1 (Top)"), mass-properties-add-part,
+  export-step-spline-part), then the maker set, test-memory P2, remaining batch 8/9 rows.
 - Verified before: ps55 config 7/19; ps56 33/50 681/828; ps57 export 30/38; ps60 custom-deviation, chordal-zero,
   file-name-blank, stl-download match. Left for live: REQUESTS "psui 11-28 01:5x", "04:1x", "05:3x";
   EXPORT-REMEMBERED-START (Units Meter vs live's remembered Millimeter).
