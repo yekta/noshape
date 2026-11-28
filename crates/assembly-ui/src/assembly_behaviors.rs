@@ -4338,6 +4338,16 @@ impl AssemblyView {
                     .gap(px(4.))
                     // Live asm-display-states-open-escape: Esc in the name box closes the panel, nothing focused.
                     .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                        // Live asm-display-states-create: Enter saves the state under the typed name, the box let go.
+                        if e.keystroke.key == "enter" && this.ui.ds_renaming.is_none() {
+                            cx.stop_propagation();
+                            let before = this.assembly(cx).map_or(0, |a| a.display_states.len());
+                            this.add_display_state(window, cx);
+                            if this.assembly(cx).map_or(0, |a| a.display_states.len()) > before {
+                                window.focus(&this.focus, cx);
+                            }
+                            return;
+                        }
                         if e.keystroke.key == "escape" && this.ui.ds_renaming.is_none() {
                             cx.stop_propagation();
                             this.ui.display_states = false;

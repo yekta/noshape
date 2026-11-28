@@ -2516,6 +2516,39 @@ fn display_states_opens_with_its_name_box_focused(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Live asm-display-states-create: a name typed in the box and Enter saves the state (the select on it, the box empty
+/// and let go, Undo there); the parity state reads the typed name in place of the hint.
+#[gpui::test]
+fn display_states_enter_saves_the_typed_name(cx: &mut TestAppContext) {
+    use gpui_kit::Focusable as _;
+    let path = pattern_document(cx, "ds-enter");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_display_states(w, cx))).unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_input("State A");
+    draw(cx, window);
+    let dialog = |cx: &mut TestAppContext| {
+        let st = cx.update_window(window, |_, _, cx| view.read(cx).ui_state(cx)).unwrap();
+        st["dialog"].clone()
+    };
+    let d = dialog(cx);
+    assert_eq!((d["text"][0].as_str(), d["fields"][0]["value"].as_str()), (Some("State A"), Some("State A")), "{d}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("enter");
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        let v = view.read(cx);
+        let names: Vec<String> = v.assembly(cx).map(|a| a.display_states.iter().map(|d| d.name.clone()).collect()).unwrap_or_default();
+        assert_eq!(names, vec!["State A".to_string()]);
+        assert!(!v.ui.ds_name.as_ref().unwrap().read(cx).focus_handle(cx).is_focused(w), "the name box let go");
+    })
+    .unwrap();
+    let d = dialog(cx);
+    assert_eq!(d["text"], serde_json::json!(["(New display state name)"]), "{d}");
+    assert_eq!(d["fields"][1]["value"].as_str(), Some("State A"), "{d}");
+}
+
 /// Live snap-diag-1118 (retaken): a dot of the face under the pointer takes a snap drag's connector within 51 px in x
 /// and in y (45° up-left at (51, 51), straight up at 50); 52 px either way doesn't.
 #[test]

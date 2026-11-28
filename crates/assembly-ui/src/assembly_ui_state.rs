@@ -871,15 +871,20 @@ impl AssemblyView {
         if let Some(text) = self.config_panel_text(cx) {
             out.push(panel("Change configuration", text));
         }
-        // Display states (live asm-display-states-open-escape): the name field's hint, then the states or the empty note.
+        // Display states (live asm-display-states-create): the name box (its text, else its hint), then the empty note
+        // or the states' select on the chosen one.
         if self.ui.display_states {
-            let mut text = vec!["(New display state name)".to_string()];
+            let typed = self.ui.ds_name.as_ref().map(|st| st.read(cx).value().to_string()).unwrap_or_default();
+            let mut text = vec![if typed.is_empty() { "(New display state name)".to_string() } else { typed.clone() }];
             let names: Vec<String> = self.assembly(cx).map(|a| a.display_states.iter().map(|d| d.name.clone()).collect()).unwrap_or_default();
+            let mut fields = vec![json!({ "label": "New display state name", "kind": "input", "value": typed })];
             if names.is_empty() {
                 text.push("No display states created".into());
+            } else {
+                let chosen = self.ui.ds_selected.and_then(|i| names.get(i).cloned()).unwrap_or_else(|| "Select a display state".into());
+                fields.push(json!({ "label": null, "kind": "select", "value": chosen }));
             }
-            text.extend(names);
-            out.push(panel("Display states", text));
+            out.push(json!({ "kind": "panel", "title": "Display states", "text": text, "fields": fields }));
         }
         if let Some((rows, _, _)) = &self.ui.select_other {
             out.push(panel("Select other", rows.iter().map(|r| self.select_other_label(r, cx)).collect()));
