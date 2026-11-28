@@ -1,33 +1,26 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 02:47 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 04:00 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 03:15 UTC)
-- QUEUED c6081900 (skasm, batch 6, T1s green: sketch, scene 277, ps-ui 18, asm-ui 6, clippy). Replays running in bg on
-  vibex8 via slot (uipr.sh in /root/skasm-scratch/bin, out ~/tmp/skasm/uip on vibex8: 6 sketch-used-* + 8 batch-6 takes).
-  If the bg task is gone after compaction: check `ssh vibex8 ~/bin/slot --status` / ~/tmp/skasm/uip/run.log before rerunning.
-- Next: SKETCH-INFERENCE-HORIZONTAL-RANGE (reach already +-7.5 px: replay rclick-line-circle-menu with logs to see the
-  source/zoom), SKETCH-SLOT-ON-SPLINE, SKETCH-OFFSET-DISTANCE-FROM-CLICK. SKETCH-INFERENCE-TANGENT-AND-SPLINE-HORIZONTAL:
-  nothing left (b landed, a not a gap).
-- LANDED 572c7b23 (P0 used-curve click). QUEUED a9e00c4f (skasm-main, branch skasm-mc-spline, 2 commits; 5508f938 failed):
-  ASM-MC-SPLINE-FACE-ORIGIN-ENTITY (B-spline face: its edges' midpoints + ends, a corner once along its curved edge, no
-  centroid) + the arc chooser (nearer of centre and midpoint: live Fillet 1 midpoint, hinge 270 deg arc centre). T1s green.
-- ASM-MC-FRAME-ON-CURVED-FACES OPEN part (TICKETS row annotated): Fillet 2's edge on the spline face, live Z -y at its middle,
-  ours +y; flipping by edge.orientation() does NOT fix it (tried, reverted). Decoded: Part 2 top face connector Z +z (block
-  70..90 x 0..20 x 0..10), Fastened aligns Z; live Z: Fillet 2 edge on spline face -y, on top face +y, spline bottom edge +y.
-  Arc revolute (pin): live midpoint (1.17,1.17,20), Z +-(-0.707,0.707,0) (sign depends on the pin cylinder's Z). Replay
-  asm-spline-* takes after a9e00c4f lands (heavy: slot).
-- Worktree skasm rebased on main 02:4x (WIP uncommitted, 9 files): batch-6. solver.rs: free_line_edit_options now
-  allow_collapse: true (DIM-ZERO-ACCEPTED's cause: the free-line edit refused the collapse); the old redundant patch is
-  in /root/skasm-scratch/solver-redundant.patch (not the path). Main already had the spline-derivative report
-  (fit_spline_end_derivatives): nurbs.rs change dropped. sketch.rs Use press merged with main's face fallback.
-  T1 run tb6.sh (sketch, scene lib, ps-ui, asm-ui revolute, clippy) running; then commit + land, then the sketch-used-*
-  replays (p0v.sh-style, slot) from skasm.
-- Rim Use (25.9,20.1,10) still open: model_edge_at returned None there; debug entities_along_ray hits.
-- rb.sh syncs each worktree to ~/agents/<worktree>/src and cds there: scripts carry no cd (fixed 02:40). Crate T1s via rb.sh
-  without ~/bin/slot (lead 02:00); slot only for replays/suites.
-- qa P2 SKETCH-INFERENCE-TANGENT-AND-SPLINE-HORIZONTAL queued.
+## NOW (11-28 04:00 UTC)
+- QUEUED 1249059f (skasm, 11 commits incl. batch 6 43a610f3; c6081900 FAILED 03:48 on use_on_a_shelled_boxs_rim_uses_its_
+  outer_loop: batch 6 let an edge in reach beat a lit face on the Use press; now only a SketchRegion (fix 30abeafc)). Also in
+  it: a circle's Offset follows the pointer (offset_follow in sketch_mode.rs; a line's keeps the preview, workflows-1122 22
+  s18), Slot on a spline (shapes.rs slot_around: offset sides + caps, 1 OFFSET where live has 3: solver has none between
+  splines). T1s green (sketch, scene 278, ps-ui use_/rim/offset/slot/used 27, clippy).
+- QUEUED 69a56fd5 (skasm-main): an edge midpoint on a B-spline/Bezier/Extrusion face runs along that face's loop
+  (align = the face; resolve_connector_aligned Face arm uses edge_orientation_in). Fits live's 3 readings (Fillet 2 edge on
+  the spline face -y, top face's fillet edge +y, spline bottom +y). OPEN: the curved side's top corners (no live data).
+  LANDED a9e00c4f, 572c7b23.
+- Replays (both bg rb.sh runs, waiting in vibex8's slot behind bool's gate + live's exchange test, as of 03:45):
+  bvo7yas7q = 6 sketch-used-* + 8 batch-6 (from skasm), b2jdtmu2r = 21 asm-spline-*/asm-mc-* (from skasm-main). Both write
+  ~/tmp/skasm/uip on vibex8 (serialised by the slot; compare lines print in the task output). If gone after compaction:
+  `ssh vibex8 ~/bin/slot --status`, rerun uipr.sh. NEVER call `slot --help` (it queues "--help" as a job).
+- Next: replay diffs; SKETCH-INFERENCE-HORIZONTAL-RANGE (reach already +-7.5 px: replay rclick-line-circle-menu with logs);
+  OFFSET open bits (picked-curve look, open chain's Escape); batch-6 P3s; ASM-MATE-ERROR-ROW (P3).
+- rb.sh syncs each worktree to ~/agents/<worktree>/src and cds there: scripts carry no cd. Crate T1s via rb.sh without
+  ~/bin/slot; slot only for replays/suites. Scripts: /root/skasm-scratch/bin (tasm, tso, tuse, uipr, tb6).
 
 ## NOW (11-27 19:50 UTC)
 - QUEUED (lead reports): 1748d8ca (skasm-base, ASM-MISTAKE-ERRORS), fdd7c592 (spline Horizontal). Landed: f06aa0b2.
