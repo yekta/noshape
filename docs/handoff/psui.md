@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 04:5x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 05:4x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,30 +33,29 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 04:5x (start here)
-- 57f48639 landed (as e76d5b079d). This land (rebased on origin/main 04:4x): e895723533 TICKETS ticks of ps47's
-  batch 8/9 rows; batch 10 code (Configuration panel/box, VS rows top-down, Variable menu, wrong-type no undo step,
-  disabled ✓ focus, sketch owner, start rectangles in live's line order; run.py mass variance, Insert dialog read,
-  old reader's null `variables`); TICKETS ticks of qa's batch-10 rows; export fixes (File name field mark, Custom field
-  click leaves a caret, run.py: live's "start X Copy N" Part Studio name in the bubble, "Export N Parts" fields by
-  label, a clicked field's caret on both sides reads as live's).
-- Verified: ps55 config 7/19 411/434; ps56 36 batch-10 + 14 Insert takes 33/50 681/828 (compare after fixes); ps57 38
-  export takes 30/38 368/402; ps58 clippy pss clean, undo/wrong-type/export tests ok; ps60 the changed export takes:
-  custom-deviation, chordal-zero, file-name-blank, stl-download match (gpui-base `click_places_caret`: the Export
-  modal's File name and Custom fields take a click's caret, Tab selects all; T1 export_dialog_keys_as_live).
-- What's left is live's (REQUESTS "psui 11-28 01:5x" and "04:1x"): VS "Where used" panel left open on 4 takes,
-  Name field read as boolean (qa RECORDER-NAME-FIELD-KIND), sketch null under Create variable, the import toast's
-  timing (13 asm takes), live's REST lag of a new instance after ✓ (3 takes), config rclick menu null (10), Undo
-  after a box switch, config-suppression-list on a wrong copy; Units Meter vs live's remembered Millimeter
-  (EXPORT-REMEMBERED-START).
-- NEXT: "Apply export rules to contents" (on, remembered; shown under a ticked "Export unique parts as individual
-  files", with a "View export rules" link; live reads the label with the link's text): ExportSettings field + ops +
-  prefs + the dialog row (export-parts-three-individual-files s12). Then export-step-spline-part s4 ("Include derived
-  tolerances in export" live true / ours false: remembered or default?), ps47 open items
-  (mistake-section-view-pick-edge s2, mass-properties-add-part s5 message, MEASURE-BRACKET-KEY), the maker set,
-  test-memory P2, remaining batch 8/9 rows.
+## STATE 11-28 05:4x (start here)
+- QUEUED 0868ddd7 05:3x (8 commits: batch 10 code, export caret fixes, TICKETS ticks, handoff). Never poll --status;
+  the lead reports. Lead + qa told (qa re-scores batches 8/9/10 once green).
+- UNCOMMITTED (since 0868ddd7): "Apply export rules to contents": ops ExportSettings/SolidExportPrefs `apply_rules`
+  (default true, remembered in keep/give; T1 apply_export_rules_starts_on_and_is_remembered), op param
+  `apply_export_rules` (ops/export.rs), dialog row ex-apply-rules under a ticked individual-files box with an
+  export_rules_link (export.rs; OPTION_CHECKS now 4), run.py strips live's " View export rules" from checkbox labels.
+  The effect on the zip's entry names is NOT implemented: asked in REQUESTS "psui 11-28 05:3x".
+- RUNNING ps62 (bg, vibe2, log /root/psui-scratch/resp/ps62.log): clippy pss+ops, ops --lib export, UPDATE_DOCS=1
+  coverage:: (regenerates docs/AGENT_API.md ON THE HOST: scp vibe2:agents/psui/src/docs/AGENT_API.md back into the
+  worktree before committing), pss --lib export, build, replay export-parts-three-individual-files, -two-selected,
+  export-stl-download into ~/tmp/psui/ps62. Then commit "psui: Export's Apply export rules to contents (on,
+  remembered, op apply_export_rules)", handoff last, land.
+- Verified before: ps55 config 7/19; ps56 33/50 681/828; ps57 export 30/38; ps60 custom-deviation, chordal-zero,
+  file-name-blank, stl-download match. Left for live: REQUESTS "psui 11-28 01:5x", "04:1x", "05:3x";
+  EXPORT-REMEMBERED-START (Units Meter vs live's remembered Millimeter).
+- NEXT: export-step-spline-part s4 ("Include derived tolerances in export" live true / ours false: remembered or
+  default?), ps47 open items (mistake-section-view-pick-edge s2, mass-properties-add-part s5 message,
+  MEASURE-BRACKET-KEY), the maker set, test-memory P2, remaining batch 8/9 rows.
 - Diff per state: scp 'vibe2:tmp/psui/psNN/a/*.json' /root/psui-scratch/psNN/, then
   `python3 /root/psui-scratch/bin/alldiffs.py /root/psui-scratch/psNN <names…>`.
+- Commit-order lesson: cherry-picking TICKETS commits onto a newer main union-merges qa's rows twice: grep each ticked
+  id's count before land.sh.
 - Open (not live-backed): redo of the step before a Properties rename loses the rename; ask live before changing.
 
 ## EARLIER
