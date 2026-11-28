@@ -2121,7 +2121,8 @@ impl SketchEditor {
     /// `prev` again at `p` if the pointer is still within its let-go reach ([`HOLD_PX`]): the same target, kind and
     /// constraints, found with the wider reach.
     fn held_snap(&self, sk: &Sketch, p: DVec2, ctx: &InferenceContext, prev: &Inference) -> Option<Inference> {
-        let own_band = matches!(prev.constraints.as_slice(), [AutoConstraint::HorizontalLine | AutoConstraint::VerticalLine]);
+        // (A point's horizontal / vertical too: live sketch-rclick-line-circle-menu, the origin's 9.4 px off, let go.)
+        let own_band = is_alignment(prev) || matches!(prev.constraints.as_slice(), [AutoConstraint::HorizontalLine | AutoConstraint::VerticalLine]);
         let wide = InferenceContext { snap_radius: self.world_per_px * if own_band { BAND_HOLD_PX } else { HOLD_PX }, ..ctx.clone() };
         let metric = self.screen_metric();
         let seen = |v: DVec2| metric.as_ref().map_or(v.length(), |m| m.len(v));
