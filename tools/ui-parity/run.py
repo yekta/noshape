@@ -457,6 +457,9 @@ def export_fields_by_label(state):
     if isinstance(d, dict) and (d.get("title") in ("Export", "Export as DXF/DWG") or re.fullmatch(r"Export \d+ Parts", str(d.get("title")))) and isinstance(d.get("fields"), list) and all(isinstance(f, dict) for f in d["fields"]):
         seen = []
         for f in d["fields"]:
+            # Live reads a checkbox's label with the link beside it ("Apply export rules to contents View export rules").
+            if isinstance(f.get("label"), str) and f["label"].endswith(" View export rules"):
+                f = {**f, "label": f["label"][: -len(" View export rules")]}
             if d["title"] == "Export as DXF/DWG" and f.get("kind") == "select" and f.get("value") in UNIT_NAMES:
                 f = {**f, "label": "Units"}
             if f not in seen:

@@ -7930,6 +7930,7 @@ Examples:
 | `max_chord_length` | number |  | Custom, glTF / GLB / OBJ / 3MF: Maximum chord length (m; kept, not applied by our mesher). |
 | `stl_text` | boolean |  | STL as text instead of binary. |
 | `individual` | boolean |  | Export unique parts as individual files (zipped). |
+| `apply_export_rules` | boolean |  | With individual files: Apply export rules to contents (default on, remembered). |
 | `include_hidden` | boolean |  | Include hidden parts. |
 | `preprocessing` | one of `None`, `Automatic`, `Remove small entities only (advanced)`, `Remove small entities only (basic)`, `Remove small entities only (advanced) and convert all surfaces to b-surfaces` |  | STEP: Preprocessing (default None). |
 | `derived_tolerances` | boolean |  | STEP: Include derived tolerances in export. |

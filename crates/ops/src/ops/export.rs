@@ -33,6 +33,7 @@ pub fn ops() -> Vec<Op> {
             opt("max_chord_length", json!({ "type": "number", "minimum": 0 }), "Custom, glTF / GLB / OBJ / 3MF: Maximum chord length (m; kept, not applied by our mesher)."),
             opt("stl_text", json!({ "type": "boolean" }), "STL as text instead of binary."),
             opt("individual", json!({ "type": "boolean" }), "Export unique parts as individual files (zipped)."),
+            opt("apply_export_rules", json!({ "type": "boolean" }), "With individual files: Apply export rules to contents (default on, remembered)."),
             opt("include_hidden", json!({ "type": "boolean" }), "Include hidden parts."),
             opt("preprocessing", json!({ "type": "string", "enum": crate::export::STEP_PREPROCESSING }), "STEP: Preprocessing (default None)."),
             opt("derived_tolerances", json!({ "type": "boolean" }), "STEP: Include derived tolerances in export."),
@@ -78,6 +79,7 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     s.y_up = a.bool_or("y_up", s.y_up)?;
     s.stl_text = a.bool_or("stl_text", s.stl_text)?;
     s.individual = a.bool_or("individual", s.individual)?;
+    s.apply_rules = a.bool_or("apply_export_rules", s.apply_rules)?;
     s.hidden = a.bool_or("include_hidden", s.hidden || format == PartFormat::Urdf)?;
     s.derived_tolerances = a.bool_or("derived_tolerances", s.derived_tolerances)?;
     if let Some(h) = a.opt_f64("mbd_text_height")? {

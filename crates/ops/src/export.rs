@@ -126,6 +126,8 @@ pub struct ExportSettings {
     pub stl_text: bool,
     pub units: usize,
     pub individual: bool,
+    /// "Apply export rules to contents" (under individual files; live: on, remembered).
+    pub apply_rules: bool,
     pub hidden: bool,
     /// URDF: index into `URDF_GEOMETRY`.
     pub urdf_geometry: usize,
@@ -218,6 +220,7 @@ pub struct SolidExportPrefs {
     pub urdf_geometry: usize,
     pub urdf_stl_text: bool,
     pub urdf_single_link: bool,
+    pub apply_rules: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -259,6 +262,7 @@ impl Default for SolidExportPrefs {
             y_up: false,
             hidden: false,
             options: 0,
+            apply_rules: true,
             step: StepPrefs::default(),
             parasolid: VersionPrefs::default(),
             rhino: VersionPrefs::default(),
@@ -317,7 +321,7 @@ impl SolidExportPrefs {
     /// Keeps `s`'s values: the shared ones and its format's own.
     pub fn keep(&mut self, s: &ExportSettings) {
         self.format = s.format.label().into();
-        (self.y_up, self.hidden, self.options) = (s.y_up, s.hidden, s.options);
+        (self.y_up, self.hidden, self.options, self.apply_rules) = (s.y_up, s.hidden, s.options, s.apply_rules);
         self.custom = s.custom;
         let v = VersionPrefs { version: s.version, latest: s.latest };
         match s.format {
@@ -344,7 +348,7 @@ impl SolidExportPrefs {
 
     /// Gives `s` the remembered shared values and those of `s.format`.
     pub fn give(&self, s: &mut ExportSettings) {
-        (s.y_up, s.hidden, s.options) = (self.y_up, self.hidden, self.options.min(OPTIONS.len() - 1));
+        (s.y_up, s.hidden, s.options, s.apply_rules) = (self.y_up, self.hidden, self.options.min(OPTIONS.len() - 1), self.apply_rules);
         s.custom = self.custom;
         let v = self.version(s.format);
         (s.version, s.latest) = (v.version, v.latest);
@@ -422,6 +426,7 @@ impl Default for ExportSettings {
             stl_text: false,
             units: METER,
             individual: false,
+            apply_rules: true,
             hidden: false,
             urdf_geometry: 0,
             urdf_single_link: false,
@@ -1755,6 +1760,15 @@ mod tests {
         prefs.keep(&s);
         let again = prefs.settings(false);
         assert_eq!((again.format, again.y_up, again.options, again.units, again.individual), (super::PartFormat::Stl, true, 2, 4, false));
+    }
+
+    /// Live (behaviours "qexport" table): "Apply export rules to contents" starts on and is remembered.
+    #[test]
+    fn apply_export_rules_starts_on_and_is_remembered() {
+        let mut prefs = super::SolidExportPrefs::default();
+        assert!(prefs.settings(false).apply_rules);
+        prefs.keep(&super::ExportSettings { individual: true, apply_rules: false, ..Default::default() });
+        assert!(!prefs.settings(false).apply_rules);
     }
 
     /// Live (exchange batch 3, 11-20): unique parts as individual files are a zip even of one part, its entries

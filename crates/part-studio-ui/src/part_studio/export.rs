@@ -31,7 +31,7 @@ const CHECK_MT: f32 = 9.;
 const CHECK_GAP: f32 = 12.;
 /// Between a format's own checkboxes (STEP's four under Version: 31 px apart, live wf39); under Options they keep `CHECK_GAP`.
 const FORMAT_CHECK_GAP: f32 = 4.;
-const OPTION_CHECKS: [&str; 3] = ["ex-individual", "ex-single-link", "ex-hidden"];
+const OPTION_CHECKS: [&str; 4] = ["ex-individual", "ex-apply-rules", "ex-single-link", "ex-hidden"];
 const LABEL_AFTER_CHECK: f32 = 4.;
 
 impl PartStudioView {
@@ -439,6 +439,11 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
         if !parts_only {
             if f != PartFormat::Urdf {
                 rows.push(chk("ex-individual", "Export unique parts as individual files", s.individual, |s, v| s.individual = v));
+                // Live export-parts-three-individual-files s12: ticking it brings "Apply export rules to contents" (on,
+                // remembered) with a "View export rules" link.
+                if s.individual {
+                    rows.push(chk("ex-apply-rules", "Apply export rules to contents", s.apply_rules, |s, v| s.apply_rules = v));
+                }
             } else if assembly {
                 rows.push(chk("ex-single-link", "Export rigid subassemblies as a single link", s.urdf_single_link, |s, v| s.urdf_single_link = v));
             }
@@ -538,10 +543,15 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
                 Row::Check { id, label, on, set, .. } => {
                     let mt = check_mt(prev_check, id);
                     prev_check = true;
-                    body.child(div().mt(px(mt)).child(modal_checkbox(id, label, on).on_click(move |_, w, _| {
+                    let row = modal_checkbox(id, label, on).on_click(move |_, w, _| {
                         set(&mut st.borrow_mut(), !on);
                         w.refresh();
-                    })))
+                    });
+                    if id == "ex-apply-rules" {
+                        body.child(h_flex().mt(px(mt)).gap(px(8.)).child(row).child(crate::part_studio_hooks::export_rules_link("ex-rules-contents")))
+                    } else {
+                        body.child(div().mt(px(mt)).child(row))
+                    }
                 }
             };
         }
