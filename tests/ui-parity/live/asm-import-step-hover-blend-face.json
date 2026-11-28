@@ -1,6 +1,6 @@
 {
  "scenario": "asm-import-step-hover-blend-face",
- "recorded": "2026-11-27T19:33:37.540Z",
+ "recorded": "2026-11-28T05:05:26.290Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -9,15 +9,15 @@
    1919,
    992
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+  "recorder": "2026-11-14.2 4002f36a + live2 2026-11-28.5"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "44b0ef7b6b749cf79e4753be",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "667709bcc744b3547742a10e",
   "start": "spline-fillet-asm",
-  "startElement": "31d0399087613ead5fb4e013",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "4cc7f5c4bb654fbe3d052189",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -101,7 +101,7 @@
   "assembly": {
    "instances": [
     {
-     "name": "Part 2 <1>",
+     "name": "Part 3 <1>",
      "fixed": false,
      "transform": [
       1,
@@ -123,7 +123,7 @@
      ]
     },
     {
-     "name": "Part 3 <1>",
+     "name": "Part 2 <1>",
      "fixed": false,
      "transform": [
       1,
@@ -191,9 +191,9 @@
     -24.463,
     43.476
    ],
-   "width_mm": 104.939,
-   "height_mm": 71.963,
-   "mmPerPixel": 0.081222,
+   "width_mm": 125.311,
+   "height_mm": 66.363,
+   "mmPerPixel": 0.074902,
    "orthographic": true
   },
   "measure": null
@@ -208,12 +208,12 @@
     }
    },
    "ok": true,
-   "ti": 27504,
-   "tmove": 27604,
+   "ti": 26793,
+   "tmove": 26840,
    "moves": 1,
-   "tdown": 27911,
+   "tdown": 27131,
    "at": [
-    438,
+    57,
     977
    ],
    "state": {
@@ -316,7 +316,7 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -338,7 +338,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -406,15 +406,15 @@
       -24.463,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 30360,
-   "te": 30360
+   "t": 29247,
+   "te": 29247
   },
   {
    "step": 2,
@@ -425,12 +425,12 @@
     }
    },
    "ok": true,
-   "ti": 30360,
-   "tmove": 30453,
+   "ti": 29247,
+   "tmove": 29302,
    "moves": 2,
-   "tdown": 31511,
+   "tdown": 30349,
    "at": [
-    525,
+    144,
     943
    ],
    "state": {
@@ -515,7 +515,7 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -537,7 +537,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -605,15 +605,15 @@
       -24.463,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 33915,
-   "te": 33915
+   "t": 32287,
+   "te": 32287
   },
   {
    "step": 3,
@@ -624,7 +624,7 @@
     ]
    },
    "ok": true,
-   "ti": 33915,
+   "ti": 32287,
    "via": "file chooser answered",
    "state": {
     "focus": {
@@ -739,7 +739,7 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -761,7 +761,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -829,15 +829,15 @@
       -24.463,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 38755,
-   "te": 38755
+   "t": 36730,
+   "te": 36730
   },
   {
    "step": 4,
@@ -848,10 +848,10 @@
     }
    },
    "ok": true,
-   "ti": 38755,
-   "tmove": 38785,
+   "ti": 36730,
+   "tmove": 36769,
    "moves": 1,
-   "tdown": 39066,
+   "tdown": 37065,
    "at": [
     1039,
     515
@@ -938,7 +938,7 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -960,7 +960,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -1028,15 +1028,15 @@
       -24.463,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 41750,
-   "te": 41750
+   "t": 39522,
+   "te": 39522
   },
   {
    "step": 5,
@@ -1044,8 +1044,7 @@
     "do": "wait"
    },
    "ok": true,
-   "ti": 41750,
-   "waitedForImport": "8 s",
+   "ti": 39522,
    "state": {
     "focus": {
      "kind": "none"
@@ -1122,13 +1121,13 @@
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "uip-blend-block.step has been imported. Open document \u00d7 Close",
     "tooltip": null,
     "sketch": null,
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -1150,7 +1149,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -1218,15 +1217,15 @@
       -24.463,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 56835,
-   "te": 56835
+   "t": 52175,
+   "te": 52175
   },
   {
    "step": 6,
@@ -1237,12 +1236,12 @@
     }
    },
    "ok": true,
-   "ti": 56835,
-   "tmove": 56864,
+   "ti": 52175,
+   "tmove": 52227,
    "moves": 1,
-   "tdown": 57152,
+   "tdown": 52530,
    "at": [
-    571,
+    190,
     58
    ],
    "state": {
@@ -1250,365 +1249,54 @@
      "kind": "none"
     },
     "dialog": {
-     "title": null,
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Current document",
-       "selected": true
-      },
-      {
-       "label": "Other documents",
-       "selected": false
-      },
-      {
-       "label": "Standard content",
-       "selected": false
-      },
-      {
-       "label": "Part Studios",
-       "selected": true
-      },
-      {
-       "label": "Assemblies",
-       "selected": false
-      }
+     "kind": "panel",
+     "title": "Insert parts and assemblies",
+     "text": [
+      "Current document",
+      "Other documents",
+      "Standard content",
+      "noshape ui parity lane2-1127",
+      "Part Studios",
+      "Assemblies",
+      "(Search Part Studios)",
+      "audit 1943 parts",
+      "audit 1990",
+      "block 1995",
+      "frames 1989 c1",
+      "frames 1989 c2",
+      "frames 1989 c3",
+      "frames 1989 c4",
+      "frames 1989 c5",
+      "hole 1987 A",
+      "live2 2233 case 1",
+      "live2 2233 case 2",
+      "live2 2233 case 3",
+      "live2 2233 case r6",
+      "live2 2233 case r10",
+      "live2 2233 case r50",
+      "Part Studio 1",
+      "q flat ops",
+      "Sketch audit 1969",
+      "start block",
+      "start block Copy 1",
+      "start block-broken",
+      "start block-fillet",
+      "start boss-block"
      ],
      "fields": [
       {
-       "label": "Search Part Studios",
-       "kind": "string",
-       "text": ""
-      },
-      {
-       "label": "audit 1943 parts",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "audit 1990",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "block 1995",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c4",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c5",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "hole 1987 A",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r6",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r10",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r50",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1 Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "q flat ops",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Sketch audit 1969",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-broken",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-fillet",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start boss-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start bracket",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start chamfer-fillet-block-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start config-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start curves",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start cylinder-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-l",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-sketch",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-types-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start maker-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start measure-ties",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block-holes",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate (ui)",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate-bend",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start ridge",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start sm-box",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start spline-fillet-asm",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start surfaces",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start two-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start up-to-next",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start vars",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start wrap-cylinder",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "uip-blend-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
+       "label": "Name: A \u2192 Z",
+       "kind": "input",
+       "value": ""
       }
-     ],
-     "error": null,
-     "ok": null,
-     "titleState": "ok"
+     ]
     },
     "dialogs": [],
     "panels": [
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / q flat ops / Sketch audit 1969 / start block / start block Copy",
       "inserted": 0,
       "inputs": [
        {
@@ -1687,13 +1375,13 @@
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "uip-blend-block.step has been imported. Open document \u00d7 Close",
     "tooltip": null,
     "sketch": null,
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -1715,7 +1403,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -1783,15 +1471,15 @@
       -24.463,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 60099,
-   "te": 60099
+   "t": 54883,
+   "te": 54883
   },
   {
    "step": 7,
@@ -1801,371 +1489,60 @@
     "ms": 4000
    },
    "ok": true,
-   "ti": 60099,
+   "ti": 54883,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": null,
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Current document",
-       "selected": true
-      },
-      {
-       "label": "Other documents",
-       "selected": false
-      },
-      {
-       "label": "Standard content",
-       "selected": false
-      },
-      {
-       "label": "Part Studios",
-       "selected": true
-      },
-      {
-       "label": "Assemblies",
-       "selected": false
-      }
+     "kind": "panel",
+     "title": "Insert parts and assemblies",
+     "text": [
+      "Current document",
+      "Other documents",
+      "Standard content",
+      "noshape ui parity lane2-1127",
+      "Part Studios",
+      "Assemblies",
+      "(Search Part Studios)",
+      "audit 1943 parts",
+      "audit 1990",
+      "block 1995",
+      "frames 1989 c1",
+      "frames 1989 c2",
+      "frames 1989 c3",
+      "frames 1989 c4",
+      "frames 1989 c5",
+      "hole 1987 A",
+      "live2 2233 case 1",
+      "live2 2233 case 2",
+      "live2 2233 case 3",
+      "live2 2233 case r6",
+      "live2 2233 case r10",
+      "live2 2233 case r50",
+      "Part Studio 1",
+      "q flat ops",
+      "Sketch audit 1969",
+      "start block",
+      "start block Copy 1",
+      "start block-broken",
+      "start block-fillet",
+      "start boss-block"
      ],
      "fields": [
       {
-       "label": "Search Part Studios",
-       "kind": "string",
-       "text": ""
-      },
-      {
-       "label": "audit 1943 parts",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "audit 1990",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "block 1995",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c4",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c5",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "hole 1987 A",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r6",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r10",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r50",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1 Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "q flat ops",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Sketch audit 1969",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-broken",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-fillet",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start boss-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start bracket",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start chamfer-fillet-block-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start config-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start curves",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start cylinder-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-l",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-sketch",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-types-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start maker-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start measure-ties",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block-holes",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate (ui)",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate-bend",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start ridge",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start sm-box",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start spline-fillet-asm",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start surfaces",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start two-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start up-to-next",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start vars",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start wrap-cylinder",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "uip-blend-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
+       "label": "Name: A \u2192 Z",
+       "kind": "input",
+       "value": ""
       }
-     ],
-     "error": null,
-     "ok": null,
-     "titleState": "ok"
+     ]
     },
     "dialogs": [],
     "panels": [
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / q flat ops / Sketch audit 1969 / start block / start block Copy",
       "inserted": 0,
       "inputs": [
        {
@@ -2244,13 +1621,13 @@
      "undo": false,
      "redo": false
     },
-    "message": null,
+    "message": "uip-blend-block.step has been imported. Open document \u00d7 Close",
     "tooltip": null,
     "sketch": null,
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -2272,7 +1649,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -2340,15 +1717,15 @@
       -24.463,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 66406,
-   "te": 66406
+   "t": 57615,
+   "te": 57615
   },
   {
    "step": 8,
@@ -2359,378 +1736,67 @@
     }
    },
    "ok": true,
-   "ti": 66406,
-   "tmove": 66465,
+   "ti": 57615,
+   "tmove": 57670,
    "moves": 1,
-   "tdown": 66889,
+   "tdown": 57995,
    "at": [
-    767,
-    595
+    386,
+    467
    ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": "audit 1943 parts",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Current document",
-       "selected": true
-      },
-      {
-       "label": "Other documents",
-       "selected": false
-      },
-      {
-       "label": "Standard content",
-       "selected": false
-      },
-      {
-       "label": "Part Studios",
-       "selected": true
-      },
-      {
-       "label": "Assemblies",
-       "selected": false
-      }
+     "kind": "panel",
+     "title": "Insert parts and assemblies",
+     "text": [
+      "Current document",
+      "Other documents",
+      "Standard content",
+      "noshape ui parity lane2-1127",
+      "Part Studios",
+      "Assemblies",
+      "(Search Part Studios)",
+      "audit 1943 parts",
+      "audit 1990",
+      "block 1995",
+      "frames 1989 c1",
+      "frames 1989 c2",
+      "frames 1989 c3",
+      "frames 1989 c4",
+      "frames 1989 c5",
+      "hole 1987 A",
+      "live2 2233 case 1",
+      "live2 2233 case 2",
+      "live2 2233 case 3",
+      "live2 2233 case r6",
+      "live2 2233 case r10",
+      "live2 2233 case r50",
+      "Part Studio 1",
+      "q flat ops",
+      "Sketch audit 1969",
+      "start block",
+      "start block Copy 1",
+      "start block-broken",
+      "start block-fillet",
+      "start boss-block"
      ],
      "fields": [
       {
-       "label": "Search Part Studios",
-       "kind": "string",
-       "text": ""
-      },
-      {
-       "label": "audit 1943 parts",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "audit 1990",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "block 1995",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c4",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c5",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "hole 1987 A",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r6",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r10",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r50",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1 Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "q flat ops",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Sketch audit 1969",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-broken",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-fillet",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start boss-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start bracket",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start chamfer-fillet-block-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start config-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start curves",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start cylinder-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-l",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-sketch",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-types-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start maker-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start measure-ties",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block-holes",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate (ui)",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate-bend",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start ridge",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start sm-box",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start spline-fillet-asm",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start surfaces",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start two-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start up-to-next",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start vars",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start wrap-cylinder",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "uip-blend-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
+       "label": "Name: A \u2192 Z",
+       "kind": "input",
+       "value": ""
       }
-     ],
-     "error": null,
-     "ok": null,
-     "titleState": "ok"
+     ]
     },
     "dialogs": [],
     "panels": [
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / q flat ops / Sketch audit 1969 / start block / start block Copy",
       "inserted": 1,
       "inputs": [
        {
@@ -2747,7 +1813,7 @@
       {
        "kind": "INSTANCE",
        "owner": null,
-       "id": "MMmMywwP0nJROkSZI"
+       "id": "MZkzuxHgkLdEqKNLS"
       }
      ]
     },
@@ -2830,7 +1896,7 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Blend block <1>",
        "fixed": false,
        "transform": [
         1,
@@ -2853,6 +1919,28 @@
       },
       {
        "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -2920,15 +2008,15 @@
       -24.464,
       43.476
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 69451,
-   "te": 69451
+   "t": 60556,
+   "te": 60556
   },
   {
    "step": 9,
@@ -2939,10 +2027,10 @@
     }
    },
    "ok": true,
-   "ti": 69451,
-   "tmove": 69490,
+   "ti": 60556,
+   "tmove": 60586,
    "moves": 1,
-   "tdown": 69843,
+   "tdown": 60912,
    "at": [
     1560,
     960
@@ -2952,365 +2040,54 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "audit 1943 parts",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Current document",
-       "selected": true
-      },
-      {
-       "label": "Other documents",
-       "selected": false
-      },
-      {
-       "label": "Standard content",
-       "selected": false
-      },
-      {
-       "label": "Part Studios",
-       "selected": true
-      },
-      {
-       "label": "Assemblies",
-       "selected": false
-      }
+     "kind": "panel",
+     "title": "Insert parts and assemblies",
+     "text": [
+      "Current document",
+      "Other documents",
+      "Standard content",
+      "noshape ui parity lane2-1127",
+      "Part Studios",
+      "Assemblies",
+      "(Search Part Studios)",
+      "audit 1943 parts",
+      "audit 1990",
+      "block 1995",
+      "frames 1989 c1",
+      "frames 1989 c2",
+      "frames 1989 c3",
+      "frames 1989 c4",
+      "frames 1989 c5",
+      "hole 1987 A",
+      "live2 2233 case 1",
+      "live2 2233 case 2",
+      "live2 2233 case 3",
+      "live2 2233 case r6",
+      "live2 2233 case r10",
+      "live2 2233 case r50",
+      "Part Studio 1",
+      "q flat ops",
+      "Sketch audit 1969",
+      "start block",
+      "start block Copy 1",
+      "start block-broken",
+      "start block-fillet",
+      "start boss-block"
      ],
      "fields": [
       {
-       "label": "Search Part Studios",
-       "kind": "string",
-       "text": ""
-      },
-      {
-       "label": "audit 1943 parts",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "audit 1990",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "block 1995",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c4",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c5",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "hole 1987 A",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r6",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r10",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r50",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1 Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "q flat ops",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Sketch audit 1969",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-broken",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-fillet",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start boss-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start bracket",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start chamfer-fillet-block-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start config-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start curves",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start cylinder-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-l",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-sketch",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-types-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start maker-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start measure-ties",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block-holes",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate (ui)",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate-bend",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start ridge",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start sm-box",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start spline-fillet-asm",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start surfaces",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start two-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start up-to-next",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start vars",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start wrap-cylinder",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "uip-blend-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
+       "label": "Name: A \u2192 Z",
+       "kind": "input",
+       "value": ""
       }
-     ],
-     "error": null,
-     "ok": null,
-     "titleState": "ok"
+     ]
     },
     "dialogs": [],
     "panels": [
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / q flat ops / Sketch audit 1969 / start block / start block Copy",
       "inserted": 1,
       "inputs": [
        {
@@ -3404,7 +2181,29 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        60.232927,
+        0,
+        1,
+        0,
+        22.506371,
+        0,
+        0,
+        1,
+        -25.724562,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -3426,7 +2225,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -3490,19 +2289,19 @@
       7.882
      ],
      "eye_mm": [
-      71.467,
-      -23.841,
-      43.061
+      74.52,
+      -29.13,
+      46.586
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 72393,
-   "te": 72393
+   "t": 62875,
+   "te": 62875
   },
   {
    "step": 10,
@@ -3511,371 +2310,60 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 72393,
+   "ti": 62875,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": "audit 1943 parts",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Current document",
-       "selected": true
-      },
-      {
-       "label": "Other documents",
-       "selected": false
-      },
-      {
-       "label": "Standard content",
-       "selected": false
-      },
-      {
-       "label": "Part Studios",
-       "selected": true
-      },
-      {
-       "label": "Assemblies",
-       "selected": false
-      }
+     "kind": "panel",
+     "title": "Insert parts and assemblies",
+     "text": [
+      "Current document",
+      "Other documents",
+      "Standard content",
+      "noshape ui parity lane2-1127",
+      "Part Studios",
+      "Assemblies",
+      "(Search Part Studios)",
+      "audit 1943 parts",
+      "audit 1990",
+      "block 1995",
+      "frames 1989 c1",
+      "frames 1989 c2",
+      "frames 1989 c3",
+      "frames 1989 c4",
+      "frames 1989 c5",
+      "hole 1987 A",
+      "live2 2233 case 1",
+      "live2 2233 case 2",
+      "live2 2233 case 3",
+      "live2 2233 case r6",
+      "live2 2233 case r10",
+      "live2 2233 case r50",
+      "Part Studio 1",
+      "q flat ops",
+      "Sketch audit 1969",
+      "start block",
+      "start block Copy 1",
+      "start block-broken",
+      "start block-fillet",
+      "start boss-block"
      ],
      "fields": [
       {
-       "label": "Search Part Studios",
-       "kind": "string",
-       "text": ""
-      },
-      {
-       "label": "audit 1943 parts",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "audit 1990",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "block 1995",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c4",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "frames 1989 c5",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "hole 1987 A",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 2",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case 3",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r6",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r10",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "live2 2233 case r50",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Part Studio 1 Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "q flat ops",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "Sketch audit 1969",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-broken",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start block-fillet",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start boss-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start bracket",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start chamfer-fillet-block-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start config-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start curves",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start cylinder-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-drawing",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start frame-l",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-sketch",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start hole-types-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start maker-plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start measure-ties",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start overlap Copy 1",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start pin-block-holes",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate (ui)",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start plate-bend",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start ridge",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start sm-box",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start spline-fillet-asm",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start surfaces",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start two-blocks",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start up-to-next",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start vars",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "start wrap-cylinder",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
-      },
-      {
-       "label": "uip-blend-block",
-       "kind": "boolean",
-       "checked": false,
-       "child": false
+       "label": "Name: A \u2192 Z",
+       "kind": "input",
+       "value": ""
       }
-     ],
-     "error": null,
-     "ok": null,
-     "titleState": "ok"
+     ]
     },
     "dialogs": [],
     "panels": [
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / q flat ops / Sketch audit 1969 / start block / start block Copy",
       "inserted": 1,
       "inputs": [
        {
@@ -3969,7 +2457,29 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        60.232927,
+        0,
+        1,
+        0,
+        22.506371,
+        0,
+        0,
+        1,
+        -25.724562,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -3991,7 +2501,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -4055,19 +2565,19 @@
       7.882
      ],
      "eye_mm": [
-      71.467,
-      -23.841,
-      43.061
+      74.52,
+      -29.13,
+      46.586
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 77198,
-   "te": 77198
+   "t": 215422,
+   "te": 215422
   },
   {
    "step": 11,
@@ -4078,13 +2588,13 @@
     }
    },
    "ok": true,
-   "ti": 77198,
-   "tmove": 77232,
+   "ti": 215423,
+   "tmove": 215491,
    "moves": 1,
-   "tdown": 77525,
+   "tdown": 215828,
    "at": [
-    885,
-    92
+    504,
+    93
    ],
    "state": {
     "focus": {
@@ -4177,7 +2687,29 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        60.232927,
+        0,
+        1,
+        0,
+        22.506371,
+        0,
+        0,
+        1,
+        -25.724562,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -4199,7 +2731,7 @@
        ]
       },
       {
-       "name": "Part 3 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -4263,19 +2795,19 @@
       7.882
      ],
      "eye_mm": [
-      71.467,
-      -23.841,
-      43.061
+      74.52,
+      -29.13,
+      46.586
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 79955,
-   "te": 79955
+   "t": 217807,
+   "te": 217808
   },
   {
    "step": 12,
@@ -4284,7 +2816,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 79955,
+   "ti": 217808,
    "state": {
     "focus": {
      "kind": "none"
@@ -4376,43 +2908,21 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
        "name": "Blend block <1>",
        "fixed": false,
        "transform": [
         1,
         0,
         0,
-        50.163728,
+        60.232927,
         0,
         1,
         0,
-        15.036818,
+        22.506371,
         0,
         0,
         1,
-        -28.208712,
+        -25.724562,
         0,
         0,
         0,
@@ -4421,6 +2931,28 @@
       },
       {
        "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -4484,19 +3016,19 @@
       7.882
      ],
      "eye_mm": [
-      71.467,
-      -23.841,
-      43.061
+      74.52,
+      -29.13,
+      46.586
      ],
-     "width_mm": 104.939,
-     "height_mm": 71.963,
-     "mmPerPixel": 0.081222,
+     "width_mm": 125.311,
+     "height_mm": 66.363,
+     "mmPerPixel": 0.074902,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 84664,
-   "te": 84665
+   "t": 370467,
+   "te": 370467
   },
   {
    "step": 13,
@@ -4505,16 +3037,16 @@
     "key": "f"
    },
    "ok": true,
-   "ti": 84665,
+   "ti": 370467,
    "pointer": {
     "at": [
-     885,
-     92
+     504,
+     93
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 84670,
+   "tdown": 370475,
    "state": {
     "focus": {
      "kind": "none"
@@ -4606,43 +3138,21 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
        "name": "Blend block <1>",
        "fixed": false,
        "transform": [
         1,
         0,
         0,
-        50.163728,
+        60.232927,
         0,
         1,
         0,
-        15.036818,
+        22.506371,
         0,
         0,
         1,
-        -28.208712,
+        -25.724562,
         0,
         0,
         0,
@@ -4651,6 +3161,28 @@
       },
       {
        "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -4709,24 +3241,24 @@
       0.866025
      ],
      "target_mm": [
-      44.121,
-      23.664,
-      -2.714
+      47.943,
+      25.765,
+      -2.872
      ],
      "eye_mm": [
-      74.587,
-      -29.104,
-      32.465
+      81.462,
+      -32.291,
+      35.832
      ],
-     "width_mm": 134.242,
-     "height_mm": 92.057,
-     "mmPerPixel": 0.103902,
+     "width_mm": 174.554,
+     "height_mm": 92.442,
+     "mmPerPixel": 0.104336,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 86952,
-   "te": 86952
+   "t": 372601,
+   "te": 372601
   },
   {
    "step": 14,
@@ -4736,7 +3268,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 86952,
+   "ti": 372601,
    "state": {
     "focus": {
      "kind": "none"
@@ -4828,43 +3360,21 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
        "name": "Blend block <1>",
        "fixed": false,
        "transform": [
         1,
         0,
         0,
-        50.163728,
+        60.232927,
         0,
         1,
         0,
-        15.036818,
+        22.506371,
         0,
         0,
         1,
-        -28.208712,
+        -25.724562,
         0,
         0,
         0,
@@ -4873,6 +3383,28 @@
       },
       {
        "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -4931,24 +3463,24 @@
       0.866025
      ],
      "target_mm": [
-      44.121,
-      23.664,
-      -2.714
+      47.943,
+      25.765,
+      -2.872
      ],
      "eye_mm": [
-      74.587,
-      -29.104,
-      32.465
+      81.462,
+      -32.291,
+      35.832
      ],
-     "width_mm": 134.242,
-     "height_mm": 92.057,
-     "mmPerPixel": 0.103902,
+     "width_mm": 174.554,
+     "height_mm": 92.442,
+     "mmPerPixel": 0.104336,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 91197,
-   "te": 91197
+   "t": 525192,
+   "te": 525192
   },
   {
    "step": 15,
@@ -4965,15 +3497,15 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 91197,
-   "tmove": 91652,
+   "ti": 525192,
+   "tmove": 525246,
    "moves": 1,
    "hover": [
     "JF6"
    ],
    "at": [
-    1610,
-    801
+    1496,
+    771
    ],
    "state": {
     "focus": {
@@ -5066,43 +3598,21 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
        "name": "Blend block <1>",
        "fixed": false,
        "transform": [
         1,
         0,
         0,
-        50.163728,
+        60.232927,
         0,
         1,
         0,
-        15.036818,
+        22.506371,
         0,
         0,
         1,
-        -28.208712,
+        -25.724562,
         0,
         0,
         0,
@@ -5111,6 +3621,28 @@
       },
       {
        "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -5169,25 +3701,25 @@
       0.866025
      ],
      "target_mm": [
-      44.121,
-      23.664,
-      -2.714
+      47.943,
+      25.765,
+      -2.872
      ],
      "eye_mm": [
-      74.587,
-      -29.104,
-      32.465
+      81.462,
+      -32.291,
+      35.832
      ],
-     "width_mm": 134.242,
-     "height_mm": 92.057,
-     "mmPerPixel": 0.103902,
+     "width_mm": 174.554,
+     "height_mm": 92.442,
+     "mmPerPixel": 0.104336,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 96191,
-   "te": 96191
+   "t": 529456,
+   "te": 529456
   }
  ],
- "t0_epoch_ms": 1795807996192
+ "t0_epoch_ms": 1795842305280
 }
