@@ -2966,6 +2966,14 @@ impl<'a> Translator<'a> {
     fn query_with(&mut self, k: usize, q: &Value, use_ids: bool) -> Result<Vec<String>, String> {
         // A mate connector by the feature that made it (a Hole's in-feature
         // one): its id may name a face too (prize-wheel-tim).
+        // A cPoint sub-feature's vertex (a Bridging curve's Edge point): ours, before live's id for it, whose point no vertex
+        // of ours holds (c2-surf-workshop-britatap's Side blend curve took the nearest vertex).
+        if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
+            && let Some(f) = q["featureId"].as_str()
+            && self.sub_points.contains_key(f)
+        {
+            return Ok(vec![format!("{SUB_POINT}{f}")]);
+        }
         if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
             && q["bodyType"] == "MATE_CONNECTOR"
             && let Some(f) = q["featureId"].as_str()
@@ -3090,10 +3098,6 @@ impl<'a> Translator<'a> {
         if q["btType"].as_str().is_some_and(|t| t.starts_with("BTMIndividualCreatedByQuery"))
             && let Some(fid) = q["featureId"].as_str()
         {
-            // The feature's own construction point (its cPoint sub-feature's vertex).
-            if self.sub_points.contains_key(fid) {
-                return Ok(vec![format!("{SUB_POINT}{fid}")]);
-            }
             let ours = self.feature_ids.get(fid).cloned().ok_or_else(|| format!("feature {fid} was not built"))?;
             let kind = q["entityType"].as_str().unwrap_or("BODY");
             if q["bodyType"] == "MATE_CONNECTOR" {
