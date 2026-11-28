@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 09:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 09:3x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,12 +35,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 09:2x (start here)
-- QUEUED (lead reports; never poll): eb48c0df, 4562f16f (both fail the list matrix), 826ae5fe (list matrix setup fix),
-  b1d690ee (test memory), then 09:2x the Section view Items fix (fd74228711). Each carries the earlier ones.
+## STATE 11-28 09:3x (start here)
+- QUEUED 654fc768 09:2x (lead reports; never poll): carries eb48c0df, 4562f16f, 826ae5fe (list matrix setup fix),
+  b1d690ee (test memory) and fd74228711 (Section view Items).
 - Section view (fd74228711): dialog fields are ui-script `field:` targets; a Parts list row goes into Items when
   active (selected till ✓), ignored with Section planes active; T1 a_part_row_goes_into_the_section_dialogs_items_field.
-  ps78: section-view-exclude-part, -include-tab-part 7/8 (left: s2 hint, REQUESTS 07:1x); SECTION-VIEW-NEXT-FIELD ticked.
+  ps78: section-view-exclude-part, -include-tab-part 7/8 (s2 hint: live 09:2x: a pick within ~0.6 s keeps it; a take race); SECTION-VIEW-NEXT-FIELD ticked.
+- ps79 (to-verify rows): 12/17; ticked SWEEP-PART-FACE-PROFILE-ADD, MEASURE-READOUT-SKETCH-REGION,
+  FULL-ROUND-EMPTY-FIELDS-RED, LOFT-PROFILE-PICK-SKETCH-REGION, ASM-DIALOG-FLIP-TOGGLE-NAME. Still differ (next):
+  circular-pattern-feature-boss-reapply-ok s14 titleState live ok / ours error; mistake-linear-pattern-feature-boss-
+  reapply s10 live error / ours ok; mistake-sweep-thin-edge-trim-ends + sweep-thin-edge-no-trim-ok s7 Sweep row live
+  error / ours ok (core?); asm-mate-connector-realign s4 focus live "Realign" / ours "Primary axis entity" (ASM-DIALOG-FOCUS).
 - Crate tests now on the Mac slot (NOSHAPE_RB_HOST=mac, /root/psui-scratch/resp/ps75.sh pattern); replays on vibe2.
 - 4562f16f's content: Export remembers individual files; Measure panel reported to ui-parity; no-material notice once
   per measured set; flash_seq toast timers (ps68 rerun 30/30, 124/124; tickets ticked).
@@ -53,9 +58,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Next heaviest are single-window GPU tests ~0.8-0.9 GB each (lavapipe targets); median 0.22 GB.
 - Export left open: Apply export rules live off (REQUESTS 05:3x/06:0x), EXPORT-REMEMBERED-START (Millimeter),
   export-step-spline-part s4 derived tolerances (same remembered class), import toast timing (REQUESTS 04:1x).
-- Section view hint after the plane pick: kept in the overlap takes, cleared in block's; parked, REQUESTS "psui 11-28 07:1x".
-- NEXT: the open psui rows: EXPORT-N-PARTS-DIALOG (left: Apply export rules default, live), PICK-FACE-OVER-NEAR-EDGE
-  (held for REQUESTS 11-27 08:46), the "fixed, to verify" rows (replay each row's takes), next heaviest test memory.
+- NEXT (lead 09:3x): the ps79 diffs above: pattern feature reapply titleState, Sweep thin trim row state, asm Realign
+  focus (rerun: /root/psui-scratch/resp/ps79.sh; JSONs scp from vibe2:tmp/psui/ps79/a). Commit 03593bd589 (tickets +
+  handoff, docs only) is NOT landed: land it with the next change. Then EXPORT-N-PARTS-DIALOG's Apply export rules
+  default (live), PICK-FACE-OVER-NEAR-EDGE (REQUESTS 11-27 08:46).
 - Verified before: ps55 config 7/19; ps56 33/50 681/828; ps57 export 30/38; ps60 custom-deviation, chordal-zero,
   file-name-blank, stl-download match. Left for live: REQUESTS "psui 11-28 01:5x", "04:1x", "05:3x";
   EXPORT-REMEMBERED-START (Units Meter vs live's remembered Millimeter).
