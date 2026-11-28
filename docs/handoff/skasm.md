@@ -1,7 +1,25 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 05:55 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 07:00 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
+
+## NOW (11-28 07:00 UTC)
+- RUNNING (Mac, 07:00): full assembly-ui lib tests for dd0fa834 (bg baco4x8wb, greps AUIDONE). A failure there is a
+  fix-forward before dd0fa834's land result.
+- QUEUED dd0fa834 (07:00; skasm, rebased: tickets d232510a + dd0fa834 "a new mate's row hoverable by name while its
+  dialog is open" = ASM-MATE-ERROR-ROW, ui_script::wrap "mate:<name>" in assembly_view.rs new_mate row; clippy clean on
+  Mac). Earlier QUEUED: 75280e34 (skasm: Q construction, refused dim, alignment hold 8 px =
+  HORIZONTAL-RANGE), 3bb2265e + 643348c2 (skasm-main: spline-face corner = straight side's end, Inference::VertexEnd,
+  "Edge of", Z +z; ops CONNECTOR_DOC/AGENT_API list vertex_end). No results yet.
+- REPLAY queued on vibex8 slot (bg bso2gs426, uipr.sh): rclick-line-circle-menu, horizontal/vertical-key, 19 sketch-used
+  retakes (out ~/tmp/skasm/uip). After the lands: asm replay from a rebased skasm (both fixes) incl.
+  mistake-asm-spline-mate-same-part and the asm-mc-on-spline-face takes (13/21 before).
+- Live REQUESTS filed 06:56 (skasm 11-28 06:5x): offset open-chain 2nd click, batch-6 COINCIDENT entities, spline top
+  corners' Z.
+- Hosts: builds + crate tests on the Mac (rb.sh NOSHAPE_RB_HOST=mac, writes only in ~/noshape-host, CLI only); replays on
+  vibex8 via ~/bin/slot (uipr.sh). Mac clippy shows vendor/gpui-pre-macos deprecation warnings: not ours, filter vendor/.
+- Scripts /root/skasm-scratch/bin: tal.sh (scene + ps-ui sketch ui), tve.sh (assembly + ops refs + clippy), tasmui.sh,
+  tdoc.sh (UPDATE_DOCS coverage; scp mac:noshape-host/agents/<wt>/src/docs/AGENT_API.md back), uipr.sh, used.txt.
 
 ## NOW (11-28 05:55 UTC)
 - LANDING (skasm, re-queued after 29a170e1's handoff rebase conflict): Q on a mixed selection all construction
