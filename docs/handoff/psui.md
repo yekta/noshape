@@ -1,11 +1,13 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 07:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 08:3x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Builds, crate tests and scenario runs on vibe2, one rb.sh at a time: `NOSHAPE_RB_HOST=vibe2 tools/tiers/rb.sh bash -c "$(cat script)"`
+- Crate tests (part-studio-ui, scene, assembly-ui) on the Mac's 6-job slot when free: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh …`
+  (lead 11-28 07:4x; keeps load off vibe2's land queue). App builds and replays stay on vibe2.
+- Builds and scenario runs on vibe2, one rb.sh at a time: `NOSHAPE_RB_HOST=vibe2 tools/tiers/rb.sh bash -c "$(cat script)"`
   (the script exports OCCT_ROOT=/opt/occt CARGO_PROFILE_DEV_DEBUG=line-tables-only TMPDIR=$HOME/tmp/psui); `git diff --name-only origin/main | xargs touch -c` first. ~/bin/slot
   only for suites, gates, timing pairs (DECISIONS 9e5b481d4). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
   `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
@@ -33,13 +35,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 07:2x (start here)
-- QUEUED eb48c0df 06:1x (0868ddd7 + Configure suppression literal label (ops coverage) + Apply export rules to
-  contents). Lead reports; never poll.
-- LANDING (queued 07:2x): 273ce0428b Export remembers Export unique parts as individual files (lead approved) +
-  b42e63ddf5 Measure panel reported to ui-parity / no-material notice once per measured set / flash_seq toast timers.
-  ps68 rerun: 30/30 measure+mass takes, 124/124 states, clippy clean. TICKETS MEASURE-BRACKET-KEY,
-  MASS-PROPERTIES-ADD-PART-FOCUS ticked; SECTION-VIEW-EDGE-PIXEL-SIDE filed.
+## STATE 11-28 08:3x (start here)
+- QUEUED eb48c0df 06:1x, 4562f16f 07:2x: both FAIL part-studio-ui's the_feature_list_matrix_matches_live (rows
+  "menu / configured suppression", "rolled back under Sketch 1": their Checkbox-only setup got the new "Configure
+  suppression with Checkbox 1" label). Fixed in the test setup (live's cov-dm-config: List first; Mac run passes);
+  LANDING 08:3x with everything above it. Lead told 08:1x.
+- 4562f16f's content: Export remembers individual files; Measure panel reported to ui-parity; no-material notice once
+  per measured set; flash_seq toast timers (ps68 rerun 30/30, 124/124; tickets ticked).
+- ps69 maker set: 7/13 match; the 6 that differ all have TICKETS rows (SKETCH-COINCIDENT-FREE-LINE-SLIDES,
+  SKETCH-TANGENT-ARC-SPAN (skasm), SKETCH-DIM-CIRCLE-RIM-TOP (psui, waits REQUESTS 11-27 20:4x), UIP-COMPARE-*,
+  extrude-offset-ring recorder owner). Nothing new.
+- TEST MEMORY (P2; earlyoom killed part-studio-ui tests at 5.2-5.4 GB on vibe2 11-27): ps70 on vibe2: whole binary
+  maxrss 3.75 GB; per test (690): the_dimension_tool_takes_the_hovered_line 3.2 GB (8 windows never closed), then
+  dialogs matrix 1.4, sketch tools matrix 1.2, line_end_dot 1.2; GPU tests ~0.8-0.9 GB each, median 0.22 GB.
+  Fix uncommitted in /root/psui-scratch/resp/close-windows.patch (`git apply` it): close_windows(cx) helper in
+  sketch_ui_tests.rs, called per case in those 4 tests. Next: Mac run of the 4 tests, then ps70-style RSS of them on
+  vibe2 (Linux numbers), commit, land.
 - Export left open: Apply export rules live off (REQUESTS 05:3x/06:0x), EXPORT-REMEMBERED-START (Millimeter),
   export-step-spline-part s4 derived tolerances (same remembered class), import toast timing (REQUESTS 04:1x).
 - Section view hint after the plane pick: kept in the overlap takes, cleared in block's; parked, REQUESTS "psui 11-28 07:1x".
