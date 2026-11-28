@@ -33,27 +33,31 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 06:2x (start here)
-- QUEUED 0868ddd7 (batch 10 code, export caret fixes, TICKETS ticks); landing now on top of it: 8578e2519f (Configure
-  suppression's literal label: 0868ddd7's format! label broke ops coverage::every_menu_item_is_listed, "stale
-  partStudio:Configure suppression") and 573dfc35e8 (Apply export rules to contents: ops `apply_rules` default on,
-  remembered, op param `apply_export_rules`, dialog row under ticked individual files + View export rules link; entry
-  names unchanged until live answers REQUESTS "psui 11-28 05:3x"). ps64: clippy, coverage, export, config tests ok.
-- ps62 replays: export-stl-download match; export-parts-three-individual-files: live reopens Export with "individual
-  files" STILL ticked (s16/17) against DECISIONS 11-27 "not remembered" (our T1
-  export_remembers_its_choices_but_not_individual_files cites this very take); live's Apply export rules starts off
-  there (account remembered?). Asked REQUESTS "psui 11-28 06:0x"; decision needed from the lead before changing.
-  export-parts-two-selected: Millimeter vs Meter = EXPORT-REMEMBERED-START.
-- NEXT: ps65 (/root/psui-scratch/resp/ps65.sh: build + replay measure-panel-spline-face (MEASURE-BRACKET-KEY: Part
-  Studio has a MeasureTool handler toggling ui.measure_pinned, yet the take's `[` opened nothing), mistake-section-view-
-  pick-edge (live: an edge click in Section planes gives "Section plane 1 (Top)"), mass-properties-add-part,
-  export-step-spline-part), then the maker set, test-memory P2, remaining batch 8/9 rows.
+## STATE 11-28 07:0x (start here)
+- QUEUED eb48c0df 06:1x (carries 0868ddd7 + 8578e2519f Configure suppression literal label (fixes ops coverage) +
+  573dfc35e8 Apply export rules to contents). Lead reports; never poll.
+- COMMITTED, not landed: "psui: Export remembers Export unique parts as individual files, as live" (lead 06:2x
+  approved; DECISIONS corrected by the lead). ps67: export-parts-three-individual-files 17/23 (left: Apply export rules
+  live off = account-remembered?, REQUESTS 06:0x; import toast timing), export-stl-y-up/doc-tab-menu-export/stl-download
+  match; -two-selected, -asm-instances-stl Millimeter = EXPORT-REMEMBERED-START; export-step-spline-part s4 derived
+  tolerances live true = same remembered class (left open).
+- UNCOMMITTED (verify, then commit + land):
+  (1) Part Studio Measure panel reported to ui-parity: ui.measure_panel_state (dialog + measure) set in
+      render_measure_panel via measure_panel_ui_state (menus.rs), read in ui_script.rs; run.py old_reader_measure_panel
+      for 11-07 takes. ps68: measure-panel-spline-face MATCH (MEASURE-BRACKET-KEY: was recorder-only; tick it),
+      28/30 measure+mass takes; key-bracket-measure matches with the normalizer (local --compare-only).
+  (2) No-material notice once per session AND measured set (NO_MATERIAL_SHOWN: Mutex<Vec<Vec<BodyId>>>,
+      first_notice_for + T1 no_material_notice_once_per_measured_set; ui.material_checked guards per-frame work).
+  (3) flash_for timers carry ui.flash_seq so an earlier identical toast's timer doesn't hide a later one (the cause of
+      mass-properties-add-part s5 null). Not yet built: rerun ps68 (/root/psui-scratch/resp/ps68.sh) to confirm
+      mass-properties-add-part 6/6, clippy clean; then commit (TICKETS: tick MEASURE-BRACKET-KEY and
+      MASS-PROPERTIES-ADD-PART-FOCUS's s5 message; new row SECTION-VIEW-EDGE-PIXEL-SIDE already added, uncommitted).
+- NEXT: ps69 (/root/psui-scratch/resp/ps69.sh: build + the 13 maker-* takes = "the maker set"; earlier survey: maker-
+  select-tangent-connected-used s8, maker-select-used-click-shift s11-12 "Confirm Sketch 2"), test-memory P2,
+  remaining batch 8/9 rows.
 - Verified before: ps55 config 7/19; ps56 33/50 681/828; ps57 export 30/38; ps60 custom-deviation, chordal-zero,
   file-name-blank, stl-download match. Left for live: REQUESTS "psui 11-28 01:5x", "04:1x", "05:3x";
   EXPORT-REMEMBERED-START (Units Meter vs live's remembered Millimeter).
-- NEXT: export-step-spline-part s4 ("Include derived tolerances in export" live true / ours false: remembered or
-  default?), ps47 open items (mistake-section-view-pick-edge s2, mass-properties-add-part s5 message,
-  MEASURE-BRACKET-KEY), the maker set, test-memory P2, remaining batch 8/9 rows.
 - Diff per state: scp 'vibe2:tmp/psui/psNN/a/*.json' /root/psui-scratch/psNN/, then
   `python3 /root/psui-scratch/bin/alldiffs.py /root/psui-scratch/psNN <names…>`.
 - Commit-order lesson: cherry-picking TICKETS commits onto a newer main union-merges qa's rows twice: grep each ticked
