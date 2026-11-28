@@ -11906,8 +11906,9 @@ fn a_start_sketch_on_a_plane_feature() {
 #[test]
 fn the_depth_batch_starts_are_lives() {
     let starts: Value = serde_json::from_str(include_str!("../../../tests/ui-parity/starts.json")).unwrap();
-    // spline-fillet-asm: within 1.5 mm³ only under SPLINE-FILLET-ASM-R2-END (docs/TICKETS.md: ours 28328.537); back to 1e-3 when fixed.
-    for (start, sketch, volume, tol) in [("ridge", "Sketch 1", 5520.0, 1e-3), ("up-to-next", "Sketch 2", 12000.0, 1e-3), ("pin-block-holes", "Sketch 3", 59287.611, 1e-3), ("spline-fillet-asm", "Sketch 1", 28329.612, 1.5)] {
+    // spline-fillet-asm: live's evVolume 28328.628 (its 28329.612 was massproperties' nominal, ±0.08 %); within 0.1 mm³ only
+    // under SPLINE-FILLET-ASM-R2-END (docs/TICKETS.md: ours 28328.537); back to 1e-3 when fixed.
+    for (start, sketch, volume, tol) in [("ridge", "Sketch 1", 5520.0, 1e-3), ("up-to-next", "Sketch 2", 12000.0, 1e-3), ("pin-block-holes", "Sketch 3", 59287.611, 1e-3), ("spline-fillet-asm", "Sketch 1", 28328.628, 0.1)] {
         let mut ctx = Ctx::new();
         let path = scratch(&format!("start-{start}.noshape"));
         noshape_ops::ui_parity::build_start(&mut ctx, &path, &starts[start]).unwrap();

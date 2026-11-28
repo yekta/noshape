@@ -7,7 +7,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 ## live 11-27 18:5x: the depth batch 7 start spline-fillet-asm
 
-- [ ] P2 **SPLINE-FILLET-ASM-R2-END (core)** (live 11-27, start "spline-fillet-asm" in tests/ui-parity/starts.json, e2e `the_depth_batch_starts_are_lives`): Part 1 is a 40x30 profile closed by a 3-point fit spline (40,0) (52,15) (40,30), extruded 20, Fillet 1 R4 on the two left vertical edges, Fillet 2 R2 on the spline's top edge (through 52,15,20). Our Part 1 is 28328.537 mm³, live 28329.612: the R2 fillet along the spline ends 1.08 mm³ short of live. The e2e compares it within 1.5 mm³ under this ticket; tighten it back to 1e-3 when fixed.
+- [ ] P2 **SPLINE-FILLET-ASM-R2-END (core)** (live 11-27, start "spline-fillet-asm" in tests/ui-parity/starts.json, e2e `the_depth_batch_starts_are_lives`): Part 1 is a 40x30 profile closed by a 3-point fit spline (40,0) (52,15) (40,30), extruded 20, Fillet 1 R4 on the two left vertical edges, Fillet 2 R2 on the spline's top edge (through 52,15,20). Our Part 1 is 28328.537 mm³; live's evVolume is 28328.628 (live 11-27 23:0x: the 28329.612 first taken was massproperties' nominal, band ±0.08 %), so ours is 0.091 mm³ under. Per face (mm²) ours = live but the R2 fillet face 125.439 (live 125.449) and the top 1337.926 (live 1337.915): the fillet's top contact or its ends sit a hair off. The e2e compares within 0.1 mm³ under this ticket; tighten it back to 1e-3 when fixed.
 
 ## qa 11-28 00:0x: live's depth batch 9, the part's look and data (63e843e5a, 49 takes: appearances, materials, Part properties, rename, Hide/Show/Isolate) on green b497dda05: 20/49 scenarios, 398/538 states; part_data not compared (ours has none)
 
