@@ -265,7 +265,7 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
     }
     // Resolution › Custom's fields (live 1745): STL's three, their lengths
     // in the STL units, then the other mesh formats' three.
-    let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).default_value(custom_text(&st.borrow(), f))))).collect());
+    let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(custom_text(&st.borrow(), f))))).collect());
     // A field that isn't a number disables Export (live: no message).
     let invalid = Rc::new(std::cell::Cell::new(false));
     for (f, (_, input)) in CUSTOM_FIELDS.iter().zip(custom.iter()) {
@@ -473,7 +473,7 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
                     .child(div().flex_1())
                     .child(div().size(px(16.)).rounded_full().bg(gpui_kit::rgb(0x555555)).flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child("?")),
             )
-            .child(
+            .child(crate::ui_script::mark(
                 div()
                     .debug_selector(|| "ex-file".into())
                     .mt(px(INPUT_MT))
@@ -486,7 +486,8 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
                     .rounded(px(4.))
                     .bg(pal.panel)
                     .child(Input::new(&file).appearance(false).text_size(px(14.))),
-            )
+                || "field:File name".to_string(),
+            ))
             .when(empty, |d| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child("Valid file name is required.")))
             .when(f == PartFormat::Obj, |d| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("(OBJ names using spaces may not be supported by other systems)")));
         let mut prev_check = false;

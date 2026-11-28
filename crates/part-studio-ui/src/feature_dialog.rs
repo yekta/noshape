@@ -2443,9 +2443,9 @@ impl FeatureDialog {
         self.status.clone()
     }
 
-    /// An applied number of the wrong type: the title and the feature's row are red (live).
+    /// A committed number of the wrong type ("10 deg" for a depth): no undo step (live).
     pub fn has_invalid_value(&self) -> bool {
-        self.applied_value_error().is_some() || self.eval_errors(|_, typed| typed.to_string()).next().is_some()
+        self.eval_errors(|_, text| text.to_string()).next().is_some()
     }
 
     /// A menu item's click leaves the keyboard outside the dialog (live ui-parity dialog-query-rclick-clear-all: after

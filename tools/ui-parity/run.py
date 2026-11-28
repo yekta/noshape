@@ -450,11 +450,11 @@ UNIT_NAMES = {"Centimeter", "Foot", "Inch", "Meter", "Millimeter", "Yard"}
 
 def export_fields_by_label(state):
     """The Export modal's fields by label, once each, on both sides: live's recorder reads them in page order, which
-    puts STL's own fields before File name and lists a mesh format's Resolution twice (export-format-stl, -3mf). The
+    puts STL's own fields before File name (in "Export 2 Parts" too) and lists a mesh format's Resolution twice (export-format-stl, -3mf). The
     same for Export as DXF/DWG, whose units list the 11-10 recorder reads first and labels "Use workspace units" after
     the checkbox above it (face-rclick-export-dxf; the 11-06 one, sketch-row-menu-export-dxf: in order, "Units")."""
     d = (state or {}).get("dialog")
-    if isinstance(d, dict) and d.get("title") in ("Export", "Export as DXF/DWG") and isinstance(d.get("fields"), list) and all(isinstance(f, dict) for f in d["fields"]):
+    if isinstance(d, dict) and (d.get("title") in ("Export", "Export as DXF/DWG") or re.fullmatch(r"Export \d+ Parts", str(d.get("title")))) and isinstance(d.get("fields"), list) and all(isinstance(f, dict) for f in d["fields"]):
         seen = []
         for f in d["fields"]:
             if d["title"] == "Export as DXF/DWG" and f.get("kind") == "select" and f.get("value") in UNIT_NAMES:
@@ -1386,6 +1386,19 @@ def insert_as_panel(state):
     return state
 
 
+def clicked_caret(a, b, step):
+    """A click on a text field leaves a caret where the pointer landed in its text: a caret on both sides in the same
+    text reads as live's (export-stl-custom-deviation: live [0, 0], ours where the field's centre falls)."""
+    on = (step or {}).get("on")
+    fa, fb = (a or {}).get("focus"), (b or {}).get("focus")
+    if not ((step or {}).get("do") == "click" and isinstance(on, dict) and "field" in on and isinstance(fa, dict) and isinstance(fb, dict)):
+        return b
+    sa, sb = fa.get("selection"), fb.get("selection")
+    if fa.get("text") == fb.get("text") and isinstance(sa, list) and isinstance(sb, list) and len(sa) == len(sb) == 2 and sa[0] == sa[1] and sb[0] == sb[1]:
+        fb["selection"] = sa
+    return b
+
+
 def old_reader_variables(a, b):
     """Live's older recorder (states with no `configurations`) read no Part Studio configuration: `variables` null
     outside a Variable Studio. Ours' Part Studio read with no variable table reads null against it."""
@@ -1417,6 +1430,11 @@ def runner_names(state, start, live_side):
     """A panel's text naming the runners' own documents (asm-menu-change-configuration, -change-to-version): live2's
     document ("noshape ui parity live2-1") and ours (the start's name) read alike, and live2's Part Studio, which its
     runner names after the start, as ours' "Part Studio 1"."""
+    # The export bubble names the Part Studio: live2's copy of the start ("start block Copy 2 - Part 1 is being
+    # prepared…", export-stl-download), ours' "Part Studio 1".
+    msg = (state or {}).get("message")
+    if live_side and start and isinstance(msg, str):
+        state["message"] = re.sub(rf"^start {re.escape(start)}( Copy \d+)? - ", "Part Studio 1 - ", msg)
     d = (state or {}).get("dialog")
     if not (isinstance(d, dict) and start):
         return state
@@ -1648,6 +1666,7 @@ def compare(live, ours, whole_document=True):
         b = picker_as_read(b, picker_read)
         b = mass_within_variance(a, b)
         b = old_reader_variables(a, b)
+        b = clicked_caret(a, b, step)
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
         a, b = export_fields_by_label(a), export_fields_by_label(b)
