@@ -1175,13 +1175,28 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   ShapeAncMap ve, ef2;
   unique_ancestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_VERTEX, TopAbs_EDGE, ve);
   unique_ancestors(sc != nullptr ? TopoDS_Shape(where2) : r, TopAbs_EDGE, TopAbs_FACE, ef2);
+  // (Or a curve within 1e-7 m of its chord, as the chord: gamma's Boolean 2 keeps 20 um of a 12 mm round past where
+  // it meets a 52 mm line between the same two planes, 1.7e-8 m off it; live's edge is one line.)
   auto line_of = [](const TopoDS_Edge& e, gp_Lin& lin) {
-    TopLoc_Location loc;
-    double          f, l;
-    const occ::handle<Geom_Line> c = occ::down_cast<Geom_Line>(BRep_Tool::Curve(e, loc, f, l));
-    if (c.IsNull())
+    TopLoc_Location                loc;
+    double                         f, l;
+    const occ::handle<Geom_Curve>  g = BRep_Tool::Curve(e, loc, f, l);
+    const occ::handle<Geom_Line>   c = occ::down_cast<Geom_Line>(g);
+    if (!c.IsNull())
+    {
+      lin = c->Lin().Transformed(loc.Transformation());
+      return true;
+    }
+    if (g.IsNull())
       return false;
-    lin = c->Lin().Transformed(loc.Transformation());
+    const gp_Pnt a = g->Value(f), b = g->Value(l);
+    if (a.Distance(b) <= 1e-7)
+      return false;
+    const gp_Lin chord(a, gp_Dir(gp_Vec(a, b)));
+    for (int i = 1; i < 16; ++i)
+      if (chord.Distance(g->Value(f + (l - f) * i / 16)) > 1e-7)
+        return false;
+    lin = chord.Transformed(loc.Transformation());
     return true;
   };
   auto planar_faces_of = [&](const TopoDS_Shape& e) {

@@ -608,6 +608,30 @@ fn crescents_where_two_holes_meet_five_microns_off_centre_are_gone() {
     assert!(u.is_valid() && (u.volume().unwrap() - v).abs() < 1e-6 * v, "{}", u.volume().unwrap());
 }
 
+/// A block with a 12 mm round fused with a box whose top runs 20 um past the round's tangent line (c2-gamma-imported's
+/// Boolean 2): the 20 um of the round's circle on the side, 1.7e-8 m off the top's line, joins it as one straight
+/// edge, as live's (no vertex where the round begins).
+#[test]
+fn a_round_twenty_microns_under_a_flat_top_joins_its_line() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec2::new(x, y) * mm;
+    let segs = [
+        Segment2d::Line { a: p(-52.0, -30.0), b: p(12.0, -30.0) },
+        Segment2d::Line { a: p(12.0, -30.0), b: p(12.0, -12.0) },
+        Segment2d::Arc { center: p(0.0, -12.0), radius: 12.0 * mm, start_angle: 0.0, end_angle: PI / 2.0 },
+        Segment2d::Line { a: p(0.0, 0.0), b: p(-52.0, 0.0) },
+        Segment2d::Line { a: p(-52.0, 0.0), b: p(-52.0, -30.0) },
+    ];
+    let side = make_face_2d(&Plane::xy(), &segs, &[]).unwrap();
+    let a = extrude(&side, DVec3::Z * 10.0 * mm).unwrap().shape;
+    let b = make_box_corners(DVec3::new(-52.0, -5.0, 0.0) * mm, DVec3::new(0.02, 0.0, 10.0) * mm).unwrap();
+    let u = unify_same_domain(&fuse(&a, &b).unwrap().shape).unwrap().shape;
+    let at_tangent: Vec<DVec3> = u.vertices().iter().filter_map(|v| v.vertex_point().ok()).filter(|q| q.x.abs() < 0.1 * mm && q.y.abs() < 1e-3 * mm).collect();
+    assert!(at_tangent.iter().all(|q| q.x > 0.01 * mm), "{at_tangent:?}");
+    assert!(u.is_valid());
+}
+
 /// A circular pattern's tools (one shape placed at each step: group_disjoint checks the first one against the rest):
 /// overlapping neighbours stay apart, neighbours apart share a group, and the cut is the one with each tool copied.
 #[test]
