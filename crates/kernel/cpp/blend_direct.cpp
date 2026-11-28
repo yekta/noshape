@@ -1478,6 +1478,29 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
           }
         }
       }
+      // A curve on a face whose parameter doesn't follow the line's (a plane's circle on a cylinder running the other
+      // way round, its seam on the face's edge): projected again, by its points' feet, each from the last (GeomProjLib's
+      // starts on the seam at 2 pi and stays there: 3.5 mm off in three_rounds_at_a_box_corner_meet_in_a_sphere).
+      for (occ::handle<Geom2d_Curve>* c2 : {&la, &lb})
+      {
+        const occ::handle<Geom_Surface> sf  = BRep_Tool::Surface(c2 == &la ? a : bface);
+        bool                            off = false;
+        for (const double w : {0.25, 0.5, 0.75})
+        {
+          const double   t  = c3->FirstParameter() + w * (c3->LastParameter() - c3->FirstParameter());
+          const gp_Pnt2d uv = (*c2)->Value(t);
+          off               = off || sf->Value(uv.X(), uv.Y()).Distance(c3->Value(t)) > 1e-6 * size;
+        }
+        if (!off)
+          continue;
+        if (dbg)
+          std::fprintf(stderr, "  line %d: its curve on the %s face strays: projected again\n", n, c2 == &la ? "part's" : "blend's");
+        *c2 = curve_by_feet(c3, c3->FirstParameter(), c3->LastParameter(), sf, 1e-6 * size);
+        if (c2->IsNull())
+          *c2 = GeomProjLib::Curve2d(c3, c3->FirstParameter(), c3->LastParameter(), sf);
+        if (c2->IsNull())
+          return false;
+      }
       const double f = c3->FirstParameter(), l = c3->LastParameter();
       const occ::handle<Geom2d_Curve> ca = da.into_period(la, f, l), cb = db.into_period(lb, f, l);
       // Its pieces inside both faces: split where it crosses either's boundary (the second's first: a blend's boundary

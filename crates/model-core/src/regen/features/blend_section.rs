@@ -2622,6 +2622,75 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             *own = !at_middle;
         }
     }
+    // Corners three of the chain's edges meet at, each straight and convex between planes, three faces in all: the ball
+    // touching the three (live's sphere there, c2-curve-pattern-composite's Fillet 2 at its box's corners), each edge's
+    // round ending on the plane through it square to the edge, and the corner's tool (from the vertex to the ball, less
+    // the ball) fused into its first edge's. Any other corner of three or more edges: declined.
+    let mut corners: Vec<(DVec3, DVec3, usize)> = Vec::new();
+    let mut corner_tools: Vec<Shape> = Vec::new();
+    // (How far along each edge the corners' balls reach: two on one edge may meet but not pass, live's all 12 edges of a
+    // 10-tall box R6 failing.)
+    let mut taken = vec![0.0; chain.len()];
+    for q in chain.iter().flat_map(|c| [c.start, c.end]) {
+        if corners.iter().any(|(v, ..)| near(*v, q)) {
+            continue;
+        }
+        let at: Vec<usize> = chain.iter().enumerate().filter(|(_, c)| near(c.start, q) || near(c.end, q)).map(|(i, _)| i).collect();
+        if at.len() < 3 {
+            continue;
+        }
+        let mut fs: Vec<usize> = at.iter().flat_map(|&i| edges[i].faces).collect();
+        fs.sort_unstable();
+        fs.dedup();
+        if at.len() != 3 || fs.len() != 3 || at.iter().any(|&i| !edges[i].straight || !edges[i].convex) || fs.iter().any(|&f| !faces[f].is_planar()) {
+            return Err(fail("rounds meeting three at a corner"));
+        }
+        let normals = fs.iter().map(|&f| faces[f].normal_at_point(q)).collect::<Result<Vec<_>, _>>()?;
+        let m = glam::DMat3::from_cols(normals[0], normals[1], normals[2]).transpose();
+        if m.determinant().abs() < 1e-6 {
+            return Err(fail("rounds meeting three at a corner"));
+        }
+        let centre = q + m.inverse() * DVec3::splat(-r);
+        if !shape.classify_point(centre, scale * 1e-9).is_ok_and(|k| k == k::PointClass::Inside) {
+            return Err(fail("rounds meeting three at a corner"));
+        }
+        let foot = |f: usize| centre + normals[fs.iter().position(|&g| g == f).unwrap_or(0)] * r;
+        // Each edge's point on the plane through the ball square to it.
+        let mut on_edge = [DVec3::ZERO; 3];
+        for (k, &i) in at.iter().enumerate() {
+            let far = if near(chain[i].start, q) { chain[i].end } else { chain[i].start };
+            let d = (far - q).normalize();
+            let s = (centre - q).dot(d);
+            taken[i] += s;
+            if s <= 0.0 || s >= (far - q).length() || taken[i] > (far - q).length() * (1.0 + 1e-9) {
+                return Err(fail("rounds meeting three at a corner"));
+            }
+            on_edge[k] = q + d * s;
+        }
+        let quad = |pts: [DVec3; 4]| -> FResult<Shape> {
+            let sides = (0..4).map(|k| k::make_line(pts[k], pts[(k + 1) % 4])).collect::<Result<Vec<_>, _>>()?;
+            Ok(k::make_face_from_wire(&k::make_wire(&sides)?, true)?)
+        };
+        let mut sides = Vec::new();
+        for (k, &i) in at.iter().enumerate() {
+            let [a, b] = edges[i].faces;
+            sides.push(quad([on_edge[k], foot(a), centre, foot(b)])?);
+            // The face the edge ends on, holding the other two.
+            let opp = fs.iter().copied().find(|f| !edges[i].faces.contains(f)).ok_or_else(|| fail("rounds meeting three at a corner"))?;
+            let others: Vec<usize> = (0..3).filter(|&o| o != k).collect();
+            sides.push(quad([q, on_edge[others[0]], foot(opp), on_edge[others[1]]])?);
+        }
+        let cell = k::sew(&sides, scale * 1e-9, true)?.shape;
+        if !cell.volume().is_ok_and(|v| v > 0.0) {
+            return Err(fail("rounds meeting three at a corner"));
+        }
+        // (Its poles and seam a quarter turn and more from the corner: no edge of theirs across the patch, live's.)
+        let toward = (q - centre).normalize();
+        let ball = k::make_sphere(&k::Plane::new(centre, toward.any_orthonormal_vector(), -toward), r, std::f64::consts::TAU)?;
+        corner_tools.push(k::cut(&cell, &ball)?.shape);
+        corners.push((q, centre, at[0]));
+    }
+    let corner_at = |q: DVec3| corners.iter().find(|(v, ..)| near(*v, q)).map(|(_, c, _)| *c);
     // The ball at a chain vertex shared by two edges; None at a free end. On `own`: the edges there, forked for the edge
     // asking (both edges ask, each on its thread: one support's last foot shared made c2-surf-workshop-knifehandle's
     // Fillet 2 tip run-on stop a step short in one regeneration in five).
@@ -2657,7 +2726,7 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         halt()?;
         let ends = [junction(own, c.start)?, junction(own, c.end)?];
         let outs = [-tangent_dir(c, true)?, tangent_dir(c, false)?];
-        let rolls_on = |end: usize| e.convex && ends[end].is_none() && !tangent_continues(shape, if end == 0 { c.start } else { c.end }, outs[end], c.index);
+        let rolls_on = |end: usize| e.convex && ends[end].is_none() && corner_at(if end == 0 { c.start } else { c.end }).is_none() && !tangent_continues(shape, if end == 0 { c.start } else { c.end }, outs[end], c.index);
         let rolls_on_free = |q: DVec3| (near(q, c.start) && ends[0].is_none()) || (near(q, c.end) && ends[1].is_none());
         if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
             eprintln!("ball edge {}: convex {} straight {} {:?} -> {:?} junctions {} {} rolls on {} {}", c.index, e.convex, e.straight, c.start * 1e3, c.end * 1e3, ends[0].is_some(), ends[1].is_some(), rolls_on(0), rolls_on(1));
@@ -2692,13 +2761,15 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 }
             }
             // From the ball at its start to the one at its end (a junction's ball off the vertex's plane).
-            let s0 = match &ends[0] {
-                Some(j) => (j.0 - c.start).dot(d),
-                None => -ext[0],
+            let s0 = match (&ends[0], corner_at(c.start)) {
+                (Some(j), _) => (j.0 - c.start).dot(d),
+                (None, Some(centre)) => (centre - c.start).dot(d),
+                (None, None) => -ext[0],
             };
-            let s1 = match &ends[1] {
-                Some(j) => (j.0 - c.start).dot(d),
-                None => (c.end - c.start).dot(d) + ext[1],
+            let s1 = match (&ends[1], corner_at(c.end)) {
+                (Some(j), _) => (j.0 - c.start).dot(d),
+                (None, Some(centre)) => (centre - c.start).dot(d),
+                (None, None) => (c.end - c.start).dot(d) + ext[1],
             };
             let (first, _) = match &ends[0] {
                 Some(j) => ball_section_as(j, ball(c.start + d * s0)?.1, &e.sup, r, kind)?,
@@ -2812,9 +2883,39 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             })
         };
         let end_planes = [end_plane(c.start, outs[0]), end_plane(c.end, outs[1])];
+        // (An end at a junction's ball: the stations run to where that ball's plane crosses the edge, not to the vertex:
+        // c2-curve-pattern-composite's R10 round over an R20 turn met its junction's ball short of the vertex, and the
+        // loft doubled back over its last stations, its sides 0.3 mm past the turn's tangent line.)
+        let reach = |j: &(DVec3, [DVec3; 2]), from: f64| -> f64 {
+            let g = |f: f64| at(f).map(|(p, t)| (j.0 - p).dot(t));
+            let (mut a, mut b) = (from, if from < 0.5 { from + 0.01 } else { from - 0.01 });
+            let (Ok(mut ga), Ok(mut gb)) = (g(a), g(b)) else { return from };
+            for _ in 0..40 {
+                if (gb - ga).abs() < 1e-300 {
+                    break;
+                }
+                let next = b - gb * (b - a) / (gb - ga);
+                if !next.is_finite() || (next - from).abs() > 0.5 {
+                    return from;
+                }
+                let Ok(gn) = g(next) else { return from };
+                (a, ga, b, gb) = (b, gb, next, gn);
+                if gb.abs() < scale * 1e-12 {
+                    return b;
+                }
+            }
+            from
+        };
+        let (f0, f1) = match closed {
+            true => (0.0, 1.0),
+            false => (ends[0].as_ref().map_or(0.0, |j| reach(j, 0.0)), ends[1].as_ref().map_or(1.0, |j| reach(j, 1.0))),
+        };
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() && (f0 != 0.0 || f1 != 1.0) {
+            eprintln!("ball loft: edge {} stations from {f0:.4} to {f1:.4} of it (junction balls)", c.index);
+        }
         for k in 0..if closed { n } else { n + 1 } {
             halt()?;
-            let f = if closed { (k as f64 / n as f64 + 0.25).fract() } else { k as f64 / n as f64 };
+            let f = if closed { (k as f64 / n as f64 + 0.25).fract() } else { f0 + (f1 - f0) * k as f64 / n as f64 };
             let (p, t) = at(f)?;
             // (At a free end on a plane nearly square to the edge, the ball in that plane: the round ends on it, not a
             // few um off it, c2-surf-workshop-knifehandle's blade end at x 15.4.)
@@ -2995,6 +3096,10 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             }),
         })
         .collect::<FResult<Vec<_>>>()?;
+    let mut tools = tools;
+    for ((_, _, first), corner) in corners.iter().zip(corner_tools) {
+        tools[*first] = k::fuse(&tools[*first], &corner)?.shape;
+    }
     // (A concave round wider than a ledge its face is: trimmed by the wall the ledge drops off at, as live's.)
     let tools = tools.into_iter().zip(edges.iter()).map(|(t, e)| if e.convex { Ok(t) } else { trim_by_walls(t.clone(), ledge_walls(shape, ef, e, faces, &t, scale)?.iter(), r) }).collect::<FResult<Vec<_>>>()?;
     let conics = edges.iter().flat_map(|e| plane_cylinder_contacts(&e.sup, r)).collect();
@@ -5861,6 +5966,74 @@ mod tests {
         let area: f64 = (0..n).map(|i| 3.0 + (i as f64 + 0.5) / n as f64).map(|x| 3.5 - (1.5f64.powi(2) - (x - 4.5).powi(2)).sqrt() - 2.0).sum::<f64>() / n as f64;
         let v = tools[0].volume().unwrap();
         assert!((v - area * 10.0).abs() < 1e-4, "{v} vs {}", area * 10.0);
+    }
+
+    /// The three edges of a box's corner rounded 5 (c2-curve-pattern-composite's Fillet 2, live's): each round ends on
+    /// the plane through the corner's ball square to its edge, and the corner is that ball's eighth.
+    #[test]
+    fn three_rounds_at_a_box_corner_meet_in_a_sphere() {
+        let body = k::make_box_corners(DVec3::ZERO, DVec3::new(40.0, 30.0, 20.0)).unwrap();
+        let corner = DVec3::new(40.0, 30.0, 20.0);
+        let at: Vec<usize> = (0..body.count(ShapeType::Edge))
+            .filter(|&i| body.sub_shape(ShapeType::Edge, i).unwrap().edge_info().is_ok_and(|f| [f.start, f.end].iter().any(|q| (*q - corner).length() < 1e-9)))
+            .collect();
+        assert_eq!(at.len(), 3);
+        let chain = chain_ordered(&body, &at, true).unwrap();
+        let scale = body.bounding_box(false).unwrap().diagonal();
+        let (tools, _) = ball_tools(&body, &chain, &body.edge_faces().unwrap(), &body.faces(), (5.0, Section::Circular, false), scale, None).unwrap();
+        let rims: Vec<Shape> = chain.iter().map(|c| c.shape.clone()).collect();
+        let made = k::blend_direct(&body, &tools, &rims).unwrap().shape;
+        assert!(made.is_valid());
+        let r: f64 = 5.0;
+        let pi = std::f64::consts::PI;
+        let removed = (1.0 - pi / 4.0) * r * r * (40.0 + 30.0 + 20.0 - 3.0 * r) + r.powi(3) * (1.0 - pi / 6.0);
+        let v = made.volume().unwrap();
+        assert!((v - (24000.0 - removed)).abs() < 1e-6, "{v} vs {}", 24000.0 - removed);
+        let faces = made.faces();
+        assert_eq!(faces.len(), 10);
+        let spheres: Vec<f64> = faces.iter().filter(|f| matches!(f.face_surface(), Ok(k::Surface::Sphere { .. }))).map(|f| f.area().unwrap()).collect();
+        assert_eq!(spheres.len(), 1);
+        assert!((spheres[0] - pi * r * r / 2.0).abs() < 1e-6, "{spheres:?}");
+    }
+
+    /// A round over a slanted end across an R20 turn between two planes (c2-curve-pattern-composite's Fillet 2): the
+    /// turn's junction balls lie short of its vertices, and the loft between them ends on them without doubling back, so
+    /// the direct build takes it.
+    #[test]
+    fn a_round_over_a_slanted_end_across_a_turn_builds_directly() {
+        // The block's section in x = 0: y 0..40, z 0..30, its y = 0, z = 30 corner turned R20; 100 long.
+        let p = |y: f64, z: f64| DVec3::new(0.0, y, z);
+        let segs = [
+            k::make_line(p(40.0, 0.0), p(40.0, 30.0)).unwrap(),
+            k::make_line(p(40.0, 30.0), p(20.0, 30.0)).unwrap(),
+            k::make_arc_3pts(p(20.0, 30.0), p(20.0 - 20.0 * std::f64::consts::FRAC_1_SQRT_2, 10.0 + 20.0 * std::f64::consts::FRAC_1_SQRT_2), p(0.0, 10.0)).unwrap(),
+            k::make_line(p(0.0, 10.0), p(0.0, 0.0)).unwrap(),
+            k::make_line(p(0.0, 0.0), p(40.0, 0.0)).unwrap(),
+        ];
+        let block = k::extrude(&k::make_face_from_wire(&k::make_wire(&segs).unwrap(), true).unwrap(), DVec3::X * 100.0).unwrap().shape;
+        // Its end cut by a vertical plane at 25 deg: x = 80 - 0.47 y.
+        let q = |x: f64, y: f64| DVec3::new(x, y, -10.0);
+        let wedge = [q(80.0, 0.0), q(200.0, 0.0), q(200.0, 50.0), q(80.0 - 0.47 * 50.0, 50.0), q(80.0, 0.0)];
+        let lines: Vec<Shape> = wedge.windows(2).map(|w| k::make_line(w[0], w[1]).unwrap()).collect();
+        let cutter = k::extrude(&k::make_face_from_wire(&k::make_wire(&lines).unwrap(), true).unwrap(), DVec3::Z * 60.0).unwrap().shape;
+        let body = k::cut(&block, &cutter).unwrap().shape;
+        // The end face's top, turn and front edges.
+        let at: Vec<usize> = (0..body.count(ShapeType::Edge))
+            .filter(|&i| {
+                body.sub_shape(ShapeType::Edge, i).unwrap().edge_info().is_ok_and(|f| {
+                    let on_end = |v: DVec3| (v.x - (80.0 - 0.47 * v.y)).abs() < 1e-6;
+                    on_end(f.start) && on_end(f.end) && f.start.z.max(f.end.z) > 1e-6 && f.start.y.min(f.end.y) < 40.0 - 1e-6
+                })
+            })
+            .collect();
+        assert_eq!(at.len(), 3);
+        let chain = chain_ordered(&body, &at, true).unwrap();
+        let scale = body.bounding_box(false).unwrap().diagonal();
+        let (tools, _) = ball_tools(&body, &chain, &body.edge_faces().unwrap(), &body.faces(), (10.0, Section::Circular, false), scale, None).unwrap();
+        let rims: Vec<Shape> = chain.iter().map(|c| c.shape.clone()).collect();
+        let made = k::blend_direct(&body, &tools, &rims).unwrap().shape;
+        assert!(made.is_valid());
+        assert!(made.volume().unwrap() < body.volume().unwrap());
     }
 
     /// Two walls' outlines picked whole (asm-scissor-lift's Fillet 13): the second outline's edges listed from a corner
