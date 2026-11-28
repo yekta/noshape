@@ -275,6 +275,111 @@ impl SplineArg {
     }
 }
 
+/// The Greville abscissae of `n`'s control points.
+fn greville(n: &Nurbs) -> Vec<f64> {
+    (0..n.ctrl.len()).map(|i| n.knots[i + 1..=i + n.degree].iter().sum::<f64>() / n.degree as f64).collect()
+}
+
+/// The (copy, master) parameter fractions at which an offset copy `cc` meets the master `mc`'s offset by `side * r`,
+/// for the copy's `params`: equal chord-length fractions of the master's offset polyline, so the pairs don't depend
+/// on the solve's history; a reversed copy runs the master backwards.
+fn offset_pairs(mc: &crate::Curve2, cc: &crate::Curve2, params: &[f64], side: f64, r: f64) -> Vec<(f64, f64)> {
+    const N: usize = 160;
+    let (t0, t1) = mc.domain();
+    let pts: Vec<glam::DVec2> = (0..=N).map(|i| {
+        let [p, d1, _] = mc.ders(t0 + (t1 - t0) * i as f64 / N as f64);
+        p + d1.normalize_or_zero().perp() * (side * r)
+    }).collect();
+    let mut len = vec![0.0; N + 1];
+    for i in 1..=N {
+        len[i] = len[i - 1] + (pts[i] - pts[i - 1]).length();
+    }
+    let total = len[N].max(1e-300);
+    let t_at = |f: f64| {
+        let s = f * total;
+        let i = len.partition_point(|l| *l < s).clamp(1, N);
+        let w = ((s - len[i - 1]) / (len[i] - len[i - 1]).max(1e-300)).clamp(0.0, 1.0);
+        (i as f64 - 1.0 + w) / N as f64
+    };
+    let (u0, u1) = cc.domain();
+    let rev = cc.point(u0).distance(mc.point(t1)) < cc.point(u0).distance(mc.point(t0));
+    params.iter().map(|&u| {
+        let u = (u - u0) / (u1 - u0);
+        (u, if rev { t_at(1.0 - u) } else { t_at(u) })
+    }).collect()
+}
+
+impl Sketch {
+    /// A solve's start for big moves: each B-spline held by OFFSET from a spline that has left the master's offset
+    /// (between its fit points too, by the offset's fit tolerance) is fitted to it again, its knots following where
+    /// the master now bends, and the points coincident with its ends follow. Newton then starts next to the answer
+    /// however far the master moved. Returns what moved, with its geometry before.
+    pub(crate) fn place_spline_offsets(&mut self) -> Vec<(EntityId, Geometry)> {
+        let offsets: Vec<(EntityId, EntityId, EntityId, f64)> = self.constraints().filter_map(|c| match c.kind {
+            ConstraintKind::Offset { reference, curve, master, side, .. } => Some((reference, curve, master, side)),
+            _ => None,
+        }).collect();
+        let mut moved: Vec<(EntityId, Geometry)> = Vec::new();
+        for (reference, curve, master, side) in offsets {
+            if !matches!(self.kind(master), Some(EntityKind::BSpline | EntityKind::FitSpline)) {
+                continue;
+            }
+            let Some(Geometry::BSpline { control, degree: 3, knots, weights: None }) = self.entity(curve).map(|e| e.geometry.clone()) else { continue };
+            let r = match self.curve(reference) {
+                Some(crate::Curve2::Arc { radius, .. } | crate::Curve2::Circle { radius, .. }) if radius > 0.0 => radius,
+                _ => continue,
+            };
+            let (Some(mc), Some(cc)) = (self.curve(master), self.curve(curve)) else { continue };
+            let template = Nurbs { degree: 3, knots, ctrl: vec![glam::DVec2::ZERO; control.len()], weights: None };
+            let g = greville(&template);
+            let params: Vec<f64> = g.iter().copied().chain(g.windows(2).map(|w| 0.5 * (w[0] + w[1]))).collect();
+            let (t0, t1) = mc.domain();
+            let at = |t: f64| mc.ders(t0 + (t1 - t0) * t.clamp(0.0, 1.0));
+            let tol = (mc.size() + r) * 2e-4;
+            let off = offset_pairs(&mc, &cc, &params, side, r).into_iter().zip(&params).any(|((_, t), &u)| {
+                let [p, d1, _] = at(t);
+                let n = d1.normalize_or_zero().perp();
+                (cc.point(u) - (p + n * (side * r))).dot(n).abs() > tol
+            });
+            if !off {
+                continue;
+            }
+            const N: usize = 160;
+            let rev = offset_pairs(&mc, &cc, &[g[0]], side, r)[0].1 > 0.5;
+            let mut pts: Vec<glam::DVec2> = (0..=N).map(|i| {
+                let [p, d1, _] = at(i as f64 / N as f64);
+                p + d1.normalize_or_zero().perp() * (side * r)
+            }).collect();
+            if rev {
+                pts.reverse();
+            }
+            let Some(fit) = Nurbs::fit_least_squares(&pts, control.len()) else { continue };
+            if fit.ctrl.len() != control.len() || fit.degree != 3 {
+                continue;
+            }
+            let ends = [(control[0], fit.ctrl[0]), (control[control.len() - 1], fit.ctrl[fit.ctrl.len() - 1])];
+            let follow: Vec<(EntityId, glam::DVec2)> = self.constraints().filter_map(|c| match c.kind {
+                ConstraintKind::Coincident { a, b } => ends.iter().find_map(|(e, p)| {
+                    (a == *e).then_some((b, *p)).or_else(|| (b == *e).then_some((a, *p)))
+                }),
+                _ => None,
+            }).collect();
+            for id in std::iter::once(curve).chain(control.iter().copied()).chain(follow.iter().map(|f| f.0)) {
+                if let Some(e) = self.entity(id) {
+                    moved.push((id, e.geometry.clone()));
+                }
+            }
+            if let Some(Geometry::BSpline { knots, .. }) = self.entity_mut_silent(curve).map(|e| &mut e.geometry) {
+                *knots = fit.knots.clone();
+            }
+            for (id, p) in control.iter().zip(&fit.ctrl).chain(follow.iter().map(|(id, p)| (id, p))) {
+                let _ = self.set_point(*id, *p);
+            }
+        }
+        moved
+    }
+}
+
 fn offset_num(kind: &EqKind, x: &[f64]) -> f64 {
     let EqKind::OffsetNum { comp, master, copy, u, t, side, arc_rad } = kind else { return 0.0 };
     let (comp, u, t, side, arc_rad) = (*comp, *u, *t, *side, *arc_rad);
@@ -1602,7 +1707,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
         let inputs: SmallVec<[u32; 8]> = rad.iter().chain(&mi).chain(&ci).copied().collect();
         let (u0, u1) = cc.domain();
         let params: Vec<f64> = match &ca {
-            SplineArg::Ctrl(n) if n.degree > 0 => (0..n.ctrl.len()).map(|i| n.knots[i + 1..=i + n.degree].iter().sum::<f64>() / n.degree as f64).collect(),
+            SplineArg::Ctrl(n) if n.degree > 0 => greville(n),
             _ => {
                 let m = (ca.arity() / 2).max(2);
                 (0..m).map(|i| u0 + (u1 - u0) * i as f64 / (m - 1) as f64).collect()
@@ -1613,28 +1718,7 @@ impl<'a, L: Lookup> Builder<'a, L> {
             Some(crate::Curve2::Arc { radius, .. } | crate::Curve2::Circle { radius, .. }) => radius,
             _ => return Err(format!("{reference} is not a circle or arc")),
         };
-        // The master's offset as a polyline: chord-length fractions against the master's parameter fractions.
-        const N: usize = 160;
-        let (t0, t1) = mc.domain();
-        let pts: Vec<glam::DVec2> = (0..=N).map(|i| {
-            let [p, d1, _] = mc.ders(t0 + (t1 - t0) * i as f64 / N as f64);
-            p + d1.normalize_or_zero().perp() * (side * r)
-        }).collect();
-        let mut len = vec![0.0; N + 1];
-        for i in 1..=N {
-            len[i] = len[i - 1] + (pts[i] - pts[i - 1]).length();
-        }
-        let total = len[N].max(1e-300);
-        let t_at = |f: f64| {
-            let s = f * total;
-            let i = len.partition_point(|l| *l < s).clamp(1, N);
-            let w = ((s - len[i - 1]) / (len[i] - len[i - 1]).max(1e-300)).clamp(0.0, 1.0);
-            (i as f64 - 1.0 + w) / N as f64
-        };
-        let rev = cc.point(u0).distance(mc.point(t1)) < cc.point(u0).distance(mc.point(t0));
-        for (i, &u) in params.iter().enumerate() {
-            let u = (u - u0) / (u1 - u0);
-            let t = if rev { 1.0 - t_at(1.0 - u) } else { t_at(u) };
+        for (i, (u, t)) in offset_pairs(&mc, &cc, &params, side, r).into_iter().enumerate() {
             let comps: &[u8] = if m > 3 && (i == 1 || i == m - 2) { &[2] } else { &[0, 1] };
             for &comp in comps {
                 self.push(EqKind::OffsetNum { comp, master: ma.clone(), copy: ca.clone(), u, t, side, arc_rad }, inputs.clone());

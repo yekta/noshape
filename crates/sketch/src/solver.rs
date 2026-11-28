@@ -1012,6 +1012,9 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
 
 /// `run_ext` after its held step.
 fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow_exclusion: bool) -> SolveReport {
+    if drag.is_empty() {
+        let _ = sk.place_spline_offsets();
+    }
     let mut excluded: HashSet<ConstraintId> = opts.unheld.iter().copied().collect();
     let mut conflicting: Vec<ConstraintId> = Vec::new();
     let mut attempt = 0;
@@ -1958,6 +1961,30 @@ impl Sketch {
     /// Constraint states come from the last analysis if the sketch structure
     /// has not changed since.
     pub fn drag(&mut self, handles: &[(DragHandle, DVec2)]) -> SolveReport {
+        // A far step of a spline's point: its offsets start on its offset with the point at the pointer.
+        let dragged: Vec<(EntityId, DVec2, DVec2)> = handles.iter().filter_map(|(h, to)| match *h {
+            DragHandle::Point(id) => Some((id, self.point(id)?, *to)),
+            DragHandle::Entity { .. } => None,
+        }).collect();
+        for (id, _, to) in &dragged {
+            let _ = self.set_point(*id, *to);
+        }
+        let placed = self.place_spline_offsets();
+        for (id, from, _) in &dragged {
+            let _ = self.set_point(*id, *from);
+        }
+        let report = self.drag_unplaced(handles);
+        if !report.drag_solved {
+            for (id, g) in placed {
+                if let Some(e) = self.entity_mut_silent(id) {
+                    e.geometry = g;
+                }
+            }
+        }
+        report
+    }
+
+    fn drag_unplaced(&mut self, handles: &[(DragHandle, DVec2)]) -> SolveReport {
         let report = self.drag_leaving(handles, Vec::new());
         if report.drag_solved || !matches!(report.status, SolveStatus::Failed { .. }) {
             return report;

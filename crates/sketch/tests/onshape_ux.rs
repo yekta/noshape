@@ -182,6 +182,50 @@ fn a_slot_on_a_spline_wraps_it() {
     assert_eq!(sk.regions().len(), 1);
 }
 
+/// Users type big changes: a slot on a spline follows its spline's points moved 6-30 mm in one step (an end 15 mm),
+/// an end dragged 15 mm in one step, and a typed dimension that moves a point 10 mm.
+#[test]
+fn a_slot_on_a_spline_follows_a_big_move() {
+    let mut sk = Sketch::new();
+    let sp = sk.add_fit_spline(&[v(0.0, 0.0), v(0.03, 0.02), v(0.06, 0.0)]).unwrap();
+    let (curves, caps) = sk.slot_chains(&[sp], 0.012).unwrap();
+    sk.add_constraint(ConstraintKind::Diameter { curve: caps[0], value: 0.012 }).unwrap();
+    assert!(sk.solve().is_solved());
+    let sides: Vec<EntityId> = curves.iter().copied().filter(|c| sk.kind(*c) != Some(EntityKind::Arc)).collect();
+    let off_by = |sk: &Sketch, w: f64| {
+        let spline = sk.curve(sp).unwrap();
+        for side in &sides {
+            let c = sk.curve(*side).unwrap();
+            let (a, b) = c.domain();
+            for i in 0..=8 {
+                let e = (spline.distance(c.point(a + (b - a) * i as f64 / 8.0)) - w).abs();
+                assert!(e < 5e-5, "side {i}/8 off by {e} from {w}");
+            }
+        }
+    };
+    let Some(Geometry::FitSpline { points, .. }) = sk.entity(sp).map(|e| e.geometry.clone()) else { panic!() };
+    for (k, to) in [(1, v(0.03, 0.026)), (0, v(0.0, 0.015)), (2, v(0.07, 0.01)), (1, v(0.03, -0.01))] {
+        sk.set_point(points[k], to).unwrap();
+        assert!(sk.solve().is_solved(), "the spline's point {k} moved to {to:?}");
+        off_by(&sk, 0.006);
+    }
+    let to = sk.point(points[0]).unwrap() + v(0.0, 0.015);
+    sk.begin_drag(&[(DragHandle::Point(points[0]), sk.point(points[0]).unwrap())]);
+    assert!(sk.drag(&[(DragHandle::Point(points[0]), to)]).drag_solved, "an end dragged 15 mm in one step");
+    assert!(sk.point(points[0]).unwrap().distance(to) < 1e-6);
+    off_by(&sk, 0.006);
+    assert!(sk.solve().is_solved());
+    let dy = |sk: &Sketch| (sk.point(points[1]).unwrap().y - sk.point(points[0]).unwrap().y).abs();
+    let d = sk.add_constraint(ConstraintKind::VerticalDistance { a: points[0], b: points[1], value: dy(&sk) }).unwrap();
+    assert!(sk.solve().is_solved());
+    sk.set_dimension_value(d, dy(&sk) - 0.01).unwrap();
+    let want = dy(&sk) - 0.01;
+    assert!(sk.solve().is_solved(), "typed 10 mm less");
+    assert!((dy(&sk) - want).abs() < 1e-9, "{} for {want}", dy(&sk));
+    off_by(&sk, 0.006);
+    assert_eq!(sk.regions().len(), 1);
+}
+
 /// Live slot-on-arc: the Slot tool on a free arc builds it as on a line: the caps on their own centre points, 6
 /// COINCIDENT, 4 TANGENT and 3 OFFSET (both sides from the arc, the start cap by the end cap's radius); only the end
 /// cap carries the width, whose Ø then drives the whole slot.
