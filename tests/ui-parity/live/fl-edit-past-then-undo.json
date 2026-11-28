@@ -1,6 +1,6 @@
 {
  "scenario": "fl-edit-past-then-undo",
- "recorded": "2026-11-28T07:05:02.947Z",
+ "recorded": "2026-11-28T15:09:22.420Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -9,12 +9,12 @@
    1919,
    992
   ],
-  "recorder": "2026-11-14.2 4002f36a + live2 2026-11-28.6"
+  "recorder": "2026-11-14.2 5ca3cf24 + live2 2026-11-28.11"
  },
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "a46f34fbcd12b84739747f79",
+  "element": "1d03bc1ae8456d57987c0987",
   "start": "spline-parts",
   "startElement": "31d0399087613ead5fb4e013",
   "runner": "live2 .nstate-uip-4.json"
@@ -218,10 +218,10 @@
     }
    },
    "ok": true,
-   "ti": 28651,
-   "tmove": 29055,
+   "ti": 26484,
+   "tmove": 26855,
    "moves": 1,
-   "tdown": 29371,
+   "tdown": 27163,
    "at": [
     451,
     313
@@ -272,7 +272,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -370,7 +370,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -616,8 +616,8 @@
      ]
     }
    },
-   "t": 61463,
-   "te": 61464
+   "t": 58995,
+   "te": 58995
   },
   {
    "step": 2,
@@ -626,7 +626,7 @@
     "until": "dialog"
    },
    "ok": true,
-   "ti": 61464,
+   "ti": 58995,
    "state": {
     "focus": {
      "kind": "field",
@@ -673,7 +673,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -771,7 +771,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -1017,8 +1017,8 @@
      ]
     }
    },
-   "t": 114439,
-   "te": 114439
+   "t": 111800,
+   "te": 111800
   },
   {
    "step": 3,
@@ -1028,7 +1028,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 114439,
+   "ti": 111800,
    "state": {
     "focus": {
      "kind": "field",
@@ -1075,7 +1075,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -1173,7 +1173,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -1419,8 +1419,8 @@
      ]
     }
    },
-   "t": 146534,
-   "te": 146535
+   "t": 143832,
+   "te": 143832
   },
   {
    "step": 4,
@@ -1431,10 +1431,10 @@
     }
    },
    "ok": true,
-   "ti": 146535,
-   "tmove": 146693,
+   "ti": 143832,
+   "tmove": 143876,
    "moves": 1,
-   "tdown": 147497,
+   "tdown": 144330,
    "at": [
     740,
     257
@@ -1491,7 +1491,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -1589,7 +1589,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -1835,8 +1835,8 @@
      ]
     }
    },
-   "t": 178776,
-   "te": 178776
+   "t": 175258,
+   "te": 175258
   },
   {
    "step": 5,
@@ -1845,7 +1845,7 @@
     "key": "mod+a"
    },
    "ok": true,
-   "ti": 178776,
+   "ti": 175258,
    "pointer": {
     "at": [
      739,
@@ -1908,7 +1908,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -2006,7 +2006,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -2252,8 +2252,8 @@
      ]
     }
    },
-   "t": 209897,
-   "te": 209897
+   "t": 206349,
+   "te": 206349
   },
   {
    "step": 6,
@@ -2262,8 +2262,8 @@
     "text": "30"
    },
    "ok": true,
-   "ti": 209897,
-   "tdown": 209897,
+   "ti": 206349,
+   "tdown": 206349,
    "state": {
     "focus": {
      "kind": "field",
@@ -2316,7 +2316,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -2414,7 +2414,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -2660,8 +2660,8 @@
      ]
     }
    },
-   "t": 241070,
-   "te": 241070
+   "t": 237532,
+   "te": 237532
   },
   {
    "step": 7,
@@ -2670,7 +2670,7 @@
     "key": "Enter"
    },
    "ok": true,
-   "ti": 241070,
+   "ti": 237532,
    "pointer": {
     "at": [
      739,
@@ -2681,7 +2681,7 @@
     ],
     "element": "input.os-param-number.dropdown-source"
    },
-   "tdown": 241081,
+   "tdown": 237539,
    "state": {
     "focus": {
      "kind": "field",
@@ -2734,7 +2734,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -2832,7 +2832,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -3078,8 +3078,8 @@
      ]
     }
    },
-   "t": 272511,
-   "te": 272511
+   "t": 268724,
+   "te": 268724
   },
   {
    "step": 8,
@@ -3089,7 +3089,7 @@
     "ms": 2000
    },
    "ok": true,
-   "ti": 272511,
+   "ti": 268724,
    "state": {
     "focus": {
      "kind": "field",
@@ -3142,7 +3142,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -3240,7 +3240,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -3486,8 +3486,8 @@
      ]
     }
    },
-   "t": 305659,
-   "te": 305659
+   "t": 302017,
+   "te": 302017
   },
   {
    "step": 9,
@@ -3498,10 +3498,10 @@
     }
    },
    "ok": true,
-   "ti": 305659,
-   "tmove": 305734,
+   "ti": 302017,
+   "tmove": 302064,
    "moves": 1,
-   "tdown": 306215,
+   "tdown": 302465,
    "at": [
     805,
     93
@@ -3695,8 +3695,8 @@
      ]
     }
    },
-   "t": 308712,
-   "te": 308712
+   "t": 304434,
+   "te": 304434
   },
   {
    "step": 10,
@@ -3705,7 +3705,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 308712,
+   "ti": 304434,
    "state": {
     "focus": {
      "kind": "none"
@@ -3895,8 +3895,8 @@
      ]
     }
    },
-   "t": 313212,
-   "te": 313212
+   "t": 308727,
+   "te": 308727
   },
   {
    "step": 11,
@@ -3906,7 +3906,7 @@
     "ms": 1200
    },
    "ok": true,
-   "ti": 313212,
+   "ti": 308727,
    "state": {
     "focus": {
      "kind": "none"
@@ -4096,8 +4096,8 @@
      ]
     }
    },
-   "t": 316386,
-   "te": 316386
+   "t": 311725,
+   "te": 311725
   },
   {
    "step": 12,
@@ -4106,7 +4106,7 @@
     "key": "mod+z"
    },
    "ok": true,
-   "ti": 316386,
+   "ti": 311725,
    "pointer": {
     "at": [
      805,
@@ -4117,7 +4117,7 @@
     ],
     "element": "canvas#canvas"
    },
-   "tdown": 316395,
+   "tdown": 311729,
    "state": {
     "focus": {
      "kind": "none"
@@ -4307,8 +4307,8 @@
      ]
     }
    },
-   "t": 318451,
-   "te": 318451
+   "t": 313568,
+   "te": 313568
   },
   {
    "step": 13,
@@ -4317,7 +4317,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 318451,
+   "ti": 313568,
    "state": {
     "focus": {
      "kind": "none"
@@ -4507,8 +4507,8 @@
      ]
     }
    },
-   "t": 323138,
-   "te": 323138
+   "t": 317864,
+   "te": 317864
   },
   {
    "step": 14,
@@ -4518,7 +4518,7 @@
     "ms": 1200
    },
    "ok": true,
-   "ti": 323138,
+   "ti": 317864,
    "state": {
     "focus": {
      "kind": "none"
@@ -4708,11 +4708,11 @@
      ]
     }
    },
-   "t": 326441,
-   "te": 326441
+   "t": 320863,
+   "te": 320863
   }
  ],
- "t0_epoch_ms": 1795849481108,
+ "t0_epoch_ms": 1795878541456,
  "end_data": {
   "features": [
    {
