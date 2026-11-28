@@ -2084,6 +2084,37 @@ fn boundary_of_two_profiles_is_ruled_between_them() {
     assert!((area - 5516.5878).abs() < 0.01, "{area}");
 }
 
+/// Profiles running past the ones they meet are trimmed where they meet, as live's (c2-surf-workshop-britatap's Bridge
+/// patch - Top: its blend curve starts half way along the pipe's edge, its sketch curve runs past the head's edge): a
+/// V profile starting half way along a U profile and one overshooting the far U profile bound a 40 x 30 mm patch.
+#[test]
+fn boundary_surface_profiles_are_trimmed_where_they_meet() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let mut line = |a: (f64, f64), b: (f64, f64)| sk.add_line(DVec2::new(a.0, a.1) * 1e-3, DVec2::new(b.0, b.1) * 1e-3).0;
+    let (u0, u1) = (line((0.0, 0.0), (50.0, 0.0)), line((0.0, 30.0), (40.0, 30.0)));
+    let (v0, v1) = (line((0.0, 0.0), (0.0, 35.0)), line((40.0, 0.0), (40.0, 30.0)));
+    let sk = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    s.add("boundarySurface", move |p| {
+        let rows = |dir: &str, es: [u32; 2]| {
+            let rows = es.iter().map(|&e| {
+                let mut v = ParamValues::default();
+                v.set(&format!("{dir}ProfileEntities"), ParamValue::Query(vec![Reference::SketchEntity { sketch: sk, entity: e }]));
+                v.set(&format!("{dir}Condition"), ParamValue::Enum("DEFAULT".into()));
+                v
+            });
+            ParamValue::Array(rows.collect())
+        };
+        p.set("uProfilesArray", rows("u", [u0, u1]));
+        p.set("vProfilesArray", rows("v", [v0, v1]));
+    });
+    let r = s.ok();
+    let i = r.context.bodies.iter().position(|b| b.kind == BodyKind::Surface).unwrap();
+    assert_eq!(r.context.bodies[i].shape.faces().len(), 1);
+    let area = surface_area(&r, i) * 1e6;
+    assert!((area - 1200.0).abs() < 1e-6, "{area} mm²");
+}
+
 /// A surface Extrude of one sketch curve (blind, symmetric when `both`), Add or New.
 fn sheet_of(s: &mut Studio, plane: DatumPlane, a: (f64, f64), b: (f64, f64), depth: &'static str, both: bool, add: bool) {
     let mut sk = noshape_sketch::Sketch::new();

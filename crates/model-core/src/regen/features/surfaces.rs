@@ -744,6 +744,38 @@ fn ruled_coons(a: &[Shape], b: &[Shape]) -> Option<Shape> {
     k::coons_surface(&sides).ok().map(|r| r.shape)
 }
 
+/// Each profile cut where the other direction's profiles meet it inside, and kept between those meetings: live trims
+/// a profile that runs past the one it meets (c2-surf-workshop-britatap's Bridge patch - Top: its blend curve starts
+/// half way along the pipe's edge, its sketch curve runs past the head's edge). Each piece with the edge it's from.
+fn trim_profiles(own: &[Vec<Shape>], other: &[Vec<Shape>]) -> FResult<Vec<Vec<(Shape, Shape)>>> {
+    let tools: Vec<&Shape> = other.iter().flatten().collect();
+    own.iter().map(|chain| {
+        let whole: Vec<(Shape, Shape)> = chain.iter().map(|e| (e.clone(), e.clone())).collect();
+        let Some(ends) = chain_ends(chain) else { return Ok(whole) };
+        let touches: Vec<DVec3> = chain.iter().flat_map(|e| tools.iter().filter_map(|t| k::distance(e, t).ok().filter(|d| d.distance < 1e-7).map(|d| d.point_a))).collect();
+        let inner: Vec<DVec3> = touches.iter().copied().filter(|p| p.distance(ends.0) > 1e-6 && p.distance(ends.1) > 1e-6).collect();
+        if inner.is_empty() {
+            return Ok(whole);
+        }
+        let cuts: Vec<Shape> = inner.iter().map(|p| k::make_vertex(*p)).collect::<Result<_, _>>()?;
+        let mut pieces: Vec<(Shape, Shape)> = Vec::new();
+        for e in chain {
+            let (a, b) = e.endpoints()?;
+            let at: Vec<Shape> = inner.iter().zip(&cuts).filter(|(p, c)| p.distance(a) > 1e-6 && p.distance(b) > 1e-6 && k::distance(e, c).is_ok_and(|d| d.distance < 1e-7)).map(|(_, c)| c.clone()).collect();
+            let parts = if at.is_empty() { vec![e.clone()] } else { k::split(std::slice::from_ref(e), &at, &Default::default())?.shape.edges() };
+            pieces.extend(parts.into_iter().map(|p| (p, e.clone())));
+        }
+        // The overhangs: a piece with an end that no other piece and no meeting holds, until none is left.
+        let held = |q: DVec3, p: &Shape, pieces: &[(Shape, Shape)]| {
+            touches.iter().any(|t| t.distance(q) < 1e-6) || pieces.iter().any(|(o, _)| !o.is_same(p) && o.endpoints().is_ok_and(|(c, d)| c.distance(q) < 1e-6 || d.distance(q) < 1e-6))
+        };
+        while let Some(i) = pieces.iter().position(|(p, _)| p.endpoints().is_ok_and(|(a, b)| !held(a, p, &pieces) || !held(b, p, &pieces))) {
+            pieces.remove(i);
+        }
+        Ok(if pieces.is_empty() { whole } else { pieces })
+    }).collect()
+}
+
 pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     let collect = |ev: &EvalCtx, array: &str, ents: &str, cond: &str| -> FResult<(Vec<Vec<Shape>>, bool)> {
         let mut out = Vec::new();
@@ -790,6 +822,14 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     if !u.is_empty() && !v.is_empty() && u.iter().any(|pu| v.iter().any(|pv| meets_mid(pu, pv) && meets_mid(pv, pu))) {
         return err(BSURF_ENDS);
     }
+    let (u, v, pieces) = if u.len() == 2 && v.len() == 2 {
+        let (tu, tv) = (trim_profiles(&u, &v)?, trim_profiles(&v, &u)?);
+        let only = |t: &[Vec<(Shape, Shape)>]| t.iter().map(|c| c.iter().map(|(p, _)| p.clone()).collect()).collect::<Vec<Vec<Shape>>>();
+        (only(&tu), only(&tv), tu.into_iter().chain(tv).flatten().collect::<Vec<_>>())
+    } else {
+        let pieces = u.iter().chain(&v).flatten().map(|e| (e.clone(), e.clone())).collect::<Vec<_>>();
+        (u, v, pieces)
+    };
     // Matched rows' edges held tangent (or in curvature) to their reference faces, else to the faces they bound.
     let mut held: Vec<k::FillEdge> = Vec::new();
     let mut unheld = false;
@@ -807,7 +847,7 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
             let faces: Vec<Shape> = ev.resolve_faces(item.query(reference)).iter().map(|&(bi, fi)| ev.face_shape(bi, fi)).collect::<FResult<_>>()?;
             for e in curve_edges(ev, item.query(ents))? {
                 match faces.iter().find(|f| f.index_of(&e, ShapeType::Edge).is_some()).cloned().or_else(|| adjacent_face(ev, &e)) {
-                    Some(support) => held.push(k::FillEdge { edge: e, support: Some(support), continuity }),
+                    Some(support) => held.extend(pieces.iter().filter(|(_, from)| from.is_same(&e)).map(|(p, _)| k::FillEdge { edge: p.clone(), support: Some(support.clone()), continuity })),
                     None => unheld = true,
                 }
             }
