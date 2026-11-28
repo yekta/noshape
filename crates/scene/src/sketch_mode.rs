@@ -271,8 +271,9 @@ struct Click {
     inference: Option<Inference>,
 }
 
-/// How near (screen px) a 3 point arc's third click takes the semicircle over its ends (live2 arcmid: 7.5 yes, 8 no).
-const ARC3_SEMICIRCLE_PX: f64 = 7.75;
+/// How near (screen px) a 3 point arc's third click takes the semicircle over its ends (live2 arcmid: 7.5 yes, 8 no;
+/// live sketch-3pt-arc-reversed-sides: 7.8 in the iso view, yes).
+const ARC3_SEMICIRCLE_PX: f64 = 7.9;
 
 /// One solve of a geometry drag ([`SketchEditor::drag_step`]).
 #[derive(Clone, Debug)]
@@ -2084,11 +2085,11 @@ impl SketchEditor {
                 best = Some(Inference { kind: InferenceKind::Quadrant, position: q, entity: None, reference: Some(c), constraints: Vec::new(), distance: (q - p).length(), priority: 1 });
             }
         }
-        // 3 point arc: snap to an exact semicircle when the center reaches the chord.
+        // 3 point arc: snap to the exact semicircle over the ends when the pointer is within reach of it (on screen).
         if self.tool == Tool::Arc3
             && self.clicks.len() == 2
             && best.as_ref().is_none_or(|i| i.priority > 1)
-            && let Some(s) = semicircle_snap(self.clicks[0].pos, self.clicks[1].pos, p, self.world_per_px * 9.0)
+            && let Some(s) = self.arc3_semicircle(self.clicks[0].pos, self.clicks[1].pos, p)
         {
             best = Some(Inference { kind: InferenceKind::Midpoint, position: s, entity: None, reference: Some((self.clicks[0].pos + self.clicks[1].pos) * 0.5), constraints: Vec::new(), distance: (s - p).length(), priority: 1 });
         }
@@ -4567,7 +4568,22 @@ impl SketchEditor {
         let m = (a + b) * 0.5;
         let r = (b - a).length() * 0.5;
         let d = p - m;
-        (r > 1e-12 && ((d.length() - r).abs() <= ARC3_SEMICIRCLE_PX * self.world_per_px)).then(|| m + d.try_normalize().unwrap_or(DVec2::Y) * r)
+        (r > 1e-12 && self.screen_gap_to_circle(m, r, p) <= ARC3_SEMICIRCLE_PX).then(|| m + d.try_normalize().unwrap_or(DVec2::Y) * r)
+    }
+
+    /// Screen pixels from `p` to the circle (`m`, `r`): to its nearest point on screen, where a foreshortened view
+    /// shows it as an ellipse.
+    fn screen_gap_to_circle(&self, m: DVec2, r: f64, p: DVec2) -> f64 {
+        let Some(metric) = self.screen_metric() else { return ((p - m).length() - r).abs() / self.world_per_px };
+        let gap = |t: f64| metric.len(m + DVec2::from_angle(t) * r - p) / self.world_per_px;
+        let step = std::f64::consts::TAU / 72.0;
+        let mut t = (0..72).map(|i| i as f64 * step).min_by(|x, y| gap(*x).total_cmp(&gap(*y))).unwrap_or(0.0);
+        let mut h = step;
+        while h > 1e-6 {
+            t = [t - h, t, t + h].into_iter().min_by(|x, y| gap(*x).total_cmp(&gap(*y))).unwrap_or(t);
+            h *= 0.5;
+        }
+        gap(t)
     }
 
     /// One-line measurement of the sketch selection for the status area at
@@ -8803,17 +8819,6 @@ fn tangent_bend(sk: &Sketch, clicks: &[Click], p: DVec2, tol: f64) -> Option<(En
     best.map(|(l, q, _)| (l, q))
 }
 
-fn semicircle_snap(a: DVec2, b: DVec2, p: DVec2, tol: f64) -> Option<DVec2> {
-    let m = (a + b) * 0.5;
-    let (ctr, _) = noshape_sketch::shapes::circle_through(a, p, b)?;
-    if (ctr - m).length() > tol {
-        return None;
-    }
-    let n = (b - a).perp().try_normalize()?;
-    let side = if (p - m).dot(n) < 0.0 { -1.0 } else { 1.0 };
-    Some(m + n * side * (b - a).length() * 0.5)
-}
-
 fn nearest_point(sk: &Sketch, p: DVec2, radius: f64) -> Option<EntityId> {
     sk.entities()
         .filter(|e| e.kind() == EntityKind::Point)
@@ -12480,6 +12485,25 @@ mod tests {
         assert!(mid && (c - mm(10.0, 0.0)).length() < 1e-9, "snapped: centre {c:?}, midpoint {mid}");
         let (c, mid) = arc(mm(10.0, 11.0));
         assert!(!mid && (c - mm(10.0, 0.0)).length() > 1e-6, "free: centre {c:?}, midpoint {mid}");
+    }
+
+    /// Live sketch-3pt-arc-reversed-sides s5: in the iso view (Top foreshortened) the third click at (10, -6) is 4 mm
+    /// inside the r 10 semicircle but 7.8 px from it on screen: live draws the semicircle; at (10, -5.5) (8.7 px) the
+    /// arc goes through the click.
+    #[test]
+    fn a_three_point_arc_measures_its_semicircle_reach_on_screen() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let snapped = |third: DVec2| {
+            let (mut ed, mut d) = editor(Tool::Arc3);
+            let per_px = (glam::DMat2::from_cols(v(3.15, 0.91), v(1.82, -1.576)) * 1e3).inverse();
+            ed.screen_map = Some((DVec2::ZERO, per_px.x_axis, per_px.y_axis));
+            for p in [mm(0.0, 0.0), mm(20.0, 0.0), third] {
+                click(&mut ed, &mut d, p);
+            }
+            d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::MidpointOf { .. }))
+        };
+        assert!(snapped(mm(10.0, -6.0)), "7.8 px on screen: the semicircle");
+        assert!(!snapped(mm(10.0, -5.5)), "8.7 px on screen: through the click");
     }
 
     /// Live (feel/sketch.json "drag" A-first, mm): a free line's end follows the pointer, its body moves it whole; a
