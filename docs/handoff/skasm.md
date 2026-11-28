@@ -1,31 +1,30 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 07:50 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 08:45 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 07:50 UTC)
-- QUEUED ff59d97f (07:48; 11 commits, includes the still-pending 75280e34 / dd0fa834 / 8728537c): a slot on an arc held
-  as on a line (caps on own centres, 6 COINCIDENT + 4 TANGENT + 3 OFFSET; equations.rs offset() takes arc-arc,
-  concentric + radius side*d = SKETCH-SLOT-CONSTRAINTS), 8728537c the 3 point arc's semicircle reach measured on screen
-  (7.9 px; iso view 7.8 px = SKETCH-3PT-ARC-SEMICIRCLE-SNAP), dd0fa834 ASM-MATE-ERROR-ROW (assembly-ui lib 241/241 on
-  the Mac). skasm-main: 3bb2265e + 643348c2 VertexEnd (assembly + model-core lib + ops refs green on the Mac). No land
-  results yet; the handoff commits ride with ff59d97f.
-- TICKETS: batch 6 (97e1a807, on main) already fixed DELETE-CORNER, RECT-ZERO-SIZE, SLOT-ON-CIRCLE-REFUSED,
-  CHAMFER-CORNER-POINT, DIM-SAME-ARC-TWICE, DIM-ZERO-ACCEPTED, CIRCLE-RIM-ON-LINE-TANGENT: marked "to verify by replay".
-- Live REQUESTS (skasm 11-28 06:5x, items 1-5): offset open-chain 2nd click, batch-6 COINCIDENT entities, spline top
-  corners' Z, (4) linear pattern white-space click with 2 pre-selected entities keeps the tool (pre-selection or two
-  entities?), (5) Mirror about a point: copy lands ON the original (horizontal axis or plain copy?).
-- Open, not started: SKETCH-ARC-ENDPOINT-ORDER (P3, live's caps listed start/end swapped: likely a comparator
-  convention), SLOT-ON-SPLINE's 3 OFFSET (needs spline-spline OFFSET in the solver).
-- REPLAY queued on vibex8 slot (bg bso2gs426, uipr.sh): rclick-line-circle-menu, horizontal/vertical-key, 19 sketch-used
-  retakes (out ~/tmp/skasm/uip). After the lands: asm replay from a rebased skasm (both fixes) incl.
-  mistake-asm-spline-mate-same-part and the asm-mc-on-spline-face takes (13/21 before).
-- Live REQUESTS filed 06:56 (skasm 11-28 06:5x): offset open-chain 2nd click, batch-6 COINCIDENT entities, spline top
-  corners' Z.
+## NOW (11-28 08:45 UTC)
+- QUEUED (land.sh, no results yet; each carries the earlier ones): 75280e34, dd0fa834, 8728537c, ff59d97f, ab49ca2c
+  (Mirror before its line passes over the Origin), 3196c652 (a free line's end Coincident with a used/fixed edge carries
+  the whole line = SKETCH-COINCIDENT-FREE-LINE-SLIDES), then: midpoint start on an older held line is Vertical
+  (SKETCH-LINE-ON-LINE-INFERENCE: live's rule = Perpendicular only when no held line along it was drawn after its
+  Parallel/Perpendicular group), spline derivative T1 (SKETCH-SPLINE-END-DERIVATIVES: the diff was the old state export;
+  ours = live), Enter in Display states' name box saves (ASM-DISPLAY-STATE-CREATE), Create Part Studio in context takes
+  the clicked origin glyph (ASM-PART-STUDIO-IN-CONTEXT-ORIGIN). skasm-main: 3bb2265e + 643348c2. Fix forward on any fail.
+- TICKETS: union-merge duplicates dropped; checked against qa's 1128-0410 replay: ASM-MEASURE-BRACKET-KEY,
+  REPLICATE-MATED-PIN-ROW, MATE-ROTATION-SIGN, PATTERN-CENTERED-ORDER match. Batch 6 rows "to verify by replay".
+- Blocked/parked: SKETCH-TRIM-COINCIDENT-AT-CUT (needs live's constraint entities), PATTERN-EMPTY-CLICK (REQUESTS 4),
+  OFFSET-DISTANCE-FROM-CLICK (live's preview side after the 2nd click), SLOT-ON-SPLINE 3 OFFSET (spline-spline OFFSET),
+  TANGENT-ARC-SPAN (complex), ARC-ENDPOINT-ORDER (P3), ASM-DRAG-REVOLUTE-ANGLE (batch 6, verify), ASM-MC-* (50/51).
+- REPLAY bn02so8gg waiting in the vibex8 slot (qa's 471-scenario shards since 06:29): rclick-line-circle-menu,
+  horizontal/vertical-key, 3pt-arc-reversed-sides, slot-on-arc + 19 sketch-used retakes (out ~/tmp/skasm/uip). After
+  the lands: asm replay (mistake-asm-spline-mate-same-part, asm-mc-on-spline-face, display-states-create, in-context).
+- Live REQUESTS 1-4 (skasm 11-28) unanswered.
 - Hosts: builds + crate tests on the Mac (rb.sh NOSHAPE_RB_HOST=mac, writes only in ~/noshape-host, CLI only); replays on
-  vibex8 via ~/bin/slot (uipr.sh). Mac clippy shows vendor/gpui-pre-macos deprecation warnings: not ours, filter vendor/.
-- Scripts /root/skasm-scratch/bin: tal.sh (scene + ps-ui sketch ui), tve.sh (assembly + ops refs + clippy), tasmui.sh,
-  tdoc.sh (UPDATE_DOCS coverage; scp mac:noshape-host/agents/<wt>/src/docs/AGENT_API.md back), uipr.sh, used.txt.
+  vibex8 via ~/bin/slot (uipr.sh). Mac clippy's 6 cocoa deprecation warnings are vendor/: not ours.
+- Scripts /root/skasm-scratch/bin: tal.sh (scene + ps-ui sketch ui), tinf.sh (sketch + scene + ps-ui filter), tds.sh
+  (assembly-ui filter + clippy), tve.sh, tasmui.sh, tdoc.sh, uipr.sh, used.txt, cmp.py SCENARIO (newest qa replay vs
+  live: dialog/focus/selection/tooltip diffs per step).
 
 ## NOW (11-28 05:55 UTC)
 - LANDING (skasm, re-queued after 29a170e1's handoff rebase conflict): Q on a mixed selection all construction
