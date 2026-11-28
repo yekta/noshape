@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 05:4x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 07:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,25 +33,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 07:0x (start here)
-- QUEUED eb48c0df 06:1x (carries 0868ddd7 + 8578e2519f Configure suppression literal label (fixes ops coverage) +
-  573dfc35e8 Apply export rules to contents). Lead reports; never poll.
-- COMMITTED, not landed: "psui: Export remembers Export unique parts as individual files, as live" (lead 06:2x
-  approved; DECISIONS corrected by the lead). ps67: export-parts-three-individual-files 17/23 (left: Apply export rules
-  live off = account-remembered?, REQUESTS 06:0x; import toast timing), export-stl-y-up/doc-tab-menu-export/stl-download
-  match; -two-selected, -asm-instances-stl Millimeter = EXPORT-REMEMBERED-START; export-step-spline-part s4 derived
-  tolerances live true = same remembered class (left open).
-- UNCOMMITTED (verify, then commit + land):
-  (1) Part Studio Measure panel reported to ui-parity: ui.measure_panel_state (dialog + measure) set in
-      render_measure_panel via measure_panel_ui_state (menus.rs), read in ui_script.rs; run.py old_reader_measure_panel
-      for 11-07 takes. ps68: measure-panel-spline-face MATCH (MEASURE-BRACKET-KEY: was recorder-only; tick it),
-      28/30 measure+mass takes; key-bracket-measure matches with the normalizer (local --compare-only).
-  (2) No-material notice once per session AND measured set (NO_MATERIAL_SHOWN: Mutex<Vec<Vec<BodyId>>>,
-      first_notice_for + T1 no_material_notice_once_per_measured_set; ui.material_checked guards per-frame work).
-  (3) flash_for timers carry ui.flash_seq so an earlier identical toast's timer doesn't hide a later one (the cause of
-      mass-properties-add-part s5 null). Not yet built: rerun ps68 (/root/psui-scratch/resp/ps68.sh) to confirm
-      mass-properties-add-part 6/6, clippy clean; then commit (TICKETS: tick MEASURE-BRACKET-KEY and
-      MASS-PROPERTIES-ADD-PART-FOCUS's s5 message; new row SECTION-VIEW-EDGE-PIXEL-SIDE already added, uncommitted).
+## STATE 11-28 07:2x (start here)
+- QUEUED eb48c0df 06:1x (0868ddd7 + Configure suppression literal label (ops coverage) + Apply export rules to
+  contents). Lead reports; never poll.
+- LANDING (queued 07:2x): 273ce0428b Export remembers Export unique parts as individual files (lead approved) +
+  b42e63ddf5 Measure panel reported to ui-parity / no-material notice once per measured set / flash_seq toast timers.
+  ps68 rerun: 30/30 measure+mass takes, 124/124 states, clippy clean. TICKETS MEASURE-BRACKET-KEY,
+  MASS-PROPERTIES-ADD-PART-FOCUS ticked; SECTION-VIEW-EDGE-PIXEL-SIDE filed.
+- Export left open: Apply export rules live off (REQUESTS 05:3x/06:0x), EXPORT-REMEMBERED-START (Millimeter),
+  export-step-spline-part s4 derived tolerances (same remembered class), import toast timing (REQUESTS 04:1x).
+- Section view hint after the plane pick: kept in the overlap takes, cleared in block's; parked, REQUESTS "psui 11-28 07:1x".
 - NEXT: ps69 (/root/psui-scratch/resp/ps69.sh: build + the 13 maker-* takes = "the maker set"; earlier survey: maker-
   select-tangent-connected-used s8, maker-select-used-click-shift s11-12 "Confirm Sketch 2"), test-memory P2,
   remaining batch 8/9 rows.
