@@ -254,8 +254,42 @@ impl Sketch {
         self.replace_geometry(id, g);
         res.modified.push(id);
         self.drop_shape_constraints(id, res);
+        self.hand_over_trimmed_ends(&old_refs, id, res);
         self.remove_orphans(&old_refs, res);
         Ok(())
+    }
+
+    /// Live (rq-1128 trim of a rectangle's edge, sketchToolType TRIM): a trimmed-off end's corner stays Coincident on
+    /// the trimmed curve. A corner point shared with another curve does so itself; a separate end passes it to the point
+    /// it was Coincident with, the end's other point Coincidents (the origin's) moving onto that point.
+    fn hand_over_trimmed_ends(&mut self, ends: &[EntityId], id: EntityId, res: &mut EditResult) {
+        let kept = self.entity(id).map(|e| e.point_refs()).unwrap_or_default();
+        for s in ends.iter().filter(|s| !kept.contains(s)) {
+            if self.kind(*s) != Some(EntityKind::Point) {
+                continue;
+            }
+            let users = self.users_of_point(*s);
+            if users.iter().any(|u| !res.created.contains(u)) {
+                self.add_c(res, ConstraintKind::Coincident { a: *s, b: id });
+            }
+            // (A trimmed middle's far piece takes the end over: the pieces are related as a whole.)
+            if !users.is_empty() {
+                continue;
+            }
+            let is_point = |sk: &Self, e: EntityId| sk.kind(e) == Some(EntityKind::Point);
+            let partners: Vec<(ConstraintId, EntityId)> = self.constraints_on(*s).into_iter().filter_map(|c| match self.constraint(c)?.kind {
+                ConstraintKind::Coincident { a, b } if a == *s && is_point(self, b) => Some((c, b)),
+                ConstraintKind::Coincident { a, b } if b == *s && is_point(self, a) => Some((c, a)),
+                _ => None,
+            }).collect();
+            let Some(&(corner, heir)) = partners.iter().find(|(_, q)| self.entity(*q).is_some_and(|e| !e.external)) else { continue };
+            if self.retarget_constraint(corner, ConstraintKind::Coincident { a: heir, b: id }).is_err() {
+                continue;
+            }
+            for (c, q) in partners.into_iter().filter(|(c, _)| *c != corner) {
+                let _ = self.retarget_constraint(c, ConstraintKind::Coincident { a: q, b: heir });
+            }
+        }
     }
 
     /// Creates a new entity for the part `[t0, t1]` of `id`.

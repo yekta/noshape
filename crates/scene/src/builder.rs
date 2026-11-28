@@ -1072,7 +1072,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 });
                 let color = match sk.color.filter(|_| !editing) {
                     Some(c) => lin_to_u8(c),
-                    None => sketch_color(&opts.graphics, p.state, false, editing || through, false),
+                    None => sketch_color(&opts.graphics, p.state, false, editing || through, p.external),
                 };
                 // Live (sketch/07, 28; with the anti-aliased rim): vertices of
                 // the edited sketch are 6.7 px dots while under-defined (blue),

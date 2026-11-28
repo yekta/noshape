@@ -518,3 +518,17 @@ fn a_second_points_glyph_goes_left_when_its_spot_is_taken(cx: &mut TestAppContex
     assert!(two.len() == 1 && (two[0].x + 40.0).abs() <= 1.0 && (two[0].y + 12.0).abs() <= 1.0, "the second at (-40, -12): {two:?}");
     assert!(a2.x + two[0].x < a1.x, "left, past the first point");
 }
+
+/// The hover × state matrix's constraint glyph row (live bundle tokens, live-exploration §1.9): plain white, hovered
+/// #fcda7f, selected #fab601 also while hovered; a conflicting one red with a white icon in each state; a Use glyph blue.
+#[test]
+fn a_constraint_glyphs_box_takes_lives_colour_in_each_state() {
+    use crate::part_studio::sketch::constraint_glyph_colors as c;
+    let states = [(false, false), (true, false), (false, true), (true, true)];
+    let own: Vec<_> = states.iter().map(|(h, s)| c(false, false, *s, *h)).collect();
+    assert_eq!(own, [(0xffffff, 0), (0xfcda7f, 0), (0xfab601, 0), (0xfab601, 0)], "(plain, hovered, selected, sel+hovered)");
+    let over: Vec<_> = states.iter().map(|(h, s)| c(true, false, *s, *h)).collect();
+    assert_eq!(over, [(0xd66e74, 0xffffff), (0xaa252d, 0xffffff), (0xbd3039, 0xffffff), (0xbd3039, 0xffffff)], "over-defined");
+    let used: Vec<_> = states.iter().map(|(h, s)| c(false, true, *s, *h).0).collect();
+    assert_eq!(used, [0xdef1fb, 0xb2ddf6, 0x90cef1, 0x90cef1], "a used curve's glyph");
+}

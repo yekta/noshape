@@ -1,14 +1,18 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 08:45 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 10:0x UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (lead P0 11-28 08:5x): the sketch hover × state matrix
-- docs/parity/sketch-hover-matrix.md: 11 kinds × 8 states, preliminary score 14 =, 22 ?, 0 ✗, 52 L (reported to the lead).
-- Then: a scene test per row (crates/scene: `sketch_color` per state, pick states on hover/selection, glyph sprites,
-  priority) turning ? into = / ✗; fix ✗; file the L cells in live/REQUESTS.md (spline, text, circle, used curve hover/
-  select, over-defined colour, multi-select, face vs plane, glyph selected). GPU cells exist in part-studio-ui
-  hover_matrix_tests (sketch_cell harness, State enum); psui owns interaction-feel.md.
+## NOW (11-28 10:0x UTC): the sketch hover × state matrix
+- docs/parity/sketch-hover-matrix.md: 48 =, 0 ?, 0 ✗, 40 L of 88 (14 new GPU cells in hover_matrix_tests, all green on
+  the Mac; glyph colours `constraint_glyph_colors` + T1; used points take the constrained colour). The 40 L asked in
+  live/REQUESTS.md "skasm 11-28 09:2x" (batch 12): add a cell per new take when it lands.
+- Same commit: live rq-1128 answers: Trim hands a cut-off corner to its Coincident partner (point on the trimmed line,
+  origin moves with it; sketch tools.rs `hand_over_trimmed_ends`), Linear pattern with a line selected ignores an empty
+  click (asked live: line alone / two circles / circular, REQUESTS 09:3x). OPEN from rq-1128: the too-large chamfer's 9
+  CHAMFER COINCIDENTs; Offset's 2nd click must not open the box (where is live's label?); ASM-MC top corner takes the
+  VERTICAL edge (Z -z), unlike probe-mcq's spline end: reconcile (TICKETS 50).
+- Scripts: tmx.sh (scene look + ps-ui hover_matrix::sk_ + glyph T1 + clippy), ttrim.sh (sketch + scene lib + clippy).
 
 ## NOW (11-28 08:45 UTC)
 - QUEUED (land.sh, no results yet; each carries the earlier ones): 75280e34, dd0fa834, 8728537c, ff59d97f, ab49ca2c
@@ -26,7 +30,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - REPLAY bn02so8gg waiting in the vibex8 slot (qa's 471-scenario shards since 06:29): rclick-line-circle-menu,
   horizontal/vertical-key, 3pt-arc-reversed-sides, slot-on-arc + 19 sketch-used retakes (out ~/tmp/skasm/uip). After
   the lands: asm replay (mistake-asm-spline-mate-same-part, asm-mc-on-spline-face, display-states-create, in-context).
-- Live REQUESTS 1-4 (skasm 11-28) unanswered.
+- Live REQUESTS 1-4 (skasm 06:5x) answered 08:39 (live/rq-1128): see the 10:0x section.
 - Hosts: builds + crate tests on the Mac (rb.sh NOSHAPE_RB_HOST=mac, writes only in ~/noshape-host, CLI only); replays on
   vibex8 via ~/bin/slot (uipr.sh). Mac clippy's 6 cocoa deprecation warnings are vendor/: not ours.
 - Scripts /root/skasm-scratch/bin: tal.sh (scene + ps-ui sketch ui), tinf.sh (sketch + scene + ps-ui filter), tds.sh

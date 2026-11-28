@@ -227,6 +227,23 @@ const OTF_BOX_COLOR: u32 = 0x788188;
 const OTF_BOX_FILL_ALPHA: f32 = 0.8;
 /// A point of another shown sketch, picked by a Select click in a sketch (a shown sketch point's ~10 px hover disc).
 const OTHER_SKETCH_POINT_REACH_PX: f64 = 5.0;
+/// A constraint glyph's box and icon colours (live bundle tokens, live-exploration §1.9): white, hovered #fcda7f,
+/// selected #fab601; blue tints for external references; red boxes with white icons for conflicts. No outline. Selected
+/// wins over hovered.
+fn constraint_glyph_colors(conflict: bool, external: bool, selected: bool, hovered: bool) -> (u32, u32) {
+    match (conflict, external, selected, hovered) {
+        (true, _, true, _) => (0xbd3039, 0xffffff),
+        (true, _, false, true) => (0xaa252d, 0xffffff),
+        (true, _, false, false) => (0xd66e74, 0xffffff),
+        (false, true, true, _) => (0x90cef1, 0x000000),
+        (false, true, false, true) => (0xb2ddf6, 0x000000),
+        (false, true, false, false) => (0xdef1fb, 0x000000),
+        (false, false, true, _) => (0xfab601, 0x000000),
+        (false, false, false, true) => (0xfcda7f, 0x000000),
+        _ => (0xffffff, 0x000000),
+    }
+}
+
 /// The clear margin round a constraint glyph's 20 px tile that still hovers it (live2 sktools-1118: lit to 14 px from
 /// its centre, off at 15–16).
 const GLYPH_MARGIN: f32 = 4.0;
@@ -5416,20 +5433,8 @@ impl PartStudioView {
             let margin = if hovered { GLYPH_HOLD_MARGIN } else { GLYPH_MARGIN };
             // (Red whether or not Show errors is ticked: live errors-1118's Sketch HV, unticked.)
             let conflict = ed.conflicting.contains(&cid);
-            // Onshape constraint boxes (§1.9): white, hover `#fcda7f`, selected
-            // `#fab601`; blue tints for external references; red boxes with
-            // white glyphs for conflicts. No outline.
-            let (bg, fg) = match (conflict, g.external, selected, hovered) {
-                (true, _, true, _) => (rgb(0xbd3039), rgb(0xffffff)),
-                (true, _, false, true) => (rgb(0xaa252d), rgb(0xffffff)),
-                (true, _, false, false) => (rgb(0xd66e74), rgb(0xffffff)),
-                (false, true, true, _) => (rgb(0x90cef1), rgb(0x000000)),
-                (false, true, false, true) => (rgb(0xb2ddf6), rgb(0x000000)),
-                (false, true, false, false) => (rgb(0xdef1fb), rgb(0x000000)),
-                (false, false, true, _) => (rgb(0xfab601), rgb(0x000000)),
-                (false, false, false, true) => (rgb(0xfcda7f), rgb(0x000000)),
-                _ => (rgb(0xffffff), rgb(0x000000)),
-            };
+            let (bg, fg) = constraint_glyph_colors(conflict, g.external, selected, hovered);
+            let (bg, fg) = (rgb(bg), rgb(fg));
             out.push(
                 div()
                     .id(SharedString::from(format!("glyph-{}-{}", cid.0, g.entity.0)))
