@@ -8,14 +8,15 @@ use noshape_kernel as k;
 use noshape_kernel::ShapeType;
 
 pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) -> Option<Connector> {
-    let mk = |origin: DVec3, z: DVec3| {
+    let mkx = |origin: DVec3, z: DVec3, x: Option<DVec3>| {
         let z = z.normalize();
-        let mut x = DVec3::X - z * z.x;
+        let mut x = x.map(|x| x - z * z.dot(x)).filter(|x| x.length_squared() > 1e-12).unwrap_or(DVec3::X - z * z.x);
         if x.length_squared() < 1e-12 {
             x = DVec3::Y - z * z.y;
         }
         Connector { reference: Reference::Implicit { on: Box::new(on.clone()), inference }, name: "Mate connector".into(), origin, x: x.normalize(), z }
     };
+    let mk = |origin: DVec3, z: DVec3| mkx(origin, z, None);
     match on {
         Reference::Origin => Some(mk(DVec3::ZERO, DVec3::Z)),
         Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => {
@@ -75,12 +76,15 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
                     Some(mk(center, outward.unwrap_or(axis)))
                 }
                 _ => {
-                    let mid = e.point_at((info.first_param + info.last_param) * 0.5).ok()?;
-                    let t = e.tangent_at((info.first_param + info.last_param) * 0.5).ok().unwrap_or(DVec3::X);
+                    let um = (info.first_param + info.last_param) * 0.5;
+                    let mid = e.point_at(um).ok()?;
+                    let t = e.tangent_at(um).ok().unwrap_or(DVec3::X);
+                    let binormal = |u: f64| edge_binormal(&e, &info, u);
+                    let at = |u: f64| e.tangent_at(u).ok().unwrap_or(t);
                     match inference {
-                        Inference::Vertex => Some(mk(info.start, t)),
-                        Inference::VertexEnd => Some(mk(info.end, -e.tangent_at(info.last_param).ok().unwrap_or(t))),
-                        _ => Some(mk(mid, t)),
+                        Inference::Vertex => Some(mkx(info.start, at(info.first_param), binormal(info.first_param))),
+                        Inference::VertexEnd => Some(mkx(info.end, -at(info.last_param), binormal(info.last_param))),
+                        _ => Some(mkx(mid, t, binormal(um))),
                     }
                 }
             }
@@ -179,4 +183,16 @@ fn rim_z(ev: &EvalCtx, bi: usize, ei: usize, at: DVec3) -> Option<DVec3> {
     };
     let swept = faces.len() == 2 && side_of(faces[0].0).is_some() && side_of(faces[0].0) == side_of(faces[1].0);
     Some(if swept { -axis.normalize() } else { axis.normalize() })
+}
+
+/// A curved edge's binormal at parameter `u` (the way the edge runs), its plane's normal where it doesn't bend there:
+/// the X of a connector on its points (live asm-import-step-fastened-top-to-spline-face: a natural spline's end X +z,
+/// its sketch's normal). None on a line, which keeps the world X.
+pub fn edge_binormal(e: &k::Shape, info: &k::EdgeInfo, u: f64) -> Option<DVec3> {
+    let bends = |u: f64| {
+        let [_, d1, d2, _] = e.derivatives_at(u).ok()?;
+        let (b, sign) = (d1.cross(d2), d1.dot(e.tangent_at(u).ok()?).signum());
+        (b.length() > 1e-6 * d1.length().powi(3)).then_some(b * sign)
+    };
+    bends(u).or_else(|| [0.5, 0.25, 0.75].iter().find_map(|f| bends(info.first_param + f * (info.last_param - info.first_param))))
 }

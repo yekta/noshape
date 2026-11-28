@@ -1965,7 +1965,11 @@ pub fn resolve_connector_aligned(ctx: &Arc<Context>, body: Option<&BodyId>, refe
                 let db = e.point_at(*b).map(|p| p.distance(frame.origin)).unwrap_or(f64::MAX);
                 da.total_cmp(&db)
             })?;
-            e.tangent_at(t).ok()?
+            let z = e.tangent_at(t).ok()?;
+            if let Some(x) = crate::regen::implicit::edge_binormal(&e, &i, t) {
+                return Some(Frame::from_axes(frame.origin, z, x));
+            }
+            z
         }
         // Boundary points of a sketch region: Z along the sketch normal.
         Reference::SketchRegion { sketch, .. } => ev.ctx.sketch(*sketch)?.frame.normal,

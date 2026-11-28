@@ -2638,6 +2638,18 @@ fn spline_face_inferences_are_its_edges_points() {
         let mid = pts.iter().find(|p| (p.frame.origin - DVec3::new(0.052, 0.015, z)).length() < 2e-4).unwrap_or_else(|| panic!("the midpoint at z {z}: {:#?}", show()));
         assert!(mid.frame.z().dot(DVec3::Y * y) > 1.0 - 1e-6, "z {z}: {:#?}", mid.frame.z());
     }
+    // Live asm-import-step-fastened-top-to-spline-face (s17): the spline's end at (40, 30, 0), Z along its tangent, X +z
+    // (the curve's plane normal, though a natural spline doesn't bend at its end), not the world X across it.
+    let b = &r.context.bodies[0];
+    let bottom = (0..b.edges.len())
+        .find(|&i| b.shape.sub_shape(noshape_kernel::ShapeType::Edge, i).ok().and_then(|e| e.edge_info().ok()).is_some_and(|n| !matches!(n.curve, noshape_kernel::Curve::Line { .. }) && n.start.z.abs() < 1e-9 && n.end.z.abs() < 1e-9))
+        .map(|i| Reference::Edge((*b.edges[i]).clone()))
+        .expect("the spline's bottom edge");
+    let ends = inference_candidates(&r.context, Some(&part), &bottom, &UnitPrefs::default());
+    let show = || ends.iter().map(|p| (p.frame.origin * 1e3, p.frame.z(), p.frame.x())).collect::<Vec<_>>();
+    let end = ends.iter().find(|p| p.frame.origin.distance(DVec3::new(0.04, 0.03, 0.0)) < 1e-7).unwrap_or_else(|| panic!("{:#?}", show()));
+    assert!(end.frame.z().dot(DVec3::new(-0.768, 0.64, 0.0)).abs() > 0.99, "{:#?}", show());
+    assert!(end.frame.x().dot(DVec3::Z) > 1.0 - 1e-6, "{:#?}", show());
 }
 
 #[test]

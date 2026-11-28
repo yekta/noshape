@@ -1,9 +1,9 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 10:28 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 11:37 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 10:31 UTC): offset arrow flip + chamfer 13th COINCIDENT + MC top corner test QUEUED via land.sh (Mac: sketch, scene lib, ps-ui offset, assembly spline_face, clippy green); next: replay on vibex8 when free
+## NOW (11-28 11:37 UTC): 7416accd QUEUED (offset flip, chamfer COINCIDENT, MC top corner); ASM-FASTEN-SPLINE-FACE-ORIENTATION QUEUED (curved edge point X = binormal; Mac: assembly, model-core, model all, ops mate/connector/assembly, clippy green); SKETCH-USE-ARC-AS-MIDPOINT-POINT waits on live (REQUESTS 11:3x use-mid-1128: live's click 7.7 px from the arc's midpoint dot; rim cell 58 disagrees); next: replay on vibex8 when free
 All three items coded, not committed:
 1. Offset: live's (10,-4) and (10,-8) clicks FLIP the side (shots: copy -5 -> +5), they hit the hollow arrow (tail on the
    copy, running to -22). Ours: `offset_arrow_at` (whole arrow, 10 px from the segment) for click + hover look;
