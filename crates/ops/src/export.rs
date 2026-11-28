@@ -197,7 +197,7 @@ impl Default for CustomResolution {
 /// saved on Export only): the format, the options every format shares, and
 /// each format's own. glTF, GLB, OBJ, 3MF and URDF share one resolution;
 /// STL keeps its own, with its units and encoding. "Export unique parts as
-/// individual files" starts unchecked every time (live depth batch 8).
+/// individual files" is remembered too (live export-parts-three-individual-files s16).
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct SolidExportPrefs {
@@ -220,6 +220,7 @@ pub struct SolidExportPrefs {
     pub urdf_geometry: usize,
     pub urdf_stl_text: bool,
     pub urdf_single_link: bool,
+    pub individual: bool,
     pub apply_rules: bool,
 }
 
@@ -262,6 +263,7 @@ impl Default for SolidExportPrefs {
             y_up: false,
             hidden: false,
             options: 0,
+            individual: false,
             apply_rules: true,
             step: StepPrefs::default(),
             parasolid: VersionPrefs::default(),
@@ -321,7 +323,7 @@ impl SolidExportPrefs {
     /// Keeps `s`'s values: the shared ones and its format's own.
     pub fn keep(&mut self, s: &ExportSettings) {
         self.format = s.format.label().into();
-        (self.y_up, self.hidden, self.options, self.apply_rules) = (s.y_up, s.hidden, s.options, s.apply_rules);
+        (self.y_up, self.hidden, self.options, self.individual, self.apply_rules) = (s.y_up, s.hidden, s.options, s.individual, s.apply_rules);
         self.custom = s.custom;
         let v = VersionPrefs { version: s.version, latest: s.latest };
         match s.format {
@@ -348,7 +350,7 @@ impl SolidExportPrefs {
 
     /// Gives `s` the remembered shared values and those of `s.format`.
     pub fn give(&self, s: &mut ExportSettings) {
-        (s.y_up, s.hidden, s.options, s.apply_rules) = (self.y_up, self.hidden, self.options.min(OPTIONS.len() - 1), self.apply_rules);
+        (s.y_up, s.hidden, s.options, s.individual, s.apply_rules) = (self.y_up, self.hidden, self.options.min(OPTIONS.len() - 1), self.individual, self.apply_rules);
         s.custom = self.custom;
         let v = self.version(s.format);
         (s.version, s.latest) = (v.version, v.latest);
@@ -1751,15 +1753,16 @@ mod tests {
         assert!(bad.is_empty(), "{} of {} directed edges unmatched", bad.len(), directed.len());
     }
 
-    /// Live depth batch 8 (export-stl-y-up, export-parts-three-individual-files): the next Export opens on the last
-    /// one's Format, Options, Units and Y axis up, but "Export unique parts as individual files" unchecked.
+    /// Live depth batch 8 (export-stl-y-up, export-parts-three-individual-files s16): the next Export opens on the last
+    /// one's Format, Options, Units, Y axis up and "Export unique parts as individual files" (the earlier "unchecked"
+    /// was wrong against that take: lead 11-28).
     #[test]
-    fn export_remembers_its_choices_but_not_individual_files() {
+    fn export_remembers_its_choices_and_individual_files() {
         let s = super::ExportSettings { format: super::PartFormat::Stl, y_up: true, individual: true, options: 2, units: 4, ..Default::default() };
         let mut prefs = super::SolidExportPrefs::default();
         prefs.keep(&s);
         let again = prefs.settings(false);
-        assert_eq!((again.format, again.y_up, again.options, again.units, again.individual), (super::PartFormat::Stl, true, 2, 4, false));
+        assert_eq!((again.format, again.y_up, again.options, again.units, again.individual), (super::PartFormat::Stl, true, 2, 4, true));
     }
 
     /// Live (behaviours "qexport" table): "Apply export rules to contents" starts on and is remembered.

@@ -263,6 +263,10 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
     if cad_file && !file_formats().contains(&st.borrow().format) {
         set_file_format(&mut st.borrow_mut(), 0);
     }
+    // Exporting parts has no individual-files row: one file, the remembered box kept for the next tab export.
+    if parts_only {
+        st.borrow_mut().individual = false;
+    }
     // Resolution › Custom's fields (live 1745): STL's three, their lengths
     // in the STL units, then the other mesh formats' three.
     let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).click_places_caret(true).default_value(custom_text(&st.borrow(), f))))).collect());
@@ -566,7 +570,11 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
                     return false;
                 }
                 let mut prefs = (*s.memory).clone();
+                let individual = prefs.individual;
                 prefs.keep(&s);
+                if parts_only {
+                    prefs.individual = individual;
+                }
                 prefs.save();
                 let run = run2.clone();
                 window.defer(cx, move |window, cx| run(s, name, window, cx));
