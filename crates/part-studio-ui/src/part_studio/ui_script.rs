@@ -269,7 +269,7 @@ impl PartStudioView {
         // The parts list's heading, as drawn (render_parts_list).
         let parts_heading = format!("Parts ({})", self.display.bodies.iter().filter(|b| super::part_section(b) == "parts").count());
         // The sketch Text dialog over the Sketch dialog reads as itself (live's recorder since 2026-11-14.11).
-        let dialog_state = self.sketch_text_ui_state(cx).or_else(|| self.image_picker_open(cx).then(crate::ui_script::open_dialog).flatten()).or_else(|| dialog.map(|d| d.ui_state(window, cx))).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.datum_panel_state(cx)).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(|| self.panel_ui_state(cx)).or_else(crate::ui_script::open_dialog);
+        let dialog_state = self.sketch_text_ui_state(cx).or_else(|| self.image_picker_open(cx).then(crate::ui_script::open_dialog).flatten()).or_else(|| dialog.map(|d| d.ui_state(window, cx))).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.datum_panel_state(cx)).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(|| self.ui.measure_panel_state.as_ref().map(|s| s.0.clone())).or_else(|| self.panel_ui_state(cx)).or_else(crate::ui_script::open_dialog);
         // The dialog the focused field is in (live `focus.dialog`; the Create variable popup stands for its dialog).
         let mut focus = focus;
         // Mass properties' Face tab: its faces field has the keyboard (live ui-parity mass-properties-face-tab).
@@ -301,7 +301,7 @@ impl PartStudioView {
             "sketch": self.ui_sketch_state(cx),
             "camera": self.ui_camera_state(cx),
             // (No readout while a feature dialog is open: the readout isn't rebuilt then.)
-            "measure": match self.ui_sketch_measure(cx) {
+            "measure": match self.ui_sketch_measure(cx).or_else(|| self.ui.measure_panel_state.as_ref().map(|s| s.1.clone())) {
                 Some(m) => m,
                 None if self.ui.measure_readout.is_empty() || self.edit.is_some() || self.interference_open() => Value::Null,
                 None => json!({ "readout": self.ui.measure_readout, "panel": null }),

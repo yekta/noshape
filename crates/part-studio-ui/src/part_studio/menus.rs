@@ -1624,6 +1624,7 @@ impl PartStudioView {
 
     pub(super) fn render_measure_panel(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
+        self.ui.measure_panel_state = None;
         if self.edit.is_some() || self.context.is_none() {
             return Vec::new();
         }
@@ -2335,6 +2336,9 @@ impl PartStudioView {
             .collect();
         let length_name = MEASURE_LENGTH_UNITS.iter().find(|(_, u)| *u == munits.length).map(|(n, _)| n.to_string()).unwrap_or_else(|| format!("{:?}", munits.length));
         let angle_name = format!("{:?}", munits.angle);
+        if !self.show_mass && (crate::ui_script::active() || cfg!(test)) {
+            self.ui.measure_panel_state = Some(measure_panel_ui_state(&measured_names, &mrows, current_type, &length_name, &angle_name));
+        }
         let length_menu = unit_menu("measure-length-unit", length_name, length_items, cx);
         let angle_menu = unit_menu("measure-angle-unit", angle_name, angle_items, cx);
         // Live (ui 10-23 a (e), a default plane alone): a selection with no
@@ -2653,6 +2657,43 @@ fn face_mass_ui_state(f: &FaceMassView, ref_active: bool, reference: Option<Stri
 /// (label, value, X / Y / Z sub-row axis, its (x), the value's 5 decimals)
 type MeasureRow = (String, String, Option<usize>, Option<MeasureVar>, Option<String>);
 
+/// The Measure panel as live's recorder reads it (measure-panel-spline-face s3, as the assembly's): `dialog` with its
+/// texts in order (a chip and its ×, the select labels, the checkbox as "[ ] name" then its name, each row's label,
+/// number and unit, a squared unit as its "2") and its four fields; `measure` with the panel's rows.
+fn measure_panel_ui_state(names: &[String], rows: &[MeasureRow], kind: &str, length: &str, angle: &str) -> (serde_json::Value, serde_json::Value) {
+    use serde_json::json;
+    const FIELD: &str = "Select entities to measure";
+    let mut text = vec![FIELD.to_string()];
+    for n in names {
+        text.extend([n.clone(), "×".into()]);
+    }
+    text.extend(["Measure type:", "Length unit:", "Angle unit:", "[ ] Reference coordinate system", "Reference coordinate system"].map(String::from));
+    let mut items = Vec::new();
+    for (label, value, axis, ..) in rows {
+        let (num, unit) = value.rsplit_once(' ').unwrap_or((value.as_str(), ""));
+        if axis.is_none() {
+            text.push(format!("{label}:"));
+        }
+        text.push(num.to_string());
+        let shown = match unit.chars().last() {
+            Some('²') => "2",
+            Some('³') => "3",
+            _ => unit,
+        };
+        if !shown.is_empty() {
+            text.push(shown.to_string());
+        }
+        items.push(json!({ "name": label, "value": num, "units": unit.replace('²', "2").replace('³', "3") }));
+    }
+    text.truncate(30);
+    let select = |value: &str| json!({ "label": FIELD, "kind": "select", "value": value });
+    let dialog = json!({
+        "kind": "panel", "title": "Measure", "text": text,
+        "fields": [select(kind), select(length), select(angle), { "label": "Reference coordinate system", "kind": "checkbox", "value": false }],
+    });
+    (dialog, json!({ "readout": [], "panel": { "selection": [], "items": items } }))
+}
+
 /// What a Measure row's (x) measures: `DISTANCE`, `LENGTH`, `DIAMETER` or
 /// `RADIUS`, and whether it is a maximum distance.
 type MeasureVar = (&'static str, bool);
@@ -2724,8 +2765,9 @@ fn measure_fmt_in(q: Quantity, units: &noshape_units::UnitPrefs) -> String {
 /// properties without material + the material-not-defined notice").
 const NO_MATERIAL: &str = "One or more parts do not have a material defined.";
 
-/// Live shows the notice once per page load: once per app session here.
-static NO_MATERIAL_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Live shows the notice once per page load for each set of measured parts (reopening on the same parts: none;
+/// adding a part while open: again, mass-properties-add-part s4-s5): once per app session here.
+static NO_MATERIAL_SHOWN: std::sync::Mutex<Vec<Vec<BodyId>>> = std::sync::Mutex::new(Vec::new());
 
 impl PartStudioView {
     /// Open or close the Mass properties panel. A part without a material
@@ -2921,16 +2963,19 @@ impl PartStudioView {
     /// shows it ≈ 1 s after a part without material is being measured
     /// (picked, or preselected when the panel opens) and hides it ≈ 4.4 s
     /// later; with nothing measured there is none (behaviours "qa5 (10-26
-    /// p4)", qa4 toast follow-up; qa5 P1-17). Once per session.
+    /// p4)", qa4 toast follow-up; qa5 P1-17). Once per session and set of measured parts.
     fn note_unmaterialed_parts(&mut self, measured: &[BodyId], cx: &mut Context<Self>) {
-        if NO_MATERIAL_SHOWN.load(std::sync::atomic::Ordering::Relaxed) {
+        if self.ui.material_checked == measured {
             return;
         }
+        self.ui.material_checked = measured.to_vec();
         let props = self.studio(cx).map(|s| s.part_properties.clone()).unwrap_or_default();
         if !no_material_notice_due(measured, |b| props.get(b).and_then(|p| p.density)) {
             return;
         }
-        NO_MATERIAL_SHOWN.store(true, std::sync::atomic::Ordering::Relaxed);
+        if !NO_MATERIAL_SHOWN.lock().is_ok_and(|mut shown| first_notice_for(&mut shown, measured)) {
+            return;
+        }
         self.ui.material_notice_pending = true;
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(std::time::Duration::from_millis(1000)).await;
@@ -2941,6 +2986,17 @@ impl PartStudioView {
         })
         .detach();
     }
+}
+
+/// Whether `measured` is a set of parts the notice hasn't been shown for (in any order); notes it.
+fn first_notice_for(shown: &mut Vec<Vec<BodyId>>, measured: &[BodyId]) -> bool {
+    let mut set = measured.to_vec();
+    set.sort();
+    if shown.contains(&set) {
+        return false;
+    }
+    shown.push(set);
+    true
 }
 
 /// Whether the measured parts call for the no-material notice: some part is
@@ -3024,7 +3080,7 @@ fn mass_parts(display: &noshape_model::display::StudioDisplay, owners: impl Iter
 
 #[cfg(test)]
 mod no_material_tests {
-    use super::no_material_notice_due;
+    use super::{first_notice_for, no_material_notice_due};
     use noshape_model::reference::{BodyId, FeatureId};
 
     /// Live (qa5 10-26 p4, qa4 toast follow-up): no notice while nothing is
@@ -3037,6 +3093,19 @@ mod no_material_tests {
         assert!(!no_material_notice_due(&[], density));
         assert!(!no_material_notice_due(std::slice::from_ref(&a), density));
         assert!(no_material_notice_due(&[a.clone(), b], density));
+    }
+
+    /// Live: reopening Mass properties on the same parts shows no notice again (behaviours "once per page load"); a
+    /// part added while it is open shows it again (mass-properties-add-part s4-s5).
+    #[::core::prelude::v1::test]
+    fn no_material_notice_once_per_measured_set() {
+        let a = BodyId { feature: FeatureId(1), index: 0 };
+        let b = BodyId { feature: FeatureId(1), index: 1 };
+        let mut shown = Vec::new();
+        assert!(first_notice_for(&mut shown, std::slice::from_ref(&a)));
+        assert!(!first_notice_for(&mut shown, std::slice::from_ref(&a)));
+        assert!(first_notice_for(&mut shown, &[a.clone(), b.clone()]));
+        assert!(!first_notice_for(&mut shown, &[b, a]));
     }
 }
 

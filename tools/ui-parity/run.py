@@ -1413,6 +1413,23 @@ def old_reader_variables(a, b):
     return b
 
 
+def old_reader_measure_panel(a, b):
+    """Live's older recorder (key-bracket-measure, 11-07) read neither the Part Studio's Measure panel nor its rows:
+    `dialog` and `measure` null with the panel's field focused. Ours' panel reads null against it."""
+    if not (isinstance(a, dict) and isinstance(b, dict)) or a.get("dialog") is not None or a.get("measure") is not None:
+        return b
+    d = b.get("dialog")
+    if not (isinstance(d, dict) and d.get("kind") == "panel" and d.get("title") == "Measure"):
+        return b
+    if ((a.get("focus") or {}).get("label")) != "Select entities to measure":
+        return b
+    b["dialog"], b["dialogs"] = None, [x for x in b.get("dialogs") or [] if x != d]
+    m = b.get("measure")
+    if isinstance(m, dict) and m.get("panel") is not None:
+        b["measure"] = None
+    return b
+
+
 def insert_panel(state):
     d = (state or {}).get("dialog")
     if isinstance(d, dict) and d.get("kind") == "panel" and d.get("title") == "Insert parts and assemblies":
@@ -1669,6 +1686,7 @@ def compare(live, ours, whole_document=True):
         b = picker_as_read(b, picker_read)
         b = mass_within_variance(a, b)
         b = old_reader_variables(a, b)
+        b = old_reader_measure_panel(a, b)
         b = clicked_caret(a, b, step)
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)

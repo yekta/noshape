@@ -2537,11 +2537,13 @@ impl PartStudioView {
         let shown = (status, text);
         self.message = Some(shown.clone());
         self.ui.flashed = Some(shown.clone());
+        self.ui.flash_seq += 1;
+        let seq = self.ui.flash_seq;
         cx.notify();
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(time).await;
             let _ = this.update(cx, |this, cx| {
-                if this.message.as_ref() == Some(&shown) {
+                if this.ui.flash_seq == seq && this.message.as_ref() == Some(&shown) {
                     this.message = None;
                     cx.notify();
                 }

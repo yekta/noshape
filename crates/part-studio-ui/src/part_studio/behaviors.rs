@@ -304,6 +304,8 @@ pub struct UiState {
     pub regen_for_arms: bool,
     /// The last toast that hides by itself (`flash_for`): Esc drops it.
     pub flashed: Option<(noshape_model::display::FeatureStatus, String)>,
+    /// Counts `flash_for` toasts: a toast's timer hides only its own, not a later one with the same text.
+    pub flash_seq: u64,
     /// "Show dependencies" panel for a feature.
     pub dependencies: Option<FeatureId>,
     pub cube_hover: Option<super::view_cube::CubeCell>,
@@ -513,6 +515,10 @@ pub struct UiState {
     pub mass_variance: bool,
     /// The Mass and section properties panel as the ui-parity state reads it (kept only while the driver runs).
     pub mass_state: Option<serde_json::Value>,
+    /// The Measure panel as the ui-parity state reads it: its `dialog` and `measure` (kept only while the driver runs).
+    pub measure_panel_state: Option<(serde_json::Value, serde_json::Value)>,
+    /// The measured parts the no-material notice last looked at (it looks again only when they change).
+    pub material_checked: Vec<BodyId>,
     /// The bottom-right Measure readout as live's recorder reads it (`measure.readout`: name, value, units).
     pub measure_readout: Vec<serde_json::Value>,
     /// The summary's last answered line, shown while a changed selection is measured (live measure-mass-1118).
@@ -923,6 +929,7 @@ impl UiState {
             rollback_drop_dg: None,
             regen_for_arms: false,
             flashed: None,
+            flash_seq: 0,
             dependencies: None,
             cube_hover: None,
             cube_origin: None,
@@ -1031,6 +1038,8 @@ impl UiState {
             mass_reference: None,
             mass_variance: false,
             mass_state: None,
+            measure_panel_state: None,
+            material_checked: Vec::new(),
             measure_last_line: None,
             measure_readout: Vec::new(),
             measure_precise: Default::default(),
