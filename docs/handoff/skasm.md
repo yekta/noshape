@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 04:00 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 04:10 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## NOW (11-28 04:00 UTC)
@@ -17,7 +17,11 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   bvo7yas7q = 6 sketch-used-* + 8 batch-6 (from skasm), b2jdtmu2r = 21 asm-spline-*/asm-mc-* (from skasm-main). Both write
   ~/tmp/skasm/uip on vibex8 (serialised by the slot; compare lines print in the task output). If gone after compaction:
   `ssh vibex8 ~/bin/slot --status`, rerun uipr.sh. NEVER call `slot --help` (it queues "--help" as a job).
-- Next: replay diffs; SKETCH-INFERENCE-HORIZONTAL-RANGE (reach already +-7.5 px: replay rclick-line-circle-menu with logs);
+- Third replay queued 04:05 (bg bokbi5vff, from skasm): sketch-rclick-line-circle-menu + 6 sketch-offset-* + sketch-slot-on-spline.
+  HORIZONTAL-RANGE analysis: live's click (50,5) is 9.3 px off the horizontal through (30,0) on screen (iso, 3.26 px/mm
+  along x): no snap is right; our off_line metric looks right, but ours ends at (50.43, 0): the x shift says another snap or
+  path (pointer_rests wake without ctx.screen?). Read the replay's step 9-10 state first.
+- Next: replay diffs; SKETCH-INFERENCE-HORIZONTAL-RANGE (above);
   OFFSET open bits (picked-curve look, open chain's Escape); batch-6 P3s; ASM-MATE-ERROR-ROW (P3).
 - rb.sh syncs each worktree to ~/agents/<worktree>/src and cds there: scripts carry no cd. Crate T1s via rb.sh without
   ~/bin/slot; slot only for replays/suites. Scripts: /root/skasm-scratch/bin (tasm, tso, tuse, uipr, tb6).
