@@ -1,0 +1,88 @@
+{
+ "name": "fl-suppress-two-selected",
+ "about": "spline-parts: Sketch 3 and Extrude 3 selected and suppressed from the menu, then unsuppressed",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 3"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 3"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 3"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 3"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unsuppress"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

@@ -1,0 +1,1028 @@
+{
+ "scenario": "fl-delete-used-sketch-menu",
+ "recorded": "2026-11-28T07:10:42.996Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 4002f36a + live2 2026-11-28.6"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "b05fcc5d58c9e9e6644c8d31",
+  "start": "boss-block",
+  "startElement": "05adbaa80819df3d011a24c3",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 2"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null,
+  "featureTree": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Extrude 1",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Sketch 2",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Extrude 2",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "(rollback bar)",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    }
+   ]
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "feature": "Sketch 2"
+    }
+   },
+   "ok": true,
+   "ti": 32986,
+   "tmove": 33385,
+   "moves": 1,
+   "tdown": 33694,
+   "at": [
+    451,
+    339
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Edit\u2026",
+      "Copy sketch",
+      "Show dimensions",
+      "Add selection to folder\u2026",
+      "Show",
+      "Show all sketches",
+      "Create Drawing of Sketch 2\u2026",
+      "Export as DXF/DWG\u2026",
+      "Section view\u2026",
+      "Suppress",
+      "Dynamic suppression",
+      "Add comment",
+      "Zoom to selection",
+      "View normal to",
+      "Show dependencies\u2026",
+      "Roll to here",
+      "Edit sketch appearance\u2026",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden fake-hover context-menu-active"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 35934,
+   "te": 35934
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "ti": 35934,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Edit\u2026",
+      "Copy sketch",
+      "Show dimensions",
+      "Add selection to folder\u2026",
+      "Show",
+      "Show all sketches",
+      "Create Drawing of Sketch 2\u2026",
+      "Export as DXF/DWG\u2026",
+      "Section view\u2026",
+      "Suppress",
+      "Dynamic suppression",
+      "Add comment",
+      "Zoom to selection",
+      "View normal to",
+      "Show dependencies\u2026",
+      "Roll to here",
+      "Edit sketch appearance\u2026",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden fake-hover context-menu-active"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 38312,
+   "te": 38312
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Delete"
+    }
+   },
+   "ok": true,
+   "ti": 38312,
+   "tmove": 38381,
+   "moves": 2,
+   "tdown": 39421,
+   "at": [
+    561,
+    770
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Extrude 2",
+       "state": "error",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 41918,
+   "te": 41918
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 41918,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Extrude 2",
+       "state": "error",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 46397,
+   "te": 46397
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "ti": 46397,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Extrude 2",
+       "state": "error",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 49506,
+   "te": 49506
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 49506,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Extrude 2",
+       "state": "error",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 52225,
+   "te": 52225
+  }
+ ],
+ "t0_epoch_ms": 1795849816341,
+ "end_data": {
+  "features": [
+   {
+    "name": "Sketch 1",
+    "type": "newSketch",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Extrude 1",
+    "type": "extrude",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Extrude 2",
+    "type": "extrude",
+    "suppressed": false,
+    "status": "ERROR",
+    "inactive": false
+   }
+  ],
+  "rollbackIndex": 3,
+  "parts": [
+   "Part 1"
+  ],
+  "box": [
+   -20,
+   -15,
+   0,
+   20,
+   15,
+   10
+  ]
+ }
+}

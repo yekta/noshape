@@ -1,0 +1,95 @@
+{
+ "name": "fl-delete-folder-menu",
+ "about": "spline-parts: folder Block (Sketch 2, Extrude 2), Delete from its menu; then undo",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 2"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "New folder"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Block"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Block"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

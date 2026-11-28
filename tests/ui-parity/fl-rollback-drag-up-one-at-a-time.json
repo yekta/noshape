@@ -1,0 +1,64 @@
+{
+ "name": "fl-rollback-drag-up-one-at-a-time",
+ "about": "spline-parts: the rollback bar dragged up a feature at a time: below Sketch 3, Extrude 2, Extrude 1",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "rollback_bar": true
+   },
+   "to": {
+    "rollback_to": "Sketch 3"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "drag",
+   "from": {
+    "rollback_bar": true
+   },
+   "to": {
+    "rollback_to": "Extrude 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "drag",
+   "from": {
+    "rollback_bar": true
+   },
+   "to": {
+    "rollback_to": "Extrude 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

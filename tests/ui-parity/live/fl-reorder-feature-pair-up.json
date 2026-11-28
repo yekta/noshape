@@ -1,0 +1,1388 @@
+{
+ "scenario": "fl-reorder-feature-pair-up",
+ "recorded": "2026-11-28T06:38:09.543Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 4002f36a + live2 2026-11-28.6"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "0ed931223daf13ee08127f43",
+  "start": "spline-parts",
+  "startElement": "4cc7f5c4bb654fbe3d052189",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 3"
+  },
+  "parts": [
+   "Part 1",
+   "Part 2",
+   "Part 3"
+  ],
+  "partsHeading": "Parts (3)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    6.094,
+    2.436,
+    -1.624
+   ],
+   "eye_mm": [
+    77.323,
+    -120.936,
+    80.624
+   ],
+   "width_mm": 468.121,
+   "height_mm": 247.911,
+   "mmPerPixel": 0.279809,
+   "orthographic": true
+  },
+  "measure": null,
+  "featureTree": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Extrude 1",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Fillet 1",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Fillet 2",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Sketch 2",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Extrude 2",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Sketch 3",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "Extrude 3",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    },
+    {
+     "name": "(rollback bar)",
+     "depth": 0,
+     "folder": false,
+     "open": null
+    }
+   ]
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "feature": "Sketch 3"
+    }
+   },
+   "ok": true,
+   "ti": 23805,
+   "tmove": 24156,
+   "moves": 1,
+   "tdown": 24449,
+   "at": [
+    70,
+    443
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 3",
+       "id": "FTtk2WVlPw3vrzI_2"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 26468,
+   "te": 26468
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "feature": "Extrude 3"
+    },
+    "mods": "shift"
+   },
+   "ok": true,
+   "ti": 26468,
+   "tmove": 26807,
+   "moves": 1,
+   "tdown": 27102,
+   "at": [
+    70,
+    469
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 3",
+       "id": "FTtk2WVlPw3vrzI_2"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 3",
+       "id": "FC0NYArvQUJ8hkx_2"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected"
+      }
+     ],
+     "rollbackAfter": "Extrude 3"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 29018,
+   "te": 29018
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "drag",
+    "from": {
+     "feature": "Extrude 3"
+    },
+    "to": {
+     "feature": "Sketch 2",
+     "edge": "top"
+    }
+   },
+   "ok": true,
+   "ti": 29018,
+   "dragPx": [
+    [
+     70,
+     469
+    ],
+    [
+     70,
+     380
+    ]
+   ],
+   "tmove": 29682,
+   "moves": 16,
+   "tdown": 30018,
+   "tup": 32052,
+   "at": [
+    [
+     70,
+     469
+    ],
+    [
+     70,
+     380
+    ]
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 3",
+       "id": "FTtk2WVlPw3vrzI_2"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 3",
+       "id": "FC0NYArvQUJ8hkx_2"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 34227,
+   "te": 34227
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 34227,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 3",
+       "id": "FTtk2WVlPw3vrzI_2"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 3",
+       "id": "FC0NYArvQUJ8hkx_2"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 38544,
+   "te": 38544
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1200
+   },
+   "ok": true,
+   "ti": 38544,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 3",
+       "id": "FTtk2WVlPw3vrzI_2"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 3",
+       "id": "FC0NYArvQUJ8hkx_2"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 3",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      6.094,
+      2.436,
+      -1.624
+     ],
+     "eye_mm": [
+      77.323,
+      -120.936,
+      80.624
+     ],
+     "width_mm": 468.121,
+     "height_mm": 247.911,
+     "mmPerPixel": 0.279809,
+     "orthographic": true
+    },
+    "measure": null,
+    "featureTree": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 1",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Fillet 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 3",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Sketch 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "Extrude 2",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      },
+      {
+       "name": "(rollback bar)",
+       "depth": 0,
+       "folder": false,
+       "open": null
+      }
+     ]
+    }
+   },
+   "t": 41558,
+   "te": 41558
+  }
+ ],
+ "t0_epoch_ms": 1795847871257,
+ "end_data": {
+  "features": [
+   {
+    "name": "Sketch 1",
+    "type": "newSketch",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Extrude 1",
+    "type": "extrude",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Fillet 1",
+    "type": "fillet",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Fillet 2",
+    "type": "fillet",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Sketch 3",
+    "type": "newSketch",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Extrude 3",
+    "type": "extrude",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Sketch 2",
+    "type": "newSketch",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   },
+   {
+    "name": "Extrude 2",
+    "type": "extrude",
+    "suppressed": false,
+    "status": "OK",
+    "inactive": false
+   }
+  ],
+  "rollbackIndex": 8,
+  "parts": [
+   "Part 1",
+   "Part 2",
+   "Part 3"
+  ],
+  "box": [
+   0,
+   0,
+   0,
+   90,
+   44,
+   25
+  ]
+ }
+}

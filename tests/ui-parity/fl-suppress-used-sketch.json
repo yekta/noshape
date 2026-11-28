@@ -1,0 +1,62 @@
+{
+ "name": "fl-suppress-used-sketch",
+ "about": "boss-block: Sketch 2 (used by Extrude 2) suppressed, then unsuppressed",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "boss-block",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unsuppress"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

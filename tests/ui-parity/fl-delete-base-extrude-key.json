@@ -1,0 +1,34 @@
+{
+ "name": "fl-delete-base-extrude-key",
+ "about": "block-fillet: Extrude 1 (Fillet 1 uses it) selected and Delete key: no dialog in live; Fillet 1 fails",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "block-fillet",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}

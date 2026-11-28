@@ -1,0 +1,54 @@
+{
+ "name": "fl-rollback-roll-to-end-menu",
+ "about": "spline-parts: rollback bar dragged below Sketch 2, then Roll to end from Extrude 3's menu",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "rollback_bar": true
+   },
+   "to": {
+    "rollback_to": "Sketch 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 3"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Roll to end"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

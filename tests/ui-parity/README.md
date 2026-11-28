@@ -224,6 +224,19 @@ Checkbox's box (toggles it), a Configuration variable's value field (click, then
   "value": "25 mm"}]`; null while the Part Studio has no configuration input.
 Regeneration after a switch or an edit is read from the Mass properties dialog's Volume (the takes end on it).
 
+Live 11-28 (depth batch 11, the feature list, `fl-*`): `{"expander": "<row>"}` a folder row's chevron (the row by its
+name, `"Block"` also matching live's `"Block (2)"`); a Part Studio folder starts collapsed. `"feature_tree": true` (a
+scenario key): each state also has `featureTree.rows`, the feature list's visible rows in order with the rollback bar as
+the row `"(rollback bar)"`: `{"name": "Block (2)", "depth": 0, "folder": true, "open": false}` (`depth` the nesting
+level, 0 the top; `open` true when the folder shows its features, null for a feature), and the take has `end_data`, the
+document after the last step as the REST API reads it: `features` (`name`, `type`, `suppressed`, `status` OK / ERROR /
+…, `inactive` rolled back), `rollbackIndex`, `parts` (names), `box` (the studio's bounding box, mm, [low x, y, z, high
+x, y, z]; null with no part). Live: deleting a feature that others use (menu Delete or the Delete key) shows no dialog;
+the feature goes and its dependents fail; deleting a folder deletes its features; double-clicking a rolled-back
+feature opens nothing; a feature can be dragged above what it uses (it then fails). Assembly takes (from 11-28) read `assembly` from the open page (the
+Instances list and the viewer's occurrence transforms), mates from REST when the list changes. A step's
+`closedToast`: live's import toast covered the click's target and was closed first (not a user action).
+
 ### Part Studio panels, picks and in context (psui, 11-07)
 
 - `{"caret": "<button>"}`: the ▾ / ▲ beside a split button: `{"caret": "Add configuration input"}` (the ▲ of the

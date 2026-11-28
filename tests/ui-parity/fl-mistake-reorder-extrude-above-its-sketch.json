@@ -1,0 +1,29 @@
+{
+ "name": "fl-mistake-reorder-extrude-above-its-sketch",
+ "about": "mistake: Extrude 3 dragged above its own Sketch 3",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "feature": "Extrude 3"
+   },
+   "to": {
+    "feature": "Sketch 3",
+    "edge": "top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

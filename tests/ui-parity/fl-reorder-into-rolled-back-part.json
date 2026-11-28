@@ -1,0 +1,47 @@
+{
+ "name": "fl-reorder-into-rolled-back-part",
+ "about": "spline-parts: rollback bar below Extrude 1, then Sketch 3 (rolled back) dragged above Sketch 2",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "rollback_bar": true
+   },
+   "to": {
+    "rollback_to": "Extrude 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "drag",
+   "from": {
+    "feature": "Sketch 3"
+   },
+   "to": {
+    "feature": "Sketch 2",
+    "edge": "top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

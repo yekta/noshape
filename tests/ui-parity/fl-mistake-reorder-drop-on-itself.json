@@ -1,0 +1,28 @@
+{
+ "name": "fl-mistake-reorder-drop-on-itself",
+ "about": "mistake: Extrude 2 dragged and dropped on its own row",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "feature": "Extrude 2"
+   },
+   "to": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

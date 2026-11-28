@@ -1,0 +1,29 @@
+{
+ "name": "fl-reorder-down-below-later",
+ "about": "spline-parts: Extrude 2 (Part 2) dragged below Extrude 3",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "feature": "Extrude 2"
+   },
+   "to": {
+    "feature": "Extrude 3",
+    "edge": "bottom"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}

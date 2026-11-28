@@ -1,0 +1,42 @@
+{
+ "name": "fl-reorder-feature-pair-up",
+ "about": "spline-parts: Sketch 3 and Extrude 3 selected, dragged above Sketch 2 together",
+ "area": "part-studio",
+ "source": "live depth batch 11 (the feature list as makers use it; lead 11-28)",
+ "start": "spline-parts",
+ "feature_tree": true,
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 3"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "feature": "Extrude 3"
+   },
+   "to": {
+    "feature": "Sketch 2",
+    "edge": "top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}
