@@ -1,19 +1,23 @@
 {
  "scenario": "asm-mate-connector-realign",
- "recorded": "2026-11-14T07:03:31.917Z",
+ "recorded": "2026-11-28T15:15:51.870Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.6"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 5ca3cf24 + live2 2026-11-28.11"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "14a2b6ae32dc0870c8f1efc2",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "d16097ded607ba7258fa43c7",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -156,9 +160,9 @@
     -21.243,
     37.495
    ],
-   "width_mm": 98.649,
-   "height_mm": 57.373,
-   "mmPerPixel": 0.058965,
+   "width_mm": 93.746,
+   "height_mm": 64.287,
+   "mmPerPixel": 0.072559,
    "orthographic": true
   },
   "measure": null
@@ -173,8 +177,12 @@
     }
    },
    "ok": true,
+   "ti": 28374,
+   "tmove": 28426,
+   "moves": 1,
+   "tdown": 28730,
    "at": [
-    250,
+    631,
     58
    ],
    "state": {
@@ -289,7 +297,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 3",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -424,14 +432,15 @@
       -21.243,
       37.495
      ],
-     "width_mm": 98.649,
-     "height_mm": 57.373,
-     "mmPerPixel": 0.058965,
+     "width_mm": 93.746,
+     "height_mm": 64.287,
+     "mmPerPixel": 0.072559,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 52901
+   "t": 31105,
+   "te": 31105
   },
   {
    "step": 2,
@@ -447,10 +456,14 @@
     }
    },
    "ok": true,
+   "ti": 31105,
+   "tmove": 31163,
+   "moves": 1,
    "hover": [],
+   "tdown": 35450,
    "at": [
-    1438,
-    763
+    1562,
+    682
    ],
    "state": {
     "focus": {
@@ -571,7 +584,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 3",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -704,16 +717,17 @@
      "eye_mm": [
       63.812,
       -21.243,
-      37.496
+      37.495
      ],
-     "width_mm": 98.649,
-     "height_mm": 57.373,
-     "mmPerPixel": 0.058965,
+     "width_mm": 93.746,
+     "height_mm": 64.287,
+     "mmPerPixel": 0.072559,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 62372
+   "t": 37738,
+   "te": 37738
   },
   {
    "step": 3,
@@ -722,6 +736,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 37738,
    "state": {
     "focus": {
      "kind": "none"
@@ -841,7 +856,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 3",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -974,16 +989,17 @@
      "eye_mm": [
       63.812,
       -21.243,
-      37.496
+      37.495
      ],
-     "width_mm": 98.649,
-     "height_mm": 57.373,
-     "mmPerPixel": 0.058965,
+     "width_mm": 93.746,
+     "height_mm": 64.287,
+     "mmPerPixel": 0.072559,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 67180
+   "t": 42137,
+   "te": 42137
   },
   {
    "step": 4,
@@ -994,21 +1010,19 @@
     }
    },
    "ok": true,
+   "ti": 42137,
+   "tmove": 42186,
+   "moves": 1,
+   "tdown": 42730,
    "at": [
-    290,
+    671,
     202
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Realign",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Primary axis entity",
      "dialog": "Mate connector 1"
     },
     "dialog": {
@@ -1148,7 +1162,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 3",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1283,14 +1297,15 @@
       -21.243,
       37.495
      ],
-     "width_mm": 98.649,
-     "height_mm": 57.373,
-     "mmPerPixel": 0.058965,
+     "width_mm": 93.746,
+     "height_mm": 64.287,
+     "mmPerPixel": 0.072559,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 72010
+   "t": 44761,
+   "te": 44761
   },
   {
    "step": 5,
@@ -1299,17 +1314,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 44761,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Realign",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Primary axis entity",
      "dialog": "Mate connector 1"
     },
     "dialog": {
@@ -1449,7 +1459,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 3",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1584,14 +1594,15 @@
       -21.243,
       37.495
      ],
-     "width_mm": 98.649,
-     "height_mm": 57.373,
-     "mmPerPixel": 0.058965,
+     "width_mm": 93.746,
+     "height_mm": 64.287,
+     "mmPerPixel": 0.072559,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 76898
+   "t": 49198,
+   "te": 49198
   },
   {
    "step": 6,
@@ -1600,14 +1611,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 49198,
    "pointer": {
     "at": [
-     290,
+     671,
      201
     ],
     "hover": [],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 49204,
    "state": {
     "focus": {
      "kind": "none"
@@ -1749,14 +1762,15 @@
       -21.243,
       37.495
      ],
-     "width_mm": 98.649,
-     "height_mm": 57.373,
-     "mmPerPixel": 0.058965,
+     "width_mm": 93.746,
+     "height_mm": 64.287,
+     "mmPerPixel": 0.072559,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 81093
+   "t": 53079,
+   "te": 53079
   },
   {
    "step": 7,
@@ -1765,6 +1779,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 53079,
    "state": {
     "focus": {
      "kind": "none"
@@ -1906,14 +1921,16 @@
       -21.243,
       37.495
      ],
-     "width_mm": 98.649,
-     "height_mm": 57.373,
-     "mmPerPixel": 0.058965,
+     "width_mm": 93.746,
+     "height_mm": 64.287,
+     "mmPerPixel": 0.072559,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 85889
+   "t": 57449,
+   "te": 57449
   }
- ]
+ ],
+ "t0_epoch_ms": 1795878929205
 }
