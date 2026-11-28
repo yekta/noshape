@@ -1,0 +1,1101 @@
+{
+ "name": "sketch-hover-face",
+ "about": "face vs plane: a line, arc, circle (region), spline, point, construction line, text, dimension, glyph and a used edge on the block's top face: plain, then each hovered and selected; Show constraints ticked for the glyph's two shots only. Live-only steps dropped: live ticked Show constraints for the glyph shots (its lanes keep it unticked; ours shows them by default) and found the text/glyph pixels by scanning; the hovers and clicks on them are px targets. Esc twice leaves a sketch selection as it is, so the selections pile up from line-selected on (each later shot also shows the earlier ones selected); the point spot misses the point and its click selects the sketch region under it (a FACE owned by \"Sketch\": the sketch isn't a feature until OK).",
+ "area": "part-studio",
+ "source": "live depth batch 12 (sketch hover x state matrix, skasm's L cells; lead 11-28 P0)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     4,
+     4,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     14,
+     4,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "3 point arc"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     18,
+     4,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     28,
+     4,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     23,
+     7,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     8,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     11,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Spline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     18,
+     14,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     23,
+     18,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     28,
+     14,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Point"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     34,
+     24,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     4,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     14,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     9,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Text"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     18,
+     21,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     32,
+     27,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Text"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "HH"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     9,
+     4,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     9,
+     1.5,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     30,
+     2,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     38,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "u"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "plain"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     9,
+     4,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "line-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     9,
+     4,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "line-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     23,
+     7,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "arc-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     23,
+     7,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "arc-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     8,
+     23,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "circle-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     8,
+     23,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "circle-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     23,
+     18,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     23,
+     18,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     34,
+     24,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "point-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     34,
+     24,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "point-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     9,
+     10,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     9,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     8,
+     20,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "region-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     8,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "region-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     9,
+     1.5,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "dimension-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     9,
+     1.5,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "dimension-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1375,
+     468
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "text-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1375,
+     468
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "text-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     40,
+     15,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     40,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1364,
+     500
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "glyph-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1364,
+     500
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "glyph-selected"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

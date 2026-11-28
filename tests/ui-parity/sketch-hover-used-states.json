@@ -1,0 +1,312 @@
+{
+ "name": "sketch-hover-used-states",
+ "about": "block top face sketch: the front and right top edges Use'd: used lines plain, hover, selected, selected+hover, both selected (+ hover); then a length dimension 30 on the front one (it's fixed: over-defined)",
+ "area": "part-studio",
+ "source": "live depth batch 12 (sketch hover x state matrix, skasm's L cells; lead 11-28 P0)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "u"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-plain"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     20,
+     0,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-selected"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     20,
+     0,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-sel-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     40,
+     15,
+     10
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-multi"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     20,
+     0,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-multi-hover"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     20,
+     -6,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "30"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-over"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     20,
+     0,
+     10
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "used-over-hover"
+  }
+ ]
+}

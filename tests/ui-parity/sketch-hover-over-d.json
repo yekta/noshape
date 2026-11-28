@@ -1,0 +1,770 @@
+{
+ "name": "sketch-hover-over-d",
+ "about": "over-defined with the ends fixed too: a line (ends + line Fixed) given length 30, a circle (centre + circle Fixed) diameter 20, a spline (ends + spline Fixed) ends 30 apart, a construction line (ends + line Fixed) length 30 (shots, then hovered)",
+ "area": "part-studio",
+ "source": "live depth batch 12 (sketch hover x state matrix, skasm's L cells; lead 11-28 P0)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     40,
+     -20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     60,
+     -20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     40,
+     -20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     60,
+     -20,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     -20,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     -20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     -26,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "30"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-line"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     50,
+     -20,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-line-hover"
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     5,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     35,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     35,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     10,
+     40,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-circle"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     0,
+     35,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-circle-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Spline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -40,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -30,
+     36,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -20,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -40,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -20,
+     30,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -30,
+     36.3,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -40,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -20,
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -30,
+     24,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "30"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-spline"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     36.3,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-spline-hover"
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     40,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     60,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     40,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     60,
+     0,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     0,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     -6,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "30"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-construction"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     50,
+     0,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "overd-construction-hover"
+  }
+ ]
+}

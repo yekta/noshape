@@ -238,6 +238,17 @@ feature opens nothing; a feature can be dragged above what it uses (it then fail
 Instances list and the viewer's occurrence transforms), mates from REST when the list changes. A step's
 `closedToast`: live's import toast covered the click's target and was closed first (not a user action).
 
+Live 11-28 (depth batch 12, sketch hover × state, `sketch-hover-*`, skasm's docs/parity/sketch-hover-matrix.md L cells):
+each take draws its sketch, then shots one entity kind plain, hovered, selected, selected and hovered, and hovered with
+another selected (`multi`); `over-*` / `defined` shoot under-, fully and over-defined geometry, `face` / `plane` one
+fixture on a part's top face and on Top. Live ticked Show constraints (the sketch context menu) for the glyph cells and
+found text strokes and glyph boxes by scanning its pick lists: those live-only steps are left out and the hovers and
+clicks on them are `px` targets (ours shows constraints by default). Live: a glyph's box has no border in any state
+(hover #fcda7f, selected #fab601, selected and hovered as selected); a curve's hover band is 5 px #ffc685, selected
+#ffa90a, selected and hovered as selected; over-defined curves are red (#cc0000 core, a #de979b halo), a hovered
+over-defined circle the hover band over a #f49d6a core;
+Shift+click on a second dimension replaces the selection.
+
 ### Part Studio panels, picks and in context (psui, 11-07)
 
 - `{"caret": "<button>"}`: the ▾ / ▲ beside a split button: `{"caret": "Add configuration input"}` (the ▲ of the

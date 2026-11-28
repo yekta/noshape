@@ -1,0 +1,556 @@
+{
+ "name": "sketch-hover-over-c",
+ "about": "Show constraints ticked (unticked after); over-defined: a rectangle's top line also made Vertical (its glyphs), a Fixed rectangle given width 30 (its region), a Fixed text dimensioned 80 to the origin (shots after each). Live-only steps dropped: live ticked Show constraints for the glyph shots (its lanes keep it unticked; ours shows them by default) and found the text/glyph pixels by scanning; the hovers and clicks on them are px targets.",
+ "area": "part-studio",
+ "source": "live depth batch 12 (sketch hover x state matrix, skasm's L cells; lead 11-28 P0)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     5,
+     28,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     25,
+     48,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Text"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     30,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     8,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Text"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "HH"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Text"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     30,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     23,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Text"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "HH"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     10,
+     48,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "v"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "over-glyph"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "px": [
+     1229,
+     450
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "over-glyph-hover"
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -40,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -20,
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -35,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -20,
+     2.5,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -35,
+     10,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -40,
+     2.5,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -35,
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -35,
+     16,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "30"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "over-region"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -30,
+     5,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "over-region-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1205,
+     546
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "px": [
+     1205,
+     546
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     15,
+     -8,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "80"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "over-text"
+  }
+ ]
+}

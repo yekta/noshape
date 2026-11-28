@@ -1,0 +1,298 @@
+{
+ "name": "sketch-hover-construction-states",
+ "about": "Top: construction lines (0,10)-(20,10) and (0,20)-(20,20): plain, hover, selected, selected+hover, both selected (+ hover) Live's Q kept both lines selected and the far click added the Front plane, so the shots are shifted: 'plain' has both lines selected; 'hover' is the first line hovered with both selected; the click on it deselects it, so 'selected' is the first line plain with the second selected and 'sel-hover' is the first hovered with the second selected; the shift-click deselects the second, so 'multi' is both plain and 'multi-hover' is the first hovered alone. Every state's colours are in the take under those names.",
+ "area": "part-studio",
+ "source": "live depth batch 12 (sketch hover x state matrix, skasm's L cells; lead 11-28 P0)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     20,
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     20,
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     10,
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     10,
+     20,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "key",
+   "key": "q"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-plain"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     10,
+     10,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     10,
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-selected"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     10,
+     10,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-sel-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     10,
+     20,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-multi"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     10,
+     10,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "construction-multi-hover"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  }
+ ]
+}

@@ -1,0 +1,302 @@
+{
+ "name": "sketch-hover-spline-states",
+ "about": "Top: splines through (0,0),(10,8),(20,8),(30,0) and the same at x + 40: plain, hover, selected, selected+hover, both selected (+ hover)",
+ "area": "part-studio",
+ "source": "live depth batch 12 (sketch hover x state matrix, skasm's L cells; lead 11-28 P0)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Spline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     10,
+     8,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     20,
+     8,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     30,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Spline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     40,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     50,
+     8,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     60,
+     8,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     70,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-plain"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     15,
+     8.6,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     15,
+     8.6,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-selected"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     15,
+     8.6,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-sel-hover"
+  },
+  {
+   "do": "click",
+   "on": {
+    "world": [
+     55,
+     8.6,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-multi"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     15,
+     8.6,
+     0
+    ]
+   },
+   "ms": 700
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "shot",
+   "name": "spline-multi-hover"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "world": [
+     -40,
+     -30,
+     0
+    ]
+   },
+   "ms": 700
+  }
+ ]
+}
