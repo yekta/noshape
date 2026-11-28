@@ -1509,7 +1509,8 @@ impl Sketch {
         if self.entities().any(|x| x.id != curve && x.point_refs().iter().any(|p| *p == start || *p == end)) {
             return None;
         }
-        Some(SolveOptions { light: vec![curve, start], still: vec![end], ..Default::default() })
+        // A dimension edit: a length of 0 collapses the line (live sketch-dim-typed-zero s12).
+        Some(SolveOptions { light: vec![curve, start], still: vec![end], allow_collapse: true, ..Default::default() })
     }
 
     /// A sketch's first dimension, a length or distance, scales the whole sketch uniformly onto its value, about the

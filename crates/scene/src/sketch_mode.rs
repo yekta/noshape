@@ -854,6 +854,8 @@ pub struct SketchEditor {
     mirror_axis: Option<EntityId>,
     /// Extend: the curve picked first, waiting for its boundary.
     pub extend_from: Option<EntityId>,
+    /// Split on a closed curve: the curve and the first point, waiting for the second.
+    split_first: Option<(EntityId, DVec2)>,
     /// Extend on a line: the end picked (the nearer one), which follows the pointer (live 11-18 sketch-tools t4-ext).
     pub extend_end: Option<EntityId>,
     /// The picked end's preview has snapped onto a boundary since the pick: the picked line then shows selected (live
@@ -1378,6 +1380,10 @@ const ARC_PREVIEW_TOL_PX: f64 = 0.05;
 /// can't take (a negative radius, a zero length). Live shows no message: the
 /// box turns pink and ✓ greys out.
 pub const DIM_NOT_POSITIVE: &str = "Value must be positive";
+/// Split on a closed curve, after its first point (live sketch-split-circle).
+pub const SPLIT_SECOND_POINT: &str = "Select a second point to split closed curve.";
+/// Slot on a closed curve (live sketch-slot-on-circle).
+pub const SLOT_REFUSED: &str = "A slot could not be created for the selected curve.";
 pub const DIM_NOT_NEGATIVE: &str = "This dimension can't be negative";
 /// Live's warning when the picked items can't be dimensioned.
 pub const DIMENSION_FAILED: &str = "A dimension cannot be created between these items.";
@@ -1665,6 +1671,7 @@ impl SketchEditor {
             slot_session: None,
             mirror_axis: None,
             extend_from: None,
+            split_first: None,
             extend_crossed: false,
             extend_end: None,
             pending_image: None,
@@ -1765,6 +1772,7 @@ impl SketchEditor {
         self.offset_pending = None;
         self.offset_label_hovered = false;
         self.mirror_axis = None;
+        self.split_first = None;
         // Extend's pending pick goes with the tool (live: Esc, selection 0).
         self.extend_end = None;
         if self.extend_from.take().is_some() {
@@ -3019,8 +3027,18 @@ impl SketchEditor {
                     _ => {
                         let ends = data.sketch.endpoints(id);
                         let (at, mid) = self.split_point(&data.sketch, id, p);
+                        // A closed curve takes two points (live sketch-split-circle s8).
+                        let first = self.split_first.take().filter(|(c, _)| *c == id);
+                        if first.is_none() && data.sketch.curve(id).is_some_and(|c| c.is_periodic()) {
+                            self.split_first = Some((id, at));
+                            self.message = Some(SPLIT_SECOND_POINT.into());
+                            return EditOutcome::redraw();
+                        }
                         let used = used_ends_before(data, id);
-                        let r = data.sketch.split(id, at);
+                        let r = match first {
+                            Some((_, at0)) => data.sketch.split_closed(id, at0, at),
+                            None => data.sketch.split(id, at),
+                        };
                         if let Ok(res) = &r {
                             if mid
                                 && let (Some(&point), Some((a, b))) = (res.created.first(), ends)
@@ -3804,6 +3822,12 @@ impl SketchEditor {
         if curves.is_empty() {
             return if committed { EditOutcome::changed() } else { EditOutcome::redraw() };
         }
+        // A circle or an ellipse is picked with no preview; the next click refuses it (live sketch-slot-on-circle).
+        if curves.iter().any(|c| matches!(data.sketch.kind(*c), Some(EntityKind::Circle | EntityKind::Ellipse))) {
+            self.pending_slot = Some((data.clone(), Vec::new()));
+            self.selection = curves;
+            return if committed { EditOutcome::changed() } else { EditOutcome::redraw() };
+        }
         let mut preview = data.clone();
         let out = self.make_slots_in(&mut preview, &curves);
         if let Some(created) = out {
@@ -3833,6 +3857,10 @@ impl SketchEditor {
     pub fn commit_slot(&mut self, data: &mut SketchData) -> EditOutcome {
         let Some((preview, created)) = self.pending_slot.take() else { return EditOutcome::none() };
         self.selection.clear();
+        if created.is_empty() {
+            self.message = Some(SLOT_REFUSED.into());
+            return EditOutcome::redraw();
+        }
         *data = preview;
         self.finish_create(data, &created);
         EditOutcome::changed()
@@ -4012,10 +4040,11 @@ impl SketchEditor {
                     self.clicks.push(click);
                     return EditOutcome::redraw();
                 }
-                let first = self.clicks.remove(0);
-                if (first.pos - click.pos).abs().min_element() < 1e-9 {
+                // A zero-size second click is ignored: the first corner waits for the next (live rect-zero-size-click).
+                if (self.clicks[0].pos - click.pos).abs().min_element() < 1e-9 {
                     return EditOutcome::none();
                 }
+                let first = self.clicks.remove(0);
                 let ids = if self.tool == Tool::CornerRect { sk.corner_rectangle(first.pos, click.pos) } else { sk.center_rectangle(first.pos, click.pos) };
                 let corners = &ids.points[..4];
                 let nearest = |q: DVec2, sk: &Sketch| corners.iter().copied().min_by(|x, y| (sk.point(*x).unwrap_or_default() - q).length().total_cmp(&(sk.point(*y).unwrap_or_default() - q).length()));
@@ -4144,14 +4173,32 @@ impl SketchEditor {
                     return EditOutcome::redraw();
                 }
                 let c = self.clicks.remove(0);
-                let r = (click.pos - c.pos).length();
+                // The rim on a line at the foot of the centre's perpendicular (6 px): the circle tangent to the line
+                // (live sketch-circle-rim-on-line: TANGENT, not COINCIDENT with the origin lying there too).
+                let on_mid = click.inference.as_ref().is_some_and(|i| matches!(i.constraints.first(), Some(AutoConstraint::MidpointOf(_))));
+                let tangent_line = sk.entities().filter(|e| !on_mid && e.kind() == EntityKind::Line && !e.reference_only).find_map(|e| {
+                    let Some(Curve2::Line { a, b }) = sk.curve(e.id) else { return None };
+                    let u = (b - a).try_normalize()?;
+                    let t = (c.pos - a).dot(u);
+                    let foot = a + u * t;
+                    // (At the line's end the rim is COINCIDENT with the end, no TANGENT: behaviours SKETCH-INFER-ARC-CIRCLE.)
+                    let near_end = (foot - a).length().min((foot - b).length()) <= self.world_per_px * 6.0;
+                    (t > 0.0 && t < (b - a).length() && !near_end && (foot - click.pos).length() <= self.world_per_px * 6.0 && (foot - c.pos).length() > 1e-9).then_some((e.id, foot))
+                });
+                let rim = tangent_line.map_or(click.pos, |(_, foot)| foot);
+                let r = (rim - c.pos).length();
                 if r < 1e-9 {
                     return EditOutcome::none();
                 }
                 let (center, autos) = Self::point_for(sk, &c);
                 let Ok(circle) = sk.add_circle_at(center, r) else { return EditOutcome::none() };
                 Self::apply_auto(sk, center, None, &autos);
-                rim_autos(sk, circle, &click);
+                match tangent_line {
+                    Some((line, _)) => {
+                        let _ = sk.add_constraint(ConstraintKind::Tangent { a: circle, b: line });
+                    }
+                    None => rim_autos(sk, circle, &click),
+                }
                 self.finish_create(data, &[circle]);
                 let away = (c.pos - click.pos).try_normalize();
                 self.set_otf(data, vec![diameter_field(&data.sketch, circle, self.world_per_px, away)]);
@@ -6222,6 +6269,14 @@ impl SketchEditor {
     fn dimension_click(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
         // The sketch origin can be dimensioned to (a fixed point is created).
         let hovered = hovered.or_else(|| (p.length() <= self.world_per_px * 9.0).then(|| origin_point(&mut data.sketch)));
+        // A picked curve clicked again is unpicked, nothing placed (live sketch-dim-arc-angle s10: an arc clicked twice).
+        if let Some(e) = hovered
+            && !is_point(&data.sketch, e)
+            && let Some(i) = self.picks.iter().position(|(x, _)| *x == e)
+        {
+            self.picks.remove(i);
+            return EditOutcome::redraw();
+        }
         if let Some(e) = hovered
             && !self.picks.iter().any(|(x, _)| *x == e)
         {
@@ -6326,7 +6381,9 @@ impl SketchEditor {
             ConstraintKind::Length { curve, .. } => data.sketch.kind(*curve) != Some(EntityKind::Line),
             _ => false,
         };
-        if value == 0.0 && dim != Dim::ANGLE && !matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. }) {
+        // A line's length takes 0 too, the line collapsing onto its start (live sketch-dim-typed-zero).
+        let line_length = matches!(&c.kind, ConstraintKind::Length { curve, .. } if data.sketch.kind(*curve) == Some(EntityKind::Line));
+        if value == 0.0 && dim != Dim::ANGLE && !line_length && !matches!(c.kind, ConstraintKind::Distance { .. } | ConstraintKind::HorizontalDistance { .. } | ConstraintKind::VerticalDistance { .. }) {
             return Err(DIM_NOT_POSITIVE.into());
         }
         if value < 0.0 {
@@ -6645,6 +6702,18 @@ impl SketchEditor {
             if ids.len() != n {
                 self.message = Some("Spline handles cannot be deleted".into());
             }
+            // A line's or arc's end point goes with its curve, never alone (live sketch-mistake-delete-rect-corner: a
+            // rectangle's corner selected + Delete keeps all 4 lines).
+            let ends: Vec<EntityId> = data
+                .sketch
+                .entities()
+                .filter_map(|e| match e.geometry {
+                    noshape_sketch::Geometry::Line { start, end } | noshape_sketch::Geometry::Arc { start, end, .. } => Some([start, end]),
+                    _ => None,
+                })
+                .flatten()
+                .collect();
+            ids.retain(|e| !ends.contains(e));
             if !ids.is_empty() {
                 data.sketch.remove_entities(&ids);
                 changed = true;
@@ -10406,6 +10475,58 @@ mod tests {
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { .. })), "the constraint is kept");
     }
 
+    /// Live sketch-trim-rect-edge-at-crossing s13: a rectangle's bottom edge trimmed left of a line crossing it keeps
+    /// its right piece, its new end COINCIDENT with the crossing line.
+    #[test]
+    fn a_trimmed_rectangle_edge_ends_coincident_on_the_crossing_line() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, mm(0.0, 0.0));
+        click(&mut ed, &mut d, mm(30.0, 20.0));
+        ed.set_tool(Tool::Line);
+        click(&mut ed, &mut d, mm(15.0, -10.0));
+        click(&mut ed, &mut d, mm(15.0, 30.0));
+        ed.set_tool(Tool::Trim);
+        let before: Vec<ConstraintKind> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
+        click(&mut ed, &mut d, mm(5.0, 0.0));
+        let kinds: Vec<ConstraintKind> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
+        let cross = d.sketch.entities().find(|e| d.sketch.curve(e.id).is_some_and(|c| matches!(c, Curve2::Line { a, b } if (a.x - b.x).abs() < 1e-9 && a.y < 0.0))).expect("the crossing line").id;
+        let at_cut = kinds.iter().filter(|k| matches!(k, ConstraintKind::Coincident { a, b } if (*b == cross && d.sketch.point(*a).is_some_and(|p| (p - mm(15.0, 0.0)).length() < 1e-6)) || (*a == cross && d.sketch.point(*b).is_some_and(|p| (p - mm(15.0, 0.0)).length() < 1e-6)))).count();
+        assert_eq!(at_cut, 1, "the cut's COINCIDENT: before {before:?}, after {kinds:?}");
+    }
+
+    /// Live sketch-dim-arc-angle s9-s10: Dimension, an arc clicked twice: the second click unpicks it and no dimension
+    /// is made (ours opened a radius box).
+    #[test]
+    fn an_arc_clicked_twice_in_dimension_is_unpicked() {
+        let (mut ed, mut d) = editor(Tool::Dimension);
+        let (c, s, e) = (d.sketch.add_point(v(0.0, 0.0)), d.sketch.add_point(v(0.01, 0.0)), d.sketch.add_point(v(-0.01, 0.0)));
+        d.sketch.add_arc_between(c, s, e).unwrap();
+        let before = d.sketch.constraints().count();
+        click(&mut ed, &mut d, v(0.0, 0.01));
+        assert_eq!(ed.picks.len(), 1, "picked");
+        click(&mut ed, &mut d, v(0.0, 0.01));
+        assert!(ed.picks.is_empty(), "unpicked");
+        assert_eq!(d.sketch.constraints().count(), before, "no dimension");
+    }
+
+    /// Live sketch-dim-typed-zero s12: a line's length typed 0 is taken (0 mm), the line collapsing onto its start;
+    /// a circle's diameter still refuses 0.
+    #[test]
+    fn a_lines_length_takes_zero() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        let (a, b) = (d.sketch.add_point(v(0.0, 0.0)), d.sketch.add_point(v(0.03, 0.0)));
+        let line = d.sketch.add_line_between(a, b).unwrap();
+        let len = d.sketch.add_constraint(ConstraintKind::Length { curve: line, value: 0.03 }).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        ed.apply_dimension(&mut d, len, "0", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap_or_else(|e| panic!("assertion: 0 refused: {e}"));
+        assert!((d.sketch.point(b).unwrap() - d.sketch.point(a).unwrap()).length() < 1e-9, "collapsed");
+        let c = d.sketch.add_point(v(0.05, 0.0));
+        let circle = d.sketch.add_entity(noshape_sketch::Geometry::Circle { center: c, radius: 0.005 }, false, false).unwrap();
+        let dia = d.sketch.add_constraint(ConstraintKind::Diameter { curve: circle, value: 0.01 }).unwrap();
+        assert_eq!(ed.apply_dimension(&mut d, dia, "0", &UnitPrefs::default(), &noshape_units::EmptyScope), Err(DIM_NOT_POSITIVE.into()));
+    }
+
     /// Live 1785: a corner rectangle's width typed in the editor (40 -> 50)
     /// scales the whole rectangle ×1.25 about its centre, the undimensioned
     /// height too.
@@ -10726,6 +10847,23 @@ mod tests {
         let (mut ed, mut d) = editor(Tool::Spline);
         click(&mut ed, &mut d, v(0.01, 0.01));
         assert!(ed.escape_commit(&mut d).is_none());
+    }
+
+    /// Live sketch-slot-on-circle s8-s9: Slot on a circle picks it (selected, no preview); the next click refuses it,
+    /// "A slot could not be created for the selected curve.", with nothing made (ours made an annulus).
+    #[test]
+    fn a_slot_on_a_circle_is_refused() {
+        let (mut ed, mut d) = editor(Tool::Slot);
+        let c = d.sketch.add_point(v(0.0, 0.0));
+        let circle = d.sketch.add_entity(noshape_sketch::Geometry::Circle { center: c, radius: 0.01 }, false, false).unwrap();
+        let before = d.sketch.entities().count();
+        click(&mut ed, &mut d, v(0.01, 0.0));
+        assert_eq!(ed.selection, vec![circle], "picked");
+        assert!(ed.message.is_none());
+        click(&mut ed, &mut d, v(0.013, 0.0));
+        assert_eq!(d.sketch.entities().count(), before, "nothing made");
+        assert!(ed.selection.is_empty());
+        assert_eq!(ed.message.as_deref(), Some(SLOT_REFUSED));
     }
 
     /// Live's slot glyphs (qa5 sketch tools): a coincident at each of the 6
@@ -15144,6 +15282,22 @@ mod tests {
         }
     }
 
+    /// Live sketch-split-circle s8: Split on a circle asks "Select a second point to split closed curve." (ours refused);
+    /// the second point splits it into two arcs sharing both points.
+    #[test]
+    fn split_on_a_circle_asks_for_a_second_point() {
+        let (mut ed, mut d) = editor(Tool::Split);
+        d.sketch.add_circle(v(0.0, 0.0), 0.01);
+        click(&mut ed, &mut d, v(0.0, 0.01));
+        assert_eq!(ed.message.as_deref(), Some(SPLIT_SECOND_POINT));
+        assert_eq!((count(&d, EntityKind::Circle), count(&d, EntityKind::Arc)), (1, 0), "nothing split yet");
+        click(&mut ed, &mut d, v(0.0, -0.01));
+        assert_eq!((count(&d, EntityKind::Circle), count(&d, EntityKind::Arc)), (0, 2), "two arcs");
+        let mut ends: Vec<(i64, i64)> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Arc).filter_map(|e| d.sketch.curve(e.id)).flat_map(|c| [c.start_point(), c.end_point()]).map(|p| ((p.x * 1e5).round() as i64, (p.y * 1e5).round() as i64)).collect();
+        ends.sort();
+        assert_eq!(ends, [(0, -1000), (0, -1000), (0, 1000), (0, 1000)], "ending at the two points");
+    }
+
     #[test]
     fn elliptical_arc_four_clicks() {
         let (mut ed, mut d) = editor(Tool::EllipticalArc);
@@ -15708,6 +15862,63 @@ mod tests {
         assert!((y(fit[1]) - y(fit[0])).abs() < 1e-9, "placed level");
         let level = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: Some(b) } if (a, b) == (fit[0], fit[1]) || (a, b) == (fit[1], fit[0]))).count();
         assert_eq!(level, 1, "one HORIZONTAL between the first two points: {:?}", d.sketch.constraints().map(|c| c.kind.clone()).collect::<Vec<_>>());
+    }
+
+    /// Live sketch-mistake-delete-rect-corner s7-s8: a rectangle's corner point selected + Delete keeps all 4 lines and
+    /// their constraints (ours deleted the 2 lines meeting there).
+    #[test]
+    fn delete_on_a_rectangles_corner_keeps_its_lines() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, mm(0.0, 0.0));
+        click(&mut ed, &mut d, mm(30.0, 20.0));
+        ed.set_tool(Tool::Select);
+        let lines = |d: &SketchData| d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).count();
+        let constraints = d.sketch.constraints().count();
+        assert_eq!(lines(&d), 4);
+        let corner = d.sketch.entities().find(|e| e.kind() == EntityKind::Point && d.sketch.point(e.id).is_some_and(|p| (p - mm(30.0, 20.0)).length() < 1e-9)).expect("the corner point").id;
+        ed.selection = vec![corner];
+        ed.delete_selection(&mut d);
+        assert_eq!(lines(&d), 4, "all 4 lines kept");
+        assert_eq!(d.sketch.constraints().count(), constraints, "their constraints kept");
+        assert!(ed.selection.is_empty(), "nothing left selected");
+    }
+
+    /// Live sketch-circle-rim-on-line s9: a line (-20, 0)-(20, 0), a circle centred (0, 10) with its rim clicked at
+    /// (0, 0), 1 px off: TANGENT to the line, no COINCIDENT.
+    #[test]
+    fn a_circles_rim_clicked_on_a_line_below_its_centre_is_tangent_to_it() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let (mut ed, mut d) = editor(Tool::Circle);
+        let line = d.sketch.add_line(mm(-20.0, 0.0), mm(20.0, 0.0));
+        click(&mut ed, &mut d, mm(0.0, 10.0));
+        click(&mut ed, &mut d, mm(0.0, 0.0) + v(PX, PX));
+        let circle = d.sketch.entities().find(|e| e.kind() == EntityKind::Circle).expect("the circle").id;
+        let kinds: Vec<ConstraintKind> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
+        assert!(kinds.iter().any(|k| matches!(k, ConstraintKind::Tangent { a, b } if (*a, *b) == (circle, line) || (*a, *b) == (line, circle))), "{kinds:?}");
+        assert!(!kinds.iter().any(|k| matches!(k, ConstraintKind::Coincident { .. })), "{kinds:?}");
+        let Some(Curve2::Circle { center, radius }) = d.sketch.curve(circle) else { panic!("a circle") };
+        assert!((center.y - radius).abs() < 1e-9, "touching the line: {center} r {radius}");
+    }
+
+    /// Live sketch-rect-zero-size-click s3-s6: Corner rectangle clicked twice at (0, 0), then at (30, 20): the zero-size
+    /// click is ignored and the 30 x 20 rectangle is made (ours dropped the first corner and made nothing).
+    #[test]
+    fn a_zero_size_rectangle_click_keeps_the_first_corner() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, mm(0.0, 0.0));
+        assert_eq!(d.sketch.entities().filter(|e| !e.reference_only).count(), 0, "the first corner makes nothing: {:?}", d.sketch.entities().map(|e| e.kind()).collect::<Vec<_>>());
+        click(&mut ed, &mut d, mm(0.0, 0.0));
+        assert_eq!(d.sketch.entities().filter(|e| !e.reference_only).count(), 0, "nothing made yet: {:?}", d.sketch.entities().map(|e| e.kind()).collect::<Vec<_>>());
+        click(&mut ed, &mut d, mm(30.0, 20.0));
+        let lines: Vec<(DVec2, DVec2)> = d.sketch.entities().filter_map(|e| d.sketch.curve(e.id)).filter_map(|c| match c {
+            Curve2::Line { a, b } => Some((a, b)),
+            _ => None,
+        }).collect();
+        assert_eq!(lines.len(), 4, "the rectangle");
+        let (lo, hi) = lines.iter().flat_map(|(a, b)| [*a, *b]).fold((mm(1e3, 1e3), mm(-1e3, -1e3)), |(lo, hi), p| (lo.min(p), hi.max(p)));
+        assert!((lo - mm(0.0, 0.0)).length() < 1e-9 && (hi - mm(30.0, 20.0)).length() < 1e-9, "from (0, 0) to (30, 20): {lo} {hi}");
     }
 
     /// Live sketch-drag-1125: a point pressed a few px off keeps that offset from the pointer (no jump onto it).

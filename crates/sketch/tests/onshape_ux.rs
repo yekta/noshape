@@ -25,9 +25,12 @@ fn chamfer_corner_cuts_both_lines_and_keeps_virtual_sharp() {
     // the original lines now end at the chamfer
     assert!((sk.curve(l1).unwrap().end_point() - v(8.0, 0.0)).length() < 1e-9);
     assert!((sk.curve(l2).unwrap().start_point() - v(10.0, 3.0)).length() < 1e-9);
-    // the corner survives as a construction point, joined to the chamfer's ends by two construction lines with their
-    // lengths (live: visualSharp, distanceAId / distanceBId)
-    assert!(sk.entity(b).unwrap().construction);
+    // the corner survives as a point (live sketch-chamfer-too-large: kind "point", not construction), joined to the
+    // chamfer's ends by two construction lines with their lengths, each on its own start point coincident with it
+    // (live: visualSharp, distanceAId / distanceBId; 13 COINCIDENT on a rectangle's corner)
+    assert!(!sk.entity(b).unwrap().construction);
+    let on_sharp = sk.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { a, b: x } if (a == b || x == b) && sk.kind(if a == b { x } else { a }) == Some(EntityKind::Point))).count();
+    assert_eq!(on_sharp, 2, "the legs' starts on the sharp");
     let legs: Vec<(DVec2, DVec2, f64)> = sk.constraints().filter_map(|c| match c.kind {
         ConstraintKind::Length { curve, value } if sk.entity(curve)?.construction => {
             let cv = sk.curve(curve)?;

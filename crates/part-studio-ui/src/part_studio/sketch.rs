@@ -1602,9 +1602,15 @@ impl PartStudioView {
                 }
                 if !overlay_pressed && tool == Some(Tool::Use) {
                     // The GPU hover may lag a quick click: the edge under the pointer then, else the face (ui-parity
-                    // maker-use-face-outline: a click inside the sketch's own face used nothing).
-                    if self.hover.is_none() {
-                        self.hover = self.model_edge_at(*position, cx).or_else(|| self.model_face_at(*position, cx));
+                    // maker-use-face-outline: a click inside the sketch's own face used nothing). An edge in reach also
+                    // beats a face or region behind it (qa sketch-used-*: a hole's rim clicked in iso, Sketch 1's circle
+                    // region lit through the hole: "That geometry can't be used").
+                    if matches!(self.hover, None | Some(Reference::Face(_) | Reference::SketchRegion { .. })) {
+                        if let Some(edge) = self.model_edge_at(*position, cx) {
+                            self.hover = Some(edge);
+                        } else if self.hover.is_none() {
+                            self.hover = self.model_face_at(*position, cx);
+                        }
                     }
                     self.use_hovered(window, cx);
                     return true;

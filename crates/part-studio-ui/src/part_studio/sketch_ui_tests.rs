@@ -9821,6 +9821,10 @@ fn the_parity_state_lists_sketch_geometry(cx: &mut TestAppContext) {
     assert_eq!(spline["points"], serde_json::json!([[0.0, 50.0], [20.0, 70.0], [40.0, 50.0]]));
     let d = spline["derivatives"].as_array().expect("its end derivatives");
     assert!(d.len() == 2 && d.iter().all(|v| v.as_array().is_some_and(|v| v.len() == 2)), "{spline}");
+    // Live's derivatives per unit of the 0–1 parameter (sketch-spline-point-drag: a natural cubic's (60, 60.5),
+    // (59.6, -60.6)), not the handles' offsets: (40, 60) and (40, -60) here.
+    let near = |v: &serde_json::Value, x: f64, y: f64| (v[0].as_f64().unwrap() - x).abs() < 1e-3 && (v[1].as_f64().unwrap() - y).abs() < 1e-3;
+    assert!(near(&d[0], 40.0, 60.0) && near(&d[1], 40.0, -60.0), "{spline}");
     assert!(!geometry.iter().any(|g| g["kind"] == "construction line"), "its handle arms go with the spline: {geometry:?}");
 }
 

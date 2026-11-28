@@ -3866,7 +3866,14 @@ impl AssemblyView {
                     None => self.result.solved.placement(top).map(|p| placement_to_frame(&p)).unwrap_or_default(),
                 };
                 let local = pose.inverse().transform_point(grab);
-                let normal = self.viewport.read(cx).camera.forward();
+                // A part left only turning about a Revolute follows the pointer in the plane square to that axis (live
+                // rev-drag-1127), not in the view plane.
+                let revolute_axis = (nested.is_none() && self.result.solved.instance_dof.get(&top) == Some(&1))
+                    .then(|| self.assembly(cx))
+                    .flatten()
+                    .and_then(|a| a.mates.iter().filter(|m| m.mate_type == MateType::Revolute && (m.a.instance == top || m.b.instance == top)).find_map(|m| self.result.solved.mate_frames.get(&m.id)))
+                    .map(|(f, _)| f.z());
+                let normal = revolute_axis.unwrap_or_else(|| self.viewport.read(cx).camera.forward());
                 self.drag = Some(DragState {
                     top,
                     press: *position,

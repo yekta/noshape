@@ -1867,6 +1867,63 @@ fn a_typed_limit_turns_the_edited_mates_preview_into_range(cx: &mut TestAppConte
     assert!(view.read_with(cx, |v, _| v.mate.is_some()), "still editing (no Solve, no ✓)");
 }
 
+/// Live rev-drag-1127 (ASM-DRAG-REVOLUTE-ANGLE): a part left only turning about a Revolute follows the pointer in the
+/// plane square to the mate's axis through the grab point, not in the view plane; a free part keeps the view plane.
+#[gpui::test]
+fn a_part_on_a_revolute_is_dragged_in_the_plane_square_to_its_axis(cx: &mut TestAppContext) {
+    use crate::viewport::ViewportEvent;
+    use gpui_kit::Modifiers;
+    let (window, view) = pattern_assembly(cx, "rev-drag");
+    let settle = |cx: &mut TestAppContext| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+    };
+    let press = |part: &'static str, cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let (lo, hi) = v.result.instance_bounds(instance(v, part, cx)).unwrap();
+                let at = v.viewport.read(cx).project((lo + hi) * 0.5).unwrap();
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                let n = v.drag.as_ref().expect("a drag").plane_normal;
+                v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
+                n
+            })
+        })
+        .unwrap()
+    };
+    draw(cx, window);
+    let forward = cx.update(|cx| view.read(cx).viewport.read(cx).camera.forward());
+    assert!(press("Part 2 <1>", cx).cross(forward).length() < 1e-9, "a free part: the view plane");
+    settle(cx);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = instance(v, "Part 1 <1>", cx);
+            v.edit("Fix", cx, |a| {
+                if let Some(i) = a.instances.iter_mut().find(|i| i.id == id) {
+                    i.fixed = true;
+                }
+            });
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        });
+    })
+    .unwrap();
+    settle(cx);
+    let axis = cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!(v.result.solved.instance_dof.get(&instance(v, "Part 2 <1>", cx)), Some(&1), "Part 2 only turns");
+        let m = v.assembly(cx).unwrap().mates.iter().find(|m| m.name == "Revolute 1").expect("Revolute 1").clone();
+        v.result.connector_world(&m.b, &v.units(cx)).unwrap().z()
+    });
+    assert!(axis.cross(forward).length() > 0.5, "the view isn't along the axis");
+    let n = press("Part 2 <1>", cx);
+    assert!(n.cross(axis).length() < 1e-6, "the plane square to the Revolute's axis: {n:?}, axis {axis:?}");
+}
+
 /// Live mate-keys-1118: Q in an edited Revolute turns the free part a quarter turn about the mate's axis, +90° about the
 /// connectors' Z (pin-block: −90° about world Z, the connectors' Z pointing down); its free rotation doesn't absorb it.
 #[gpui::test]

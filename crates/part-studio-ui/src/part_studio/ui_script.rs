@@ -973,7 +973,7 @@ fn entity_kind_name(kind: noshape_sketch::EntityKind) -> &'static str {
 }
 
 /// The sketch's entities with their points in sketch mm (UIS-STATE-GEOMETRY): a curve's defining points in order
-/// (centre first), a circle's radius, a fit spline's end derivatives (its handle tips less its ends) and the Use
+/// (centre first), a circle's radius, a fit spline's end derivatives (per unit of its 0–1 parameter, as live) and the Use
 /// results, `used`. Sorted, so the comparer matches them in order.
 fn sketch_geometry(sk: &noshape_sketch::Sketch, owned: &std::collections::HashSet<noshape_sketch::EntityId>, text_box: &std::collections::HashSet<noshape_sketch::EntityId>) -> Vec<Value> {
     use noshape_sketch::{EntityKind, Geometry};

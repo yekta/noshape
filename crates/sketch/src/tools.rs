@@ -398,6 +398,32 @@ impl Sketch {
         Ok(res)
     }
 
+    /// Splits a closed curve at the points closest to `p` and `q` (live: Split on a circle asks for a second point)
+    /// into two pieces that share both new points; an open curve splits at `p` alone.
+    pub fn split_closed(&mut self, id: EntityId, p: DVec2, q: DVec2) -> Result<EditResult> {
+        let c = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
+        if !c.is_periodic() {
+            return self.split(id, p);
+        }
+        let (a, b) = c.domain();
+        let period = b - a;
+        let (mut first, mut second) = (c.closest(p), c.closest(q));
+        let gap = (second.0 - first.0).rem_euclid(period);
+        if gap < 1e-9 * period || gap > period * (1.0 - 1e-9) {
+            return Err(SketchError::OperationFailed("the two split points are the same".into()));
+        }
+        if second.0 < first.0 {
+            std::mem::swap(&mut first, &mut second);
+        }
+        let mut res = EditResult::default();
+        let (p0, p1) = (self.add_point(first.1), self.add_point(second.1));
+        res.created.extend([p0, p1]);
+        let nid = self.new_piece(id, first.0, second.0, p0, p1, &mut res)?;
+        self.apply_interval(id, second.0, first.0 + period, p1, p0, &mut res)?;
+        self.relate_pieces(id, nid, &mut res);
+        Ok(res)
+    }
+
     /// The Extend tool (live: two picks): extends the line or arc `id` to
     /// `boundary`, taken whole (a line as its infinite line, an arc as its
     /// circle), from whichever end reaches it first.
@@ -657,19 +683,21 @@ impl Sketch {
         }
         let line = self.add_line_between(pa, pb)?;
         res.created.push(line);
-        // The old corner becomes the virtual sharp.
+        // The old corner stays as the virtual sharp, a point (live sketch-chamfer-too-large: kind "point").
         if self.users_of_point(corner).is_empty() {
-            let _ = self.set_construction(corner, true);
             self.add_c(&mut res, ConstraintKind::Coincident { a: corner, b: a });
             self.add_c(&mut res, ConstraintKind::Coincident { a: corner, b });
             res.modified.push(corner);
         }
         // Live (behaviours "qa5 sketch tools" (4)): `distanceAId` / `distanceBId`, construction lines from the virtual
         // sharp to the chamfer's ends, each with its LENGTH.
+        // Each leg starts on its own point, coincident with the sharp (live: 13 COINCIDENT on a rectangle's corner).
         for (end, d) in [(pa, d1), (pb, d2)] {
-            let leg = self.add_line_between(corner, end)?;
+            let start = self.add_point(v);
+            let leg = self.add_line_between(start, end)?;
             let _ = self.set_construction(leg, true);
-            res.created.push(leg);
+            res.created.extend([start, leg]);
+            self.add_c(&mut res, ConstraintKind::Coincident { a: start, b: corner });
             self.add_c(&mut res, ConstraintKind::Length { curve: leg, value: d });
         }
         Ok(res)
