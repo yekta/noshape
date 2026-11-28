@@ -317,6 +317,7 @@ fn register_part_studio_hooks() {
         },
         variable_table: |doc, studio, host, window, cx| cx.new(|cx| variable_studio::VariableStudioView::new_in_panel(doc, studio, host, window, cx)).into(),
         readonly_variable_table: |doc, element, r, k, n, cx| variable_insert::readonly_table(doc, variable_insert::InsertTarget::Element(element), r, k, n, cx),
+        variable_table_state: |view, cx| view.clone().downcast::<variable_studio::VariableStudioView>().map(|v| v.read(cx).ui_table(cx)).unwrap_or_default(),
         variable_panel_footer: variable_insert::panel_footer,
         variable_type_cell: |id, options, current, on_select| variable_studio::type_cell(id, options, current, on_select),
         compare_blend: compare_mode::blend,

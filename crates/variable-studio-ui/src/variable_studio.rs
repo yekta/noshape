@@ -135,6 +135,14 @@ impl VariableStudioView {
         serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "configuration": self.config_open.then(|| self.ui_configuration(cx)), "help": self.help_open })
     }
 
+    /// This studio's table as shown in another element's Variable table panel (the ui-parity state's
+    /// `variables.tables[]`): `{"title", "collapsed", "rows"}`.
+    pub fn ui_table(&self, cx: &App) -> serde_json::Value {
+        let title = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let rows = if self.collapsed { Vec::new() } else { self.ui_drawn.clone() };
+        serde_json::json!({ "title": title, "collapsed": self.collapsed, "rows": rows })
+    }
+
     /// The studio's configuration inputs: `{"name", "kind": list | checkbox | variable | text, "default", "shown",
     /// "rows"}` (a list's options; `shown` the configuration the studio shows).
     fn ui_configuration(&self, cx: &App) -> Vec<serde_json::Value> {

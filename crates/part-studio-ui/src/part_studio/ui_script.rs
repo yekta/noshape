@@ -309,7 +309,7 @@ impl PartStudioView {
         })
     }
 
-    /// `variables` (README "config_data", live depth batch 10): the Variable table panel's tables (none here yet) and the
+    /// `variables` (README "config_data", live depth batch 10): the Variable table panel's tables and the
     /// Configuration panel's inputs while it is open, a List's configured columns ("Extrude 1 › Depth") and each row's
     /// values (a cell being typed in as typed).
     fn ui_config_variables(&self, cx: &App) -> Value {
@@ -375,7 +375,43 @@ impl PartStudioView {
                 })
                 .collect::<Vec<_>>()
         });
-        json!({ "tables": [], "configuration": configuration, "insert_into_all": null, "configuration_panel": open, "help": null })
+        json!({ "tables": self.ui_variable_tables(cx), "configuration": configuration, "insert_into_all": null, "configuration_panel": open, "help": null })
+    }
+
+    /// The Variable table panel's tables while it is open (live vs-ps-variable-table-after-edit s9): the inserted
+    /// Variable Studios' first, then the Part Studio's own, untitled.
+    fn ui_variable_tables(&self, cx: &App) -> Vec<Value> {
+        if self.right_panel != Some(super::config_panel::RightPanel::Variables) {
+            return Vec::new();
+        }
+        let doc = &self.doc.read(cx).session.doc;
+        let mut tables: Vec<Value> = noshape_model::variables::element_studios(doc, self.tab)
+            .iter()
+            .map(|r| match self.ui.var_tables.get(&r.studio) {
+                Some(v) if r.external.is_none() => crate::part_studio_hooks::variable_table_state(v, cx),
+                _ => json!({ "title": doc.tab(r.studio).map(|t| t.name.clone()).unwrap_or_default(), "collapsed": false, "rows": [] }),
+            })
+            .collect();
+        let kind = |k: &str| match k {
+            "LENGTH" => "Length",
+            "ANGLE" => "Angle",
+            "NUMBER" => "Number",
+            "MEASURED" => "Measured",
+            "TABLE" => "From import",
+            _ => "Any",
+        };
+        let rows: Vec<Value> = match self.ui.var_folded {
+            true => Vec::new(),
+            false => self
+                .studio(cx)
+                .map(|s| noshape_model::variable_table::active_rows_in(s, &self.current_config(s)))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|r| json!({ "name": r.name, "type": kind(&r.kind), "value": noshape_units::localize(&r.value), "description": r.description }))
+                .collect(),
+        };
+        tables.push(json!({ "title": "", "collapsed": self.ui.var_folded, "rows": rows }));
+        tables
     }
 
     /// `configurations` (README "config_data"): the Configurations box above the feature list, its shown inputs and

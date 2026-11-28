@@ -66,6 +66,8 @@ pub struct Hooks {
     pub variable_table: fn(Entity<DocModel>, TabId, TabId, &mut Window, &mut App) -> AnyView,
     /// Another document's Variable Studio, read-only, in an element's Variable table (element, studio, index, count).
     pub readonly_variable_table: ReadonlyVariableTable,
+    /// A [`Hooks::variable_table`] view's table for the ui-parity state: `{"title", "collapsed", "rows"}`.
+    pub variable_table_state: fn(&AnyView, &App) -> serde_json::Value,
     /// The Variable table panel's footer (Create Variable Studio | ▴) of an element.
     pub variable_panel_footer: fn(Entity<DocModel>, TabId, &App) -> AnyElement,
     /// The Variable Studio's Type select.
@@ -171,6 +173,10 @@ pub fn variable_table(doc: Entity<DocModel>, studio: TabId, host: TabId, window:
     (hooks().variable_table)(doc, studio, host, window, cx)
 }
 
+pub fn variable_table_state(view: &AnyView, cx: &App) -> serde_json::Value {
+    (hooks().variable_table_state)(view, cx)
+}
+
 pub fn readonly_variable_table(doc: &Entity<DocModel>, element: TabId, r: &StudioRef, k: usize, n: usize, cx: &App) -> Option<AnyElement> {
     (hooks().readonly_variable_table)(doc, element, r, k, n, cx)
 }
@@ -259,6 +265,7 @@ pub fn register_for_tests() {
         set_feature_dialog_width: |_, _| {},
         variable_table: |_, _, _, _, cx| cx.new(|_| gpui_kit::Empty).into(),
         readonly_variable_table: |_, _, _, _, _, _| None,
+        variable_table_state: |_, _| serde_json::Value::Null,
         variable_panel_footer: |_, _, _| div().into_any_element(),
         variable_type_cell: |_, _, _, _| div(),
         compare_blend: |_, _| TEST_COMPARE.with(|c| c.get()),
