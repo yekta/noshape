@@ -1,6 +1,6 @@
 {
  "scenario": "config-suppression-list",
- "recorded": "2026-11-28T04:30:19.416Z",
+ "recorded": "2026-11-28T14:17:26.556Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -9,12 +9,12 @@
    1919,
    992
   ],
-  "recorder": "2026-11-14.2 4002f36a + live2 2026-11-28.4"
+  "recorder": "2026-11-14.2 5ca3cf24 + live2 2026-11-28.11"
  },
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "6faa007e391b4b23e3d2c940",
+  "element": "1db8071d4eeb5d918f8fa498",
   "start": "config-blocks",
   "startElement": "1e02ef8ec3c2e3dc2f09fdc9",
   "runner": "live2 .nstate-uip-4.json"
@@ -34,7 +34,7 @@
   "features": {
    "rows": [
     {
-     "name": "start config-blocks asm Copy 1",
+     "name": "start config-blocks asm",
      "state": "ok",
      "selected": false,
      "editing": false,
@@ -90,7 +90,53 @@
   "tooltip": null,
   "sketch": null,
   "assembly": {
-   "error": "Error: page.evaluate: Error: GET /api/assemblies/d/060c0461ca301a2c112f155e/w/96663039d748842f7c25efc6/e/6faa007e391b4b23e3d2c940 429 {\n  \"message\" : \"Too many "
+   "instances": [
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
   },
   "drawing": null,
   "camera": {
@@ -139,10 +185,10 @@
     }
    },
    "ok": true,
-   "ti": 182720,
-   "tmove": 183671,
+   "ti": 25419,
+   "tmove": 26329,
    "moves": 1,
-   "tdown": 183965,
+   "tdown": 26621,
    "at": [
     1144,
     976
@@ -213,7 +259,8 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "error": "Error: page.evaluate: Error: GET /api/assemblies/d/060c0461ca301a2c112f155e/w/96663039d748842f7c25efc6/e/6faa007e391b4b23e3d2c940 429 {\n  \"message\" : \"Too many "
+     "instances": [],
+     "mates": []
     },
     "drawing": null,
     "camera": {
@@ -254,12 +301,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 343294,
-   "te": 343294
+   "t": 30932,
+   "te": 30932
   },
   {
    "step": 2,
@@ -269,7 +316,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 343294,
+   "ti": 30932,
    "state": {
     "focus": {
      "kind": "none"
@@ -336,7 +383,8 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "error": "Error: page.evaluate: Error: GET /api/assemblies/d/060c0461ca301a2c112f155e/w/96663039d748842f7c25efc6/e/6faa007e391b4b23e3d2c940 429 {\n  \"message\" : \"Too many "
+     "instances": [],
+     "mates": []
     },
     "drawing": null,
     "camera": {
@@ -377,12 +425,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 502009,
-   "te": 502009
+   "t": 34287,
+   "te": 34287
   },
   {
    "step": 3,
@@ -393,10 +441,10 @@
     }
    },
    "ok": true,
-   "ti": 502009,
-   "tmove": 502054,
+   "ti": 34287,
+   "tmove": 34331,
    "moves": 1,
-   "tdown": 502400,
+   "tdown": 34625,
    "at": [
     1904,
     478
@@ -467,7 +515,8 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "error": "Error: page.evaluate: Error: GET /api/assemblies/d/060c0461ca301a2c112f155e/w/96663039d748842f7c25efc6/e/6faa007e391b4b23e3d2c940 429 {\n  \"message\" : \"Too many "
+     "instances": [],
+     "mates": []
     },
     "drawing": null,
     "camera": {
@@ -502,11 +551,11 @@
      "rows": [
       {
        "name": "Small",
-       "active": false
+       "active": true
       },
       {
        "name": "Large",
-       "active": true
+       "active": false
       }
      ],
      "banner": null
@@ -518,7 +567,7 @@
        "name": "Size",
        "kind": "list",
        "default": "Small",
-       "shown": "Large",
+       "shown": "Small",
        "rows": [
         "Small",
         "Large"
@@ -538,12 +587,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 659939,
-   "te": 659939
+   "t": 36757,
+   "te": 36757
   },
   {
    "step": 4,
@@ -553,7 +602,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 659939,
+   "ti": 36757,
    "state": {
     "focus": {
      "kind": "none"
@@ -620,7 +669,8 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "error": "Error: page.evaluate: Error: GET /api/assemblies/d/060c0461ca301a2c112f155e/w/96663039d748842f7c25efc6/e/6faa007e391b4b23e3d2c940 429 {\n  \"message\" : \"Too many "
+     "instances": [],
+     "mates": []
     },
     "drawing": null,
     "camera": {
@@ -655,11 +705,11 @@
      "rows": [
       {
        "name": "Small",
-       "active": false
+       "active": true
       },
       {
        "name": "Large",
-       "active": true
+       "active": false
       }
      ],
      "banner": null
@@ -671,7 +721,7 @@
        "name": "Size",
        "kind": "list",
        "default": "Small",
-       "shown": "Large",
+       "shown": "Small",
        "rows": [
         "Small",
         "Large"
@@ -691,12 +741,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 818644,
-   "te": 818644
+   "t": 40148,
+   "te": 40148
   },
   {
    "step": 5,
@@ -707,10 +757,10 @@
     }
    },
    "ok": true,
-   "ti": 818644,
-   "tmove": 818977,
+   "ti": 40148,
+   "tmove": 40484,
    "moves": 1,
-   "tdown": 819271,
+   "tdown": 40770,
    "at": [
     451,
     446
@@ -800,7 +850,8 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "error": "Error: page.evaluate: Error: GET /api/assemblies/d/060c0461ca301a2c112f155e/w/96663039d748842f7c25efc6/e/6faa007e391b4b23e3d2c940 429 {\n  \"message\" : \"Too many "
+     "instances": [],
+     "mates": []
     },
     "drawing": null,
     "camera": {
@@ -835,11 +886,11 @@
      "rows": [
       {
        "name": "Small",
-       "active": false
+       "active": true
       },
       {
        "name": "Large",
-       "active": true
+       "active": false
       }
      ],
      "banner": null
@@ -851,7 +902,7 @@
        "name": "Size",
        "kind": "list",
        "default": "Small",
-       "shown": "Large",
+       "shown": "Small",
        "rows": [
         "Small",
         "Large"
@@ -871,12 +922,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 976631,
-   "te": 976631
+   "t": 42777,
+   "te": 42777
   },
   {
    "step": 6,
@@ -887,10 +938,10 @@
     }
    },
    "ok": true,
-   "ti": 976631,
-   "tmove": 976674,
+   "ti": 42777,
+   "tmove": 42825,
    "moves": 2,
-   "tdown": 977721,
+   "tdown": 43894,
    "at": [
     559,
     627
@@ -961,52 +1012,7 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "instances": [
-      {
-       "name": "Part 1 <1>",
-       "fixed": true,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      }
-     ],
+     "instances": [],
      "mates": []
     },
     "drawing": null,
@@ -1042,11 +1048,11 @@
      "rows": [
       {
        "name": "Small | on",
-       "active": false
+       "active": true
       },
       {
        "name": "Large | on",
-       "active": true
+       "active": false
       }
      ],
      "banner": null
@@ -1056,10 +1062,24 @@
      "configuration": [
       {
        "name": "Size",
-       "kind": "checkbox",
-       "default": null,
-       "shown": null,
-       "rows": []
+       "kind": "list",
+       "default": "Small",
+       "shown": "Small",
+       "rows": [
+        "Small",
+        "Large"
+       ],
+       "columns": [
+        "Extrude 2 \u203a Unsuppressed"
+       ],
+       "values": [
+        [
+         true
+        ],
+        [
+         true
+        ]
+       ]
       }
      ],
      "insert_into_all": null,
@@ -1070,12 +1090,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 980334,
-   "te": 980334
+   "t": 45958,
+   "te": 45958
   },
   {
    "step": 7,
@@ -1085,7 +1105,7 @@
     "ms": 2000
    },
    "ok": true,
-   "ti": 980334,
+   "ti": 45958,
    "state": {
     "focus": {
      "kind": "none"
@@ -1152,52 +1172,7 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "instances": [
-      {
-       "name": "Part 1 <1>",
-       "fixed": true,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      }
-     ],
+     "instances": [],
      "mates": []
     },
     "drawing": null,
@@ -1233,11 +1208,11 @@
      "rows": [
       {
        "name": "Small | on",
-       "active": false
+       "active": true
       },
       {
        "name": "Large | on",
-       "active": true
+       "active": false
       }
      ],
      "banner": null
@@ -1247,10 +1222,24 @@
      "configuration": [
       {
        "name": "Size",
-       "kind": "checkbox",
-       "default": null,
-       "shown": null,
-       "rows": []
+       "kind": "list",
+       "default": "Small",
+       "shown": "Small",
+       "rows": [
+        "Small",
+        "Large"
+       ],
+       "columns": [
+        "Extrude 2 \u203a Unsuppressed"
+       ],
+       "values": [
+        [
+         true
+        ],
+        [
+         true
+        ]
+       ]
       }
      ],
      "insert_into_all": null,
@@ -1261,12 +1250,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 984617,
-   "te": 984617
+   "t": 50287,
+   "te": 50287
   },
   {
    "step": 8,
@@ -1277,13 +1266,13 @@
     }
    },
    "ok": true,
-   "ti": 984617,
-   "tmove": 984648,
+   "ti": 50287,
+   "tmove": 50316,
    "moves": 1,
-   "tdown": 984952,
+   "tdown": 50601,
    "at": [
-    1563,
-    305
+    1506,
+    304
    ],
    "state": {
     "focus": {
@@ -1352,52 +1341,7 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "instances": [
-      {
-       "name": "Part 1 <1>",
-       "fixed": true,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      }
-     ],
+     "instances": [],
      "mates": []
     },
     "drawing": null,
@@ -1433,7 +1377,7 @@
      "rows": [
       {
        "name": "Small | on",
-       "active": false
+       "active": true
       },
       {
        "name": "Large | on",
@@ -1447,10 +1391,24 @@
      "configuration": [
       {
        "name": "Size",
-       "kind": "checkbox",
-       "default": null,
-       "shown": null,
-       "rows": []
+       "kind": "list",
+       "default": "Small",
+       "shown": "Small",
+       "rows": [
+        "Small",
+        "Large"
+       ],
+       "columns": [
+        "Extrude 2 \u203a Unsuppressed"
+       ],
+       "values": [
+        [
+         true
+        ],
+        [
+         false
+        ]
+       ]
       }
      ],
      "insert_into_all": null,
@@ -1461,12 +1419,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 987360,
-   "te": 987360
+   "t": 52533,
+   "te": 52533
   },
   {
    "step": 9,
@@ -1476,7 +1434,7 @@
     "ms": 2000
    },
    "ok": true,
-   "ti": 987360,
+   "ti": 52533,
    "state": {
     "focus": {
      "kind": "other",
@@ -1544,52 +1502,7 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "instances": [
-      {
-       "name": "Part 1 <1>",
-       "fixed": true,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      }
-     ],
+     "instances": [],
      "mates": []
     },
     "drawing": null,
@@ -1625,7 +1538,7 @@
      "rows": [
       {
        "name": "Small | on",
-       "active": false
+       "active": true
       },
       {
        "name": "Large | on",
@@ -1639,10 +1552,24 @@
      "configuration": [
       {
        "name": "Size",
-       "kind": "checkbox",
-       "default": null,
-       "shown": null,
-       "rows": []
+       "kind": "list",
+       "default": "Small",
+       "shown": "Small",
+       "rows": [
+        "Small",
+        "Large"
+       ],
+       "columns": [
+        "Extrude 2 \u203a Unsuppressed"
+       ],
+       "values": [
+        [
+         true
+        ],
+        [
+         false
+        ]
+       ]
       }
      ],
      "insert_into_all": null,
@@ -1653,12 +1580,12 @@
      {
       "label": "Size",
       "kind": "list",
-      "value": "Large"
+      "value": "Small"
      }
     ]
    },
-   "t": 992005,
-   "te": 992005
+   "t": 56447,
+   "te": 56447
   },
   {
    "step": 10,
@@ -1670,10 +1597,10 @@
     }
    },
    "ok": true,
-   "ti": 992005,
-   "tmove": 992031,
+   "ti": 56447,
+   "tmove": 56488,
    "moves": 2,
-   "tdown": 992406,
+   "tdown": 56899,
    "at": [
     535,
     125
@@ -1723,26 +1650,25 @@
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 2",
-       "state": "ok",
+       "state": "suppressed",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": ""
+       "cls": "suppressed not-computed"
       }
      ],
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1",
-     "Part 2"
+     "Part 1"
     ],
-    "partsHeading": "Parts (2)",
+    "partsHeading": "Parts (1)",
     "undo": {
      "undo": true,
      "redo": false
@@ -1751,52 +1677,7 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "instances": [
-      {
-       "name": "Part 1 <1>",
-       "fixed": true,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      }
-     ],
+     "instances": [],
      "mates": []
     },
     "drawing": null,
@@ -1846,10 +1727,24 @@
      "configuration": [
       {
        "name": "Size",
-       "kind": "checkbox",
-       "default": null,
-       "shown": null,
-       "rows": []
+       "kind": "list",
+       "default": "Small",
+       "shown": "Large",
+       "rows": [
+        "Small",
+        "Large"
+       ],
+       "columns": [
+        "Extrude 2 \u203a Unsuppressed"
+       ],
+       "values": [
+        [
+         true
+        ],
+        [
+         false
+        ]
+       ]
       }
      ],
      "insert_into_all": null,
@@ -1864,8 +1759,8 @@
      }
     ]
    },
-   "t": 996425,
-   "te": 996425
+   "t": 60416,
+   "te": 60416
   },
   {
    "step": 11,
@@ -1875,7 +1770,7 @@
     "ms": 3000
    },
    "ok": true,
-   "ti": 996425,
+   "ti": 60416,
    "state": {
     "focus": {
      "kind": "other",
@@ -1921,26 +1816,25 @@
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 2",
-       "state": "ok",
+       "state": "suppressed",
        "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": ""
+       "cls": "suppressed not-computed"
       }
      ],
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1",
-     "Part 2"
+     "Part 1"
     ],
-    "partsHeading": "Parts (2)",
+    "partsHeading": "Parts (1)",
     "undo": {
      "undo": true,
      "redo": false
@@ -1949,52 +1843,7 @@
     "tooltip": null,
     "sketch": null,
     "assembly": {
-     "instances": [
-      {
-       "name": "Part 1 <1>",
-       "fixed": true,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      },
-      {
-       "name": "Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
-      }
-     ],
+     "instances": [],
      "mates": []
     },
     "drawing": null,
@@ -2044,10 +1893,24 @@
      "configuration": [
       {
        "name": "Size",
-       "kind": "checkbox",
-       "default": null,
-       "shown": null,
-       "rows": []
+       "kind": "list",
+       "default": "Small",
+       "shown": "Large",
+       "rows": [
+        "Small",
+        "Large"
+       ],
+       "columns": [
+        "Extrude 2 \u203a Unsuppressed"
+       ],
+       "values": [
+        [
+         true
+        ],
+        [
+         false
+        ]
+       ]
       }
      ],
      "insert_into_all": null,
@@ -2062,9 +1925,9 @@
      }
     ]
    },
-   "t": 1001724,
-   "te": 1001724
+   "t": 65265,
+   "te": 65265
   }
  ],
- "t0_epoch_ms": 1795840197390
+ "t0_epoch_ms": 1795875426528
 }
