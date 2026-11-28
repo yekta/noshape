@@ -6179,6 +6179,16 @@ fn export_dialog_keys_as_live(cx: &mut TestAppContext) {
     assert!(!shown(cx), "Enter in File name closed the dialog");
     cx.run_until_parked();
     assert_eq!(names.borrow().as_slice(), ["Part Studio 12".to_string()], "exported at once, with the name typed");
+    // Live mistake-export-file-name-blank s8: the click that focuses File name leaves the caret where it lands (past
+    // the text's end), so a key goes after the name.
+    open(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let field = vcx.debug_bounds("ex-file").expect("File name");
+    vcx.simulate_click(field.center(), Modifiers::default());
+    vcx.simulate_keystrokes("3 enter");
+    draw(cx, window);
+    cx.run_until_parked();
+    assert_eq!(names.borrow().last().map(String::as_str), Some("Part Studio 13"), "the click placed the caret");
 }
 
 /// Opening a feature's dialog redraws only its toolbar button (now active); the other tools keep their cached views

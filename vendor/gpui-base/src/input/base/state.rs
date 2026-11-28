@@ -478,6 +478,13 @@ pub struct InputBaseState<M: InputModeKind> {
     /// (a click into it, Tab, or `focus()`); a click while focused places
     /// the caret.
     pub(super) select_on_focus: bool,
+    /// NOSHAPE PATCH: a click that focuses the input places the caret (a web
+    /// modal's text box: Onshape's Export); Tab still selects all.
+    click_places_caret: bool,
+    /// NOSHAPE PATCH: a press landed while the input wasn't focused.
+    pressed_unfocused: bool,
+    /// NOSHAPE PATCH: the input had the focus when last painted.
+    pub(super) focused_when_drawn: std::cell::Cell<bool>,
     /// NOSHAPE PATCH: Esc after an edit restores the text the input had when
     /// it got the focus (or at the last Enter / `set_value`) and drops the
     /// focus; Esc without an edit passes on (a dialog cancels).
@@ -888,6 +895,9 @@ impl<M: InputModeKind> InputBaseState<M> {
             masked: false,
             clean_on_escape: false,
             select_on_focus: true,
+            click_places_caret: false,
+            pressed_unfocused: false,
+            focused_when_drawn: std::cell::Cell::new(false),
             revert_on_escape: true,
             escape_baseline: None,
             focus_requested: std::cell::Cell::new((false, false)),
@@ -1335,6 +1345,13 @@ impl<M: InputModeKind> InputBaseState<M> {
     /// Onshape's search boxes keep their text).
     pub fn revert_on_escape(mut self, on: bool) -> Self {
         self.revert_on_escape = on;
+        self
+    }
+
+    /// NOSHAPE PATCH: a click that focuses the input places the caret where it
+    /// lands instead of selecting all (default false).
+    pub fn click_places_caret(mut self, on: bool) -> Self {
+        self.click_places_caret = on;
         self
     }
 
@@ -2633,6 +2650,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         }
 
         self.selecting = true;
+        self.pressed_unfocused = !self.focused_when_drawn.get();
         let (offset, line_end_affinity, columns_past_line_end) =
             self.resolve_mouse_position(event.position);
 
@@ -3763,7 +3781,8 @@ impl<M: InputModeKind> InputBaseState<M> {
             let requested_text = self.focus_text.take();
             self.escape_baseline = Some(requested_text.unwrap_or_else(|| self.text.to_string().into()));
             let (_, caller_selected) = self.focus_requested.replace((false, false));
-            if self.select_on_focus && !caller_selected {
+            let clicked = std::mem::take(&mut self.pressed_unfocused) && self.click_places_caret;
+            if self.select_on_focus && !caller_selected && !clicked {
                 self.selecting = false;
                 self.select_all(window, cx);
             }

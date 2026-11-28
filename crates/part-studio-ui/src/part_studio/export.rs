@@ -254,7 +254,7 @@ fn export_title(parts: usize) -> SharedString {
 }
 
 fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only: bool, cad_file: bool, run: RunExport, window: &mut Window, cx: &mut App) {
-    let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
+    let file = cx.new(|cx| InputState::new(window, cx).click_places_caret(true).default_value(base));
     // The last export's format and options (live: exportSolidOptions); a CAD file's, Parasolid unless it was one of its.
     // A part row's list ends with Inspection list (live inspection-list-1118), the tab's doesn't.
     let part_row = parts_only && !assembly && !cad_file;
@@ -265,7 +265,7 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
     }
     // Resolution › Custom's fields (live 1745): STL's three, their lengths
     // in the STL units, then the other mesh formats' three.
-    let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(custom_text(&st.borrow(), f))))).collect());
+    let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).click_places_caret(true).default_value(custom_text(&st.borrow(), f))))).collect());
     // A field that isn't a number disables Export (live: no message).
     let invalid = Rc::new(std::cell::Cell::new(false));
     for (f, (_, input)) in CUSTOM_FIELDS.iter().zip(custom.iter()) {

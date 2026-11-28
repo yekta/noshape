@@ -3149,6 +3149,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
         let (focus_handle, show_cursor, disabled, selected_range, editor_style, editor_paddings, multi_line) = {
             let state = self.state.read(cx);
             let sel = *state.active_selection();
+            state.focused_when_drawn.set(state.focus_handle.is_focused(window));
             (
                 state.focus_handle.clone(),
                 state.show_cursor(window, cx),
