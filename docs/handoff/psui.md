@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-27 16:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 04:5x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,90 +33,31 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## PLAN 11-28 01:28 (after compaction: start here; lead: do exactly this, core waits on inner_regions)
-0. (01:3x) Step 1 done: the test's redo + rename-by-new-name steps were unfounded (no live take of redo after a
-   rename) and dropped; it now checks the undo undid the Extrude. Open: ours loses a non-undo rename on redo of the
-   step before it (redo restores the pre-rename state); ask live for a capture before changing it.
-1. Fix the one ps47 failure: ops e2e `a_part_renamed_in_its_properties_is_not_an_undo_step` fails at its
-   history_redo + part_set_properties step ("no part `Bracket`; parts: Part 1": the undo undid the extrude/rename
-   chain differently than the test assumes). Read the test (crates/ops/tests/e2e.rs), fix the test's later steps
-   (live properties-name-save-renames: Save is no undo step), re-run that test only on vibe2.
-2. Commit as "psui: …" (code; commit says the "after B" unit test changed because it was wrong vs live
-   appearance-part-rgb-escape; the dialogs row now reads the face dialog from state["feature"] (state moved in batch 9,
-   expectation unchanged)), handoff last.
-3. `git fetch && git rebase origin/main` (batch 10 takes come in). core's 434c2a49 carries my inner_regions hunk
-   byte-identical: on a conflict in features/sketch.rs keep one copy.
-4. ps48 (resp/ps48.sh, written): clippy pss + noshape, ui-bench build, replay of the 19 batch-10 config/export takes.
-   Touch diff files first. Then land (read diff --stat, grep TICKETS rows for duplicates), report to the lead in ≤5 lines,
-   tell core when it's queued.
-5. Tick qa rows from ps47 (70/93 scenarios, 785/932 states): batch-9 rows 73c1c85edd mostly fixed (only remaining
-   batch-9-ish diffs: mass-properties-add-part s5 message "One or more parts do not have a material defined.",
-   mass volume 1 mm³ off (spline), measure-panel-spline-face s3 no panel); batch-8 2d235a33de.
-- Already in the tree (uncommitted, since ps47 started, untested): run.py seeds "remembered": {"export"} into
-  export_solid.json (remembered_export; the 13 export Format diffs), export File name " Copy N" normalised,
-  "configurations" in LATER_KEYS; Part Studio state "variables" (config panel inputs, List columns "<feature> ›
-  <param>", values per row, typed cell text) and "configurations" (config box) in part_studio/ui_script.rs;
-  config_cell marks (config_panel.rs config_cell_mark, mark_first + "<input>|" form), config_param marks (config box),
-  app ui_script control_name config_cell/config_param. Section-view prompt diffs: live inconsistent (same Front pick
-  clears it in section-view-front, keeps it in -exclude-part): left as is.
-- ps47 still open: export-parts-three-individual-files s5 (live "STL Format" first field), mistake-asm-import-step-*
-  (2), mistake-section-view-pick-edge s2 (ours Front, live Top: edge [20,0,10] -> adjacent face pick order).
-
-## IN FLIGHT 11-28 00:3x (superseded by PLAN above)
-- FIRST: cb495ba6 FAILED in the land queue 00:19: part_studio::sketch::ui_tests::dialogs::the_dialogs_matrix_matches_live
-  panicked at dialogs_feel_tests.rs:1271 (672 passed, 1 failed). Fix forward (likely the face-menu / appearance /
-  Hide changes of a34bf898), then land with everything below.
-- ps46 (resp/ps46.log, bg on vibe2) = batch-8 rescore + batch-9 diffs on the tree as of 00:0x; ps47.sh written (93 takes,
-  tests incl. e2e::a_part_renamed_in_its_properties, clippy pss+ops+asm-ui) for all edits since: touch diff files first.
-- Uncommitted since ps45 (43/49): panel-row Edit appearance selects the part; face appearance Rename popup reported
-  as panel "Rename"; colour editor Tab from B -> Tessellation select (select_focus; unit test "after B, A" changed:
-  wrong vs live appearance-part-rgb-escape, say so in the commit); Properties Save rename is no undo step
-  (properties_save_is_undo_step(ps, body, v), callers updated, new e2e); section arrow click flips the plane
-  (section_manip.rs ToolUp); Section planes picks Face/Plane/Connector only (behaviors.rs pick_kinds: edge click ->
-  adjacent face, live mistake-section-view-pick-edge); cylinder Section view… uses section_through; export Custom
-  number fields marked field:<label>; Mass properties "Parts to measure" focus once the selection changed
-  (ui.mass_opened_with).
-- EXPORT-TOAST-DOCUMENT-NAME: live's default File name = "<tab> - <part>", live's start tab is "start block Copy 2";
-  check ours' in ps46 before deciding run.py vs ours.
-
-## (earlier, 00:0x)
-- QUEUED cb495ba6 (3 commits: batch-9 state + fixes, inner_regions, handoff); ec4c4387 landed before it. core was
-  told (it lands its eval.rs Reference::Sketch use of features::sketch::inner_regions after mine). Never poll
-  --status; the lead reports. On land: report <=5 lines; cc skasm on SKETCH-COINCIDENT-FREE-LINE-SLIDES /
-  SKETCH-TANGENT-ARC-SPAN + REQUESTS "psui 11-27 16:26".
-- Uncommitted (ps45 running on vibe2, log resp/ps45.log: pss tests appearance/material/menu/rename/propert, ops
-  e2e::material + e2e::mass_properties, clippy pss+ops+app-core, build, batch-9 replay):
-  parts-list rename emptied -> toast "Name is required." (behaviors.rs NAME_REQUIRED, cleared on commit/non-empty);
-  Material Library select marked dropdown:Library, Escape closes its list before the panel (close_library_list);
-  colour editor keeps parts' drawn colours at open (AppearanceEdit.shown/committed_color) so part_data shows live's
-  pre-Enter colour; #/A (and R/G/B) fields select_on_focus(false); Properties text fields select_on_focus(false);
-  material search Escape clears the search and keeps focus (2nd Esc closes the panel); hex Enter with an incomplete
-  colour does nothing (editor stays); material densities from the CSV's kg/m³ (ONSHAPE_MATERIALS 4th field, both
-  material_data.rs; ops LB_IN3 removed; mass 2.319 as live); surface face menu: Hide other/all surfaces (of the
-  surfaces); after ps45 started (touch before the next run): material panel Custom fields report focus "field" with
-  their label (focused_custom_field + ui_script branch).
-  Then commit (psui: …), handoff last, land.
-- After ps45 (uncommitted, ps46 = resp/ps46.sh: tests, clippy pss+asm-ui, build, batch-8 rescore + batch-9 diffs):
-  PS-MENU-CYLINDER-FACE: a cylinder's face menu has View normal to (down its axis, mod.rs view_normal frame_of) +
-  Section view… + Curve/surface analysis… (menus.rs `cylinder`, mod.rs cylinder_face); Insert panel ✕ marked
-  "button:cancel" (ASM-INSERT-CANCEL closed in TICKETS: only the name); ASM-INSERT-ROW-ADDS-INSTANCE closed as not
-  a defect (live's s9 is before its REST round trip; s10 lists it as ours). properties-material-field-click: ours
-  already kept Properties open in ps43; recheck in ps46.
-- qa batch 9 (TICKETS 73c1c85edd "qa 11-28 00:0x", 20/49 on b497dda05 = before cb495ba6): PART-DATA-STATE,
-  APPEARANCE-EDITOR, APPEARANCES-PANEL-TABS, HIDE-CLEARS-SELECTION, PROPERTIES-DIALOG-FIELDS (P2), RENAME-BLANK-MESSAGE,
-  MATERIAL-DIALOG-DETAILS (P3): check each against ps45/ps46 and tick the fixed ones in TICKETS.
-- sketch-used 0/19: skasm's (lead: SKETCH-USED-CURVES-NOT-SELECTABLE is skasm's P0; don't duplicate).
-- live's depth batch 10 (6ca15328 queued, 55 takes: Variables, Variable Studio, Configurations; config_data:
-  state.variables/state.configurations, targets config_cell "<row>:<column>" and config_param; export takes carry
-  "remembered": {"export": {...}}): ours needs those state keys and targets after batch 8 (README "Configurations").
-- Then qa batch 8 (TICKETS 2d235a33de "qa 11-27 23:2x", scored on green 5128614a4, before ec4c4387): rescore on main
-  first; P2 EXPORT-CUSTOM-FIELDS-NO-FOCUS, EXPORT-N-PARTS-DIALOG ("Export 2/3 Parts" + 2 checkboxes),
-  SECTION-VIEW-ARROW-FLIP (+ {"world"} drag target), SECTION-VIEW-NEXT-FIELD (focus to Items to exclude; edge pick
-  doesn't clear the plane), MEASURE-BRACKET-KEY ("[" opens Measure); P3 PART-MENU-CURVE-ANALYSIS,
-  MASS-PROPERTIES-ADD-PART-FOCUS, EXPORT-TOAST-DOCUMENT-NAME (run.py drops live's " Copy N");
-  ASM-MASS-PROPERTIES-BUTTON (lead's/asm; mine if only the button name).
-- Export open: "Include hidden instances in export" still remembered.
-- Hosts: vibe2 = builds/app runs (one at a time, land queue shares it); vibex8 for shards via ~/bin/slot.
+## STATE 11-28 04:5x (start here)
+- 57f48639 landed (as e76d5b079d). This land (rebased on origin/main 04:4x): e895723533 TICKETS ticks of ps47's
+  batch 8/9 rows; batch 10 code (Configuration panel/box, VS rows top-down, Variable menu, wrong-type no undo step,
+  disabled ✓ focus, sketch owner, start rectangles in live's line order; run.py mass variance, Insert dialog read,
+  old reader's null `variables`); TICKETS ticks of qa's batch-10 rows; export fixes (File name field mark, Custom field
+  click leaves a caret, run.py: live's "start X Copy N" Part Studio name in the bubble, "Export N Parts" fields by
+  label, a clicked field's caret on both sides reads as live's).
+- Verified: ps55 config 7/19 411/434; ps56 36 batch-10 + 14 Insert takes 33/50 681/828 (compare after fixes); ps57 38
+  export takes 30/38 368/402; ps58 clippy pss clean, undo/wrong-type/export tests ok; ps60 the changed export takes:
+  custom-deviation, chordal-zero, file-name-blank, stl-download match (gpui-base `click_places_caret`: the Export
+  modal's File name and Custom fields take a click's caret, Tab selects all; T1 export_dialog_keys_as_live).
+- What's left is live's (REQUESTS "psui 11-28 01:5x" and "04:1x"): VS "Where used" panel left open on 4 takes,
+  Name field read as boolean (qa RECORDER-NAME-FIELD-KIND), sketch null under Create variable, the import toast's
+  timing (13 asm takes), live's REST lag of a new instance after ✓ (3 takes), config rclick menu null (10), Undo
+  after a box switch, config-suppression-list on a wrong copy; Units Meter vs live's remembered Millimeter
+  (EXPORT-REMEMBERED-START).
+- NEXT: "Apply export rules to contents" (on, remembered; shown under a ticked "Export unique parts as individual
+  files", with a "View export rules" link; live reads the label with the link's text): ExportSettings field + ops +
+  prefs + the dialog row (export-parts-three-individual-files s12). Then export-step-spline-part s4 ("Include derived
+  tolerances in export" live true / ours false: remembered or default?), ps47 open items
+  (mistake-section-view-pick-edge s2, mass-properties-add-part s5 message, MEASURE-BRACKET-KEY), the maker set,
+  test-memory P2, remaining batch 8/9 rows.
+- Diff per state: scp 'vibe2:tmp/psui/psNN/a/*.json' /root/psui-scratch/psNN/, then
+  `python3 /root/psui-scratch/bin/alldiffs.py /root/psui-scratch/psNN <names…>`.
+- Open (not live-backed): redo of the step before a Properties rename loses the rename; ask live before changing.
 
 ## EARLIER
 - sketch-tool-insert-image s3: retake asked (REQUESTS "psui 11-27 15:42").
