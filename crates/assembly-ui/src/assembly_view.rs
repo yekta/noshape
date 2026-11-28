@@ -1603,7 +1603,7 @@ impl AssemblyView {
         let picking = self.pick_mode(cx).is_some();
         let hovered_overlay = self.hover_overlay;
         // Assembly origin and assembly mate connectors (pickable).
-        h.origin = (!self.ui.origin_hidden || picking).then_some((size * 0.8, picking && hovered_overlay == Some(OverlayPick::Origin)));
+        h.origin = (!self.ui.origin_hidden || picking).then_some((size * 0.8, (picking || self.ui.ps_in_context.is_some()) && hovered_overlay == Some(OverlayPick::Origin)));
         h.origin_triad = self.origin_as_triad(cx);
         h.origin_row_hover = self.ui.origin_row_hover;
         let mut overlay_connectors = Vec::new();
@@ -3726,6 +3726,21 @@ impl AssemblyView {
                     // Group dialog: clicking an instance adds or removes it.
                     if let Some(top) = self.pick(*pick).map(|t| t.path[0]) {
                         self.toggle_group_member(top, cx);
+                    }
+                } else if self.ui.ps_in_context.is_some() {
+                    // Origin of new Part Studio: the origin's or an assembly connector's glyph fills its field (live
+                    // asm-create-part-studio-in-context-finished: the Origin picked, its row selected).
+                    let picked = match self.overlay(*pick) {
+                        Some(OverlayPick::Origin) => Some(behaviors::PsOrigin::Origin),
+                        Some(OverlayPick::Connector(i)) => match self.overlay_connectors.get(i) {
+                            Some(OverlayConnector::Assembly(id)) => Some(behaviors::PsOrigin::Connector(*id)),
+                            _ => None,
+                        },
+                        _ => None,
+                    };
+                    if let Some(o) = picked {
+                        self.ui.ps_in_context = Some(o);
+                        cx.notify();
                     }
                 } else if self.pick_mode(cx).is_some() {
                     if let Some(c) = self.chosen_connector(*pick, cx) {

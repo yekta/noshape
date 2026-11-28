@@ -2516,6 +2516,27 @@ fn display_states_opens_with_its_name_box_focused(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Live asm-create-part-studio-in-context-finished: with Origin of new Part Studio open, a click on the origin's glyph
+/// fills its field with the Origin.
+#[gpui::test]
+fn in_context_origin_takes_the_origin_glyph(cx: &mut TestAppContext) {
+    use crate::viewport::ViewportEvent;
+    let path = pattern_document(cx, "ps-in-ctx-origin");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.open_ps_in_context(false, cx))).unwrap();
+    draw(cx, window);
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = crate::assembly_scene::overlay_id(v.built.as_ref().expect("a scene"), crate::assembly_scene::OverlayPick::Origin);
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(id), position: glam::DVec2::new(400.0, 300.0), modifiers: gpui_kit::Modifiers::default() }, w, cx);
+            assert_eq!(v.ui.ps_in_context, Some(super::behaviors::PsOrigin::Origin));
+        })
+    })
+    .unwrap();
+}
+
 /// Live asm-display-states-create: a name typed in the box and Enter saves the state (the select on it, the box empty
 /// and let go, Undo there); the parity state reads the typed name in place of the hint.
 #[gpui::test]
