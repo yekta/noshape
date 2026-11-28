@@ -691,6 +691,14 @@ impl PartStudioView {
         self.hovered_sketch_entity(cx).is_some_and(|e| self.sketch_data(cx).is_some_and(|d| d.sketch.point(e).is_some()))
     }
 
+    /// A used curve lies on the model edge the GPU picks: the menu takes the curve under the cursor, as a click does
+    /// (live sketch-used-ctrl-multiselect s80: "Delete 2 sketch entities" with the used line selected and the spline
+    /// under it).
+    fn used_curve_under_cursor(&self, cx: &App) -> Option<noshape_sketch::EntityId> {
+        let at = self.sketch.as_ref()?.cursor?;
+        self.sketch_pick_at(at, cx).filter(|e| self.sketch_data(cx).is_some_and(|d| d.sketch.entity(*e).is_some_and(|x| x.external)))
+    }
+
     fn hovered_sketch_entity(&self, cx: &App) -> Option<noshape_sketch::EntityId> {
         let ed = self.sketch.as_ref()?;
         let e = match &self.hover {
@@ -1612,7 +1620,14 @@ impl PartStudioView {
                 // selection and what is lit; it doesn't toggle the selection. On nothing lit it waits for the release:
                 // a Ctrl drag from there is a box that takes out of the selection (live sel-gestures-1122).
                 if !overlay_pressed && modifiers.control && !modifiers.platform && tool == Some(Tool::Select) {
-                    if self.hovered_sketch_entity(cx).is_some() {
+                    // The press's own place: the hover holds while a menu is open, and a Ctrl+click beside it opens the
+                    // menu here (live sketch-used-ctrl-multiselect s81: the used arc then, not added to the selection).
+                    if let Some(q) = to_plane(self, *position, cx)
+                        && let Some(ed) = &mut self.sketch
+                    {
+                        ed.cursor = Some(q);
+                    }
+                    if self.hovered_sketch_entity(cx).is_some() || self.used_curve_under_cursor(cx).is_some() {
                         self.open_sketch_context_menu(window.mouse_position(), None, window, cx);
                         return true;
                     }
@@ -6225,7 +6240,9 @@ impl PartStudioView {
     /// The sketch context menu; for a dimension (`dim`), its own items lead
     /// and "Delete dimension" ends it (live, qa4 DIM-MENU).
     fn open_sketch_context_menu(&mut self, position: Point<Pixels>, dim: Option<noshape_sketch::ConstraintId>, window: &mut Window, cx: &mut Context<Self>) {
-        let hovered = self.hovered_sketch_entity(cx).filter(|_| dim.is_none());
+        let own = self.hovered_sketch_entity(cx);
+        let used = own.is_none().then(|| self.used_curve_under_cursor(cx)).flatten();
+        let hovered = own.or(used).filter(|_| dim.is_none());
         // A constraint glyph's menu has no dimension items.
         let dim_is_dimension = dim.and_then(|cid| Some(self.sketch_data(cx)?.sketch.constraint(cid)?.is_dimension())).unwrap_or(true);
         let dim_items: Vec<(String, String)> = dim.filter(|_| dim_is_dimension).map(|cid| self.dimension_menu_items(cid, cx)).unwrap_or_default();
@@ -6235,7 +6252,7 @@ impl PartStudioView {
             Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if matches!(**on, Reference::Edge(_)) => Some((**on).clone()),
             _ => None,
         };
-        let model_edge = matches!(self.hover, Some(Reference::Edge(_) | Reference::Face(_))) || midpoint_of.is_some();
+        let model_edge = used.is_none() && (matches!(self.hover, Some(Reference::Edge(_) | Reference::Face(_))) || midpoint_of.is_some());
         // Model geometry under the cursor: its part (Hide / Isolate / Make
         // transparent) and, for a straight edge, Align view (live sketch/204).
         let model_ref = self.hover.clone().filter(|_| model_edge);

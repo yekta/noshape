@@ -918,13 +918,12 @@ impl Render for OsMenu {
             .on_mouse_down_out(cx.listener(move |this, e: &MouseDownEvent, window, cx| {
                 // A submenu stays open for a click on its parent's rows (live asm-menu-edit-dynamic-suppression).
                 if !this.contains(e.position, cx) && !this.parent_contains(e.position, cx) {
-                    // Ctrl+click is Onshape's context-menu gesture: beside an open context menu it does nothing and the
-                    // menu stays (live sketch-used-ctrl-multiselect s81-s83).
+                    this.dismiss(window, cx);
+                    // Ctrl+click is Onshape's context-menu gesture: beside an open context menu it opens the menu there
+                    // (live sketch-used-ctrl-multiselect s81-s84: the rows change, the next Ctrl+click lands on a row).
                     if plain_menu && !camera && crate::viewport::is_ctrl_click(e) {
-                        cx.set_global(PressClosedMenu(Some(e.position)));
                         return;
                     }
-                    this.dismiss(window, cx);
                     cx.set_global(PressClosedMenu(Some(e.position)));
                 }
             }))

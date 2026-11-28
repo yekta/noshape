@@ -8020,6 +8020,41 @@ fn a_used_edges_line_is_clicked_and_boxed_in_its_sketch(cx: &mut TestAppContext)
     assert!(!kinds.is_empty() && kinds.iter().all(|k| k == "SKETCH_ENTITY"), "the selection reads SKETCH_ENTITY: {kinds:?}");
 }
 
+/// Live sketch-used-ctrl-multiselect s80: the menu over a used line takes the line (a sketch entity's menu), also where
+/// the hover is the model edge under it: "Delete sketch entity" and Construction, none of the part's rows (Hide Part 1).
+#[gpui::test]
+fn the_menu_over_a_used_line_takes_the_line_not_the_edge_under_it(cx: &mut TestAppContext) {
+    let (window, view, edge, pick, a, b) = sketch_on_top_face(cx, "used-line-menu", Tool::Use);
+    let mid = on_screen(cx, &view, (a + b) * 0.5);
+    let m = Modifiers::default();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        for ev in [ViewportEvent::PointerMove { position: mid, modifiers: m }, ViewportEvent::Hover(Some(pick)), ViewportEvent::ToolDown { position: mid, modifiers: m, click_count: 1 }, ViewportEvent::ToolUp { position: mid, modifiers: m }] {
+            if let ViewportEvent::PointerMove { position, .. } = ev {
+                vp.update(cx, |vp, _| vp.place_pointer(position));
+            }
+            v.on_viewport_event(&vp, &ev, w, cx);
+        }
+    }))
+    .unwrap();
+    draw(cx, window);
+    keys(cx, window, &["escape"]);
+    let labels = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                if let Some(ed) = &mut v.sketch {
+                    ed.selection.clear();
+                    ed.cursor = Some((a + b) * 0.5);
+                }
+                v.hover = Some(edge.clone());
+                v.open_sketch_context_menu(gpui_kit::point(px(600.), px(400.)), None, w, cx);
+                v.context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default()
+            })
+        })
+        .unwrap();
+    assert!(labels.iter().any(|l| l == "Delete sketch entity") && labels.iter().any(|l| l == "Construction") && !labels.iter().any(|l| l.starts_with("Hide Part")), "{labels:?}");
+}
+
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
 fn sketch_on_top_face(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>, Reference, u32, DVec2, DVec2) {
