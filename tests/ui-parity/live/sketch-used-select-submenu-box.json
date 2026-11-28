@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-used-select-submenu-box",
- "recorded": "2026-11-27T15:40:56.719Z",
+ "recorded": "2026-11-28T01:43:05.166Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -9,12 +9,12 @@
    1919,
    992
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.8"
  },
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "24796a0aed6e11e0ca069c36",
+  "element": "6fb55defe130d1815fd2e374",
   "start": "empty",
   "startElement": "4eec9edd3fdbccf544498d1e",
   "runner": "live2 .nstate-uip-4.json"
@@ -83,10 +83,10 @@
     }
    },
    "ok": true,
-   "ti": 25656,
-   "tmove": 25723,
+   "ti": 23664,
+   "tmove": 23713,
    "moves": 2,
-   "tdown": 26075,
+   "tdown": 24021,
    "at": [
     536,
     58
@@ -207,8 +207,8 @@
     },
     "measure": null
    },
-   "t": 29164,
-   "te": 29164
+   "t": 26966,
+   "te": 26967
   },
   {
    "step": 2,
@@ -219,10 +219,10 @@
     }
    },
    "ok": true,
-   "ti": 29164,
-   "tmove": 29226,
-   "moves": 3,
-   "tdown": 29991,
+   "ti": 26967,
+   "tmove": 27031,
+   "moves": 2,
+   "tdown": 27757,
    "at": [
     1273,
     568
@@ -313,10 +313,10 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": null,
-     "constraints": null,
-     "dimensions": null,
-     "error": "sketch model not reached"
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -347,8 +347,8 @@
     },
     "measure": null
    },
-   "t": 32519,
-   "te": 32519
+   "t": 29710,
+   "te": 29710
   },
   {
    "step": 3,
@@ -357,18 +357,16 @@
     "key": "l"
    },
    "ok": true,
-   "ti": 32519,
+   "ti": 29710,
    "pointer": {
     "at": [
-     1889,
-     932
+     1273,
+     568
     ],
     "hover": [],
-    "element": "button.btn.btn-secondary"
+    "element": "canvas#canvas"
    },
-   "tdown": 32527,
-   "tmove": 34558,
-   "moves": 1,
+   "tdown": 29716,
    "state": {
     "focus": {
      "kind": "none"
@@ -455,10 +453,10 @@
     "tooltip": null,
     "sketch": {
      "tool": "Line",
-     "entities": null,
-     "constraints": null,
-     "dimensions": null,
-     "error": "sketch model not reached"
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -489,8 +487,8 @@
     },
     "measure": null
    },
-   "t": 35059,
-   "te": 35059
+   "t": 31635,
+   "te": 31635
   },
   {
    "step": 4,
@@ -504,14 +502,14 @@
     }
    },
    "ok": true,
-   "ti": 35059,
-   "tmove": 35140,
+   "ti": 31635,
+   "tmove": 31680,
    "moves": 2,
    "hover": [
     "IB"
    ],
-   "tdown": 38266,
-   "tup": 38406,
+   "tdown": 34208,
+   "tup": 34327,
    "at": [
     1273,
     519
@@ -636,8 +634,8 @@
     },
     "measure": null
    },
-   "t": 40425,
-   "te": 40425
+   "t": 36345,
+   "te": 36345
   },
   {
    "step": 5,
@@ -651,12 +649,12 @@
     }
    },
    "ok": true,
-   "ti": 40425,
-   "tmove": 40483,
+   "ti": 36345,
+   "tmove": 36381,
    "moves": 2,
    "hover": [],
-   "tdown": 45197,
-   "tup": 45293,
+   "tdown": 40849,
+   "tup": 40946,
    "at": [
     1399,
     555
@@ -800,8 +798,8 @@
     },
     "measure": null
    },
-   "t": 47402,
-   "te": 47402
+   "t": 42881,
+   "te": 42881
   },
   {
    "step": 6,
@@ -810,7 +808,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 47403,
+   "ti": 42881,
    "pointer": {
     "at": [
      1399,
@@ -819,7 +817,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 47408,
+   "tdown": 42886,
    "state": {
     "focus": {
      "kind": "none"
@@ -959,8 +957,8 @@
     },
     "measure": null
    },
-   "t": 50820,
-   "te": 50820
+   "t": 46237,
+   "te": 46237
   },
   {
    "step": 7,
@@ -969,7 +967,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 50820,
+   "ti": 46237,
    "pointer": {
     "at": [
      1399,
@@ -978,7 +976,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 50825,
+   "tdown": 46241,
    "state": {
     "focus": {
      "kind": "none"
@@ -1118,8 +1116,8 @@
     },
     "measure": null
    },
-   "t": 54189,
-   "te": 54189
+   "t": 49600,
+   "te": 49600
   },
   {
    "step": 8,
@@ -1130,10 +1128,10 @@
     }
    },
    "ok": true,
-   "ti": 54189,
-   "tmove": 54222,
+   "ti": 49600,
+   "tmove": 49632,
    "moves": 1,
-   "tdown": 54658,
+   "tdown": 50035,
    "at": [
     843,
     58
@@ -1277,8 +1275,8 @@
     },
     "measure": null
    },
-   "t": 56608,
-   "te": 56608
+   "t": 51918,
+   "te": 51918
   },
   {
    "step": 9,
@@ -1292,14 +1290,14 @@
     }
    },
    "ok": true,
-   "ti": 56608,
-   "tmove": 56654,
+   "ti": 51918,
+   "tmove": 51949,
    "moves": 2,
    "hover": [
     "JFE"
    ],
-   "tdown": 59536,
-   "tup": 59654,
+   "tdown": 54263,
+   "tup": 54378,
    "at": [
     1399,
     555
@@ -1443,8 +1441,8 @@
     },
     "measure": null
    },
-   "t": 61648,
-   "te": 61648
+   "t": 56240,
+   "te": 56240
   },
   {
    "step": 10,
@@ -1458,14 +1456,14 @@
     }
    },
    "ok": true,
-   "ti": 61648,
-   "tmove": 61721,
+   "ti": 56240,
+   "tmove": 56266,
    "moves": 2,
    "hover": [
     "JFE"
    ],
-   "tdown": 64313,
-   "tup": 64429,
+   "tdown": 58559,
+   "tup": 58664,
    "at": [
     1426,
     557
@@ -1609,8 +1607,8 @@
     },
     "measure": null
    },
-   "t": 66358,
-   "te": 66359
+   "t": 60609,
+   "te": 60609
   },
   {
    "step": 11,
@@ -1624,12 +1622,12 @@
     }
    },
    "ok": true,
-   "ti": 66359,
-   "tmove": 66399,
+   "ti": 60609,
+   "tmove": 60665,
    "moves": 2,
    "hover": [],
-   "tdown": 71362,
-   "tup": 71468,
+   "tdown": 65394,
+   "tup": 65515,
    "at": [
     1448,
     549
@@ -1773,8 +1771,8 @@
     },
     "measure": null
    },
-   "t": 73457,
-   "te": 73457
+   "t": 67497,
+   "te": 67498
   },
   {
    "step": 12,
@@ -1783,7 +1781,7 @@
     "key": "Enter"
    },
    "ok": true,
-   "ti": 73457,
+   "ti": 67498,
    "pointer": {
     "at": [
      1448,
@@ -1792,7 +1790,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 73469,
+   "tdown": 67501,
    "state": {
     "focus": {
      "kind": "none"
@@ -1875,7 +1873,7 @@
      "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "uip-blend-block.step has been imported. Open document \u00d7 Close",
     "tooltip": null,
     "sketch": {
      "tool": "Spline",
@@ -1932,8 +1930,8 @@
     },
     "measure": null
    },
-   "t": 75313,
-   "te": 75313
+   "t": 69397,
+   "te": 69397
   },
   {
    "step": 13,
@@ -1942,7 +1940,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 75313,
+   "ti": 69397,
    "pointer": {
     "at": [
      1448,
@@ -1951,7 +1949,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 75316,
+   "tdown": 69407,
    "state": {
     "focus": {
      "kind": "none"
@@ -2034,7 +2032,7 @@
      "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "uip-blend-block.step has been imported. Open document \u00d7 Close",
     "tooltip": null,
     "sketch": {
      "tool": "Spline",
@@ -2123,8 +2121,8 @@
     },
     "measure": null
    },
-   "t": 78660,
-   "te": 78660
+   "t": 72777,
+   "te": 72777
   },
   {
    "step": 14,
@@ -2133,7 +2131,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 78660,
+   "ti": 72777,
    "pointer": {
     "at": [
      1448,
@@ -2142,7 +2140,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 78668,
+   "tdown": 72782,
    "state": {
     "focus": {
      "kind": "none"
@@ -2314,8 +2312,8 @@
     },
     "measure": null
    },
-   "t": 82032,
-   "te": 82032
+   "t": 76178,
+   "te": 76178
   },
   {
    "step": 15,
@@ -2324,7 +2322,7 @@
     "key": "l"
    },
    "ok": true,
-   "ti": 82032,
+   "ti": 76179,
    "pointer": {
     "at": [
      1448,
@@ -2333,7 +2331,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 82038,
+   "tdown": 76182,
    "state": {
     "focus": {
      "kind": "none"
@@ -2505,8 +2503,8 @@
     },
     "measure": null
    },
-   "t": 83986,
-   "te": 83986
+   "t": 78094,
+   "te": 78094
   },
   {
    "step": 16,
@@ -2520,14 +2518,14 @@
     }
    },
    "ok": true,
-   "ti": 83986,
-   "tmove": 84035,
+   "ti": 78094,
+   "tmove": 78136,
    "moves": 2,
    "hover": [
     "JFc"
    ],
-   "tdown": 87228,
-   "tup": 87371,
+   "tdown": 80491,
+   "tup": 80628,
    "at": [
     1448,
     549
@@ -2703,8 +2701,8 @@
     },
     "measure": null
    },
-   "t": 89397,
-   "te": 89397
+   "t": 82560,
+   "te": 82560
   },
   {
    "step": 17,
@@ -2718,12 +2716,12 @@
     }
    },
    "ok": true,
-   "ti": 89397,
-   "tmove": 89451,
+   "ti": 82560,
+   "tmove": 82589,
    "moves": 2,
    "hover": [],
-   "tdown": 94306,
-   "tup": 94406,
+   "tdown": 87083,
+   "tup": 87178,
    "at": [
     1485,
     517
@@ -2915,8 +2913,8 @@
     },
     "measure": null
    },
-   "t": 96415,
-   "te": 96415
+   "t": 89088,
+   "te": 89088
   },
   {
    "step": 18,
@@ -2925,7 +2923,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 96415,
+   "ti": 89088,
    "pointer": {
     "at": [
      1485,
@@ -2934,7 +2932,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 96420,
+   "tdown": 89092,
    "state": {
     "focus": {
      "kind": "none"
@@ -3122,8 +3120,8 @@
     },
     "measure": null
    },
-   "t": 99803,
-   "te": 99803
+   "t": 92432,
+   "te": 92432
   },
   {
    "step": 19,
@@ -3132,7 +3130,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 99803,
+   "ti": 92432,
    "pointer": {
     "at": [
      1485,
@@ -3141,7 +3139,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 99807,
+   "tdown": 92440,
    "state": {
     "focus": {
      "kind": "none"
@@ -3329,8 +3327,8 @@
     },
     "measure": null
    },
-   "t": 103153,
-   "te": 103153
+   "t": 95781,
+   "te": 95781
   },
   {
    "step": 20,
@@ -3341,10 +3339,10 @@
     }
    },
    "ok": true,
-   "ti": 103153,
-   "tmove": 103181,
+   "ti": 95781,
+   "tmove": 95810,
    "moves": 1,
-   "tdown": 103550,
+   "tdown": 96175,
    "at": [
     739,
     58
@@ -3536,8 +3534,8 @@
     },
     "measure": null
    },
-   "t": 105494,
-   "te": 105494
+   "t": 98050,
+   "te": 98050
   },
   {
    "step": 21,
@@ -3551,14 +3549,14 @@
     }
    },
    "ok": true,
-   "ti": 105494,
-   "tmove": 105532,
+   "ti": 98050,
+   "tmove": 98080,
    "moves": 2,
    "hover": [
     "JFk"
    ],
-   "tdown": 108125,
-   "tup": 108242,
+   "tdown": 100259,
+   "tup": 100369,
    "at": [
     1485,
     517
@@ -3750,8 +3748,8 @@
     },
     "measure": null
    },
-   "t": 110175,
-   "te": 110175
+   "t": 102225,
+   "te": 102225
   },
   {
    "step": 22,
@@ -3765,12 +3763,12 @@
     }
    },
    "ok": true,
-   "ti": 110175,
-   "tmove": 110212,
+   "ti": 102225,
+   "tmove": 102255,
    "moves": 2,
    "hover": [],
-   "tdown": 115257,
-   "tup": 115365,
+   "tdown": 106610,
+   "tup": 106743,
    "at": [
     1471,
     492
@@ -3962,8 +3960,8 @@
     },
     "measure": null
    },
-   "t": 117304,
-   "te": 117304
+   "t": 108666,
+   "te": 108666
   },
   {
    "step": 23,
@@ -3977,14 +3975,14 @@
     }
    },
    "ok": true,
-   "ti": 117304,
-   "tmove": 117337,
+   "ti": 108666,
+   "tmove": 108697,
    "moves": 2,
    "hover": [
     "JFR"
    ],
-   "tdown": 119933,
-   "tup": 120033,
+   "tdown": 110895,
+   "tup": 110992,
    "at": [
     1488,
     503
@@ -4197,8 +4195,8 @@
     },
     "measure": null
    },
-   "t": 121978,
-   "te": 121978
+   "t": 112869,
+   "te": 112869
   },
   {
    "step": 24,
@@ -4207,7 +4205,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 121978,
+   "ti": 112869,
    "pointer": {
     "at": [
      1488,
@@ -4216,7 +4214,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 121982,
+   "tdown": 112874,
    "state": {
     "focus": {
      "kind": "none"
@@ -4425,8 +4423,8 @@
     },
     "measure": null
    },
-   "t": 125384,
-   "te": 125384
+   "t": 116200,
+   "te": 116200
   },
   {
    "step": 25,
@@ -4435,7 +4433,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 125384,
+   "ti": 116200,
    "pointer": {
     "at": [
      1488,
@@ -4444,7 +4442,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 125389,
+   "tdown": 116206,
    "state": {
     "focus": {
      "kind": "none"
@@ -4653,8 +4651,8 @@
     },
     "measure": null
    },
-   "t": 128766,
-   "te": 128766
+   "t": 119560,
+   "te": 119560
   },
   {
    "step": 26,
@@ -4663,7 +4661,7 @@
     "key": "l"
    },
    "ok": true,
-   "ti": 128766,
+   "ti": 119560,
    "pointer": {
     "at": [
      1488,
@@ -4672,7 +4670,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 128771,
+   "tdown": 119565,
    "state": {
     "focus": {
      "kind": "none"
@@ -4881,8 +4879,8 @@
     },
     "measure": null
    },
-   "t": 130634,
-   "te": 130634
+   "t": 121411,
+   "te": 121411
   },
   {
    "step": 27,
@@ -4896,14 +4894,14 @@
     }
    },
    "ok": true,
-   "ti": 130634,
-   "tmove": 130676,
+   "ti": 121411,
+   "tmove": 121446,
    "moves": 2,
    "hover": [
     "JFs"
    ],
-   "tdown": 133449,
-   "tup": 133589,
+   "tdown": 123754,
+   "tup": 123875,
    "at": [
     1471,
     492
@@ -5116,8 +5114,8 @@
     },
     "measure": null
    },
-   "t": 135474,
-   "te": 135474
+   "t": 125769,
+   "te": 125769
   },
   {
    "step": 28,
@@ -5126,23 +5124,23 @@
     "on": {
      "sketch_point": [
       0,
-      40
+      39
      ]
     }
    },
    "ok": true,
-   "ti": 135474,
-   "tmove": 135509,
+   "ti": 125769,
+   "tmove": 125808,
    "moves": 2,
    "hover": [
     "JFV",
     "IB"
    ],
-   "tdown": 138093,
-   "tup": 138191,
+   "tdown": 128055,
+   "tup": 128153,
    "at": [
-    1346,
-    456
+    1344,
+    458
    ],
    "state": {
     "focus": {
@@ -5369,8 +5367,8 @@
     },
     "measure": null
    },
-   "t": 140139,
-   "te": 140139
+   "t": 130050,
+   "te": 130050
   },
   {
    "step": 29,
@@ -5384,14 +5382,14 @@
     }
    },
    "ok": true,
-   "ti": 140139,
-   "tmove": 140215,
+   "ti": 130050,
+   "tmove": 130086,
    "moves": 2,
    "hover": [
     "IF"
    ],
-   "tdown": 142846,
-   "tup": 142943,
+   "tdown": 132382,
+   "tup": 132482,
    "at": [
     1273,
     519
@@ -5637,8 +5635,8 @@
     },
     "measure": null
    },
-   "t": 144980,
-   "te": 144980
+   "t": 134416,
+   "te": 134416
   },
   {
    "step": 30,
@@ -5647,7 +5645,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 144980,
+   "ti": 134416,
    "pointer": {
     "at": [
      1273,
@@ -5656,7 +5654,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 144984,
+   "tdown": 134420,
    "state": {
     "focus": {
      "kind": "none"
@@ -5898,8 +5896,8 @@
     },
     "measure": null
    },
-   "t": 148445,
-   "te": 148445
+   "t": 137796,
+   "te": 137796
   },
   {
    "step": 31,
@@ -5908,7 +5906,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 148445,
+   "ti": 137796,
    "pointer": {
     "at": [
      1273,
@@ -5917,7 +5915,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 148452,
+   "tdown": 137801,
    "state": {
     "focus": {
      "kind": "none"
@@ -6159,8 +6157,8 @@
     },
     "measure": null
    },
-   "t": 151865,
-   "te": 151865
+   "t": 141169,
+   "te": 141169
   },
   {
    "step": 32,
@@ -6169,7 +6167,7 @@
     "key": "c"
    },
    "ok": true,
-   "ti": 151866,
+   "ti": 141169,
    "pointer": {
     "at": [
      1273,
@@ -6178,7 +6176,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 151871,
+   "tdown": 141172,
    "state": {
     "focus": {
      "kind": "none"
@@ -6420,8 +6418,8 @@
     },
     "measure": null
    },
-   "t": 153924,
-   "te": 153924
+   "t": 143066,
+   "te": 143066
   },
   {
    "step": 33,
@@ -6435,12 +6433,12 @@
     }
    },
    "ok": true,
-   "ti": 153924,
-   "tmove": 153996,
+   "ti": 143066,
+   "tmove": 143095,
    "moves": 2,
    "hover": [],
-   "tdown": 158427,
-   "tup": 158533,
+   "tdown": 147103,
+   "tup": 147210,
    "at": [
     1372,
     506
@@ -6686,8 +6684,8 @@
     },
     "measure": null
    },
-   "t": 160601,
-   "te": 160601
+   "t": 149101,
+   "te": 149101
   },
   {
    "step": 34,
@@ -6701,12 +6699,12 @@
     }
    },
    "ok": true,
-   "ti": 160601,
-   "tmove": 160661,
+   "ti": 149101,
+   "tmove": 149134,
    "moves": 2,
    "hover": [],
-   "tdown": 165650,
-   "tup": 165766,
+   "tdown": 153584,
+   "tup": 153682,
    "at": [
     1391,
     511
@@ -6963,8 +6961,8 @@
     },
     "measure": null
    },
-   "t": 167788,
-   "te": 167788
+   "t": 155595,
+   "te": 155595
   },
   {
    "step": 35,
@@ -6973,7 +6971,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 167788,
+   "ti": 155595,
    "pointer": {
     "at": [
      1391,
@@ -6982,7 +6980,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 167792,
+   "tdown": 155599,
    "state": {
     "focus": {
      "kind": "none"
@@ -7235,8 +7233,8 @@
     },
     "measure": null
    },
-   "t": 171135,
-   "te": 171135
+   "t": 158929,
+   "te": 158929
   },
   {
    "step": 36,
@@ -7245,7 +7243,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 171136,
+   "ti": 158929,
    "pointer": {
     "at": [
      1391,
@@ -7254,7 +7252,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 171140,
+   "tdown": 158933,
    "state": {
     "focus": {
      "kind": "none"
@@ -7507,8 +7505,8 @@
     },
     "measure": null
    },
-   "t": 174433,
-   "te": 174433
+   "t": 162253,
+   "te": 162253
   },
   {
    "step": 37,
@@ -7519,10 +7517,10 @@
     }
    },
    "ok": true,
-   "ti": 174433,
-   "tmove": 174468,
+   "ti": 162253,
+   "tmove": 162295,
    "moves": 1,
-   "tdown": 174827,
+   "tdown": 162663,
    "at": [
     805,
     93
@@ -7591,8 +7589,8 @@
     },
     "measure": null
    },
-   "t": 176792,
-   "te": 176792
+   "t": 164636,
+   "te": 164636
   },
   {
    "step": 38,
@@ -7601,7 +7599,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 176792,
+   "ti": 164636,
    "state": {
     "focus": {
      "kind": "none"
@@ -7666,8 +7664,8 @@
     },
     "measure": null
    },
-   "t": 181055,
-   "te": 181055
+   "t": 168925,
+   "te": 168925
   },
   {
    "step": 39,
@@ -7678,10 +7676,10 @@
     }
    },
    "ok": true,
-   "ti": 181055,
-   "tmove": 181383,
+   "ti": 168925,
+   "tmove": 169253,
    "moves": 1,
-   "tdown": 181693,
+   "tdown": 169571,
    "at": [
     451,
     287
@@ -7700,7 +7698,7 @@
       {
        "kind": "FEATURE",
        "owner": null,
-       "id": "FxCrj9RgrtCxAkF_0"
+       "id": "FzSjP2TQkpwmrmW_0"
       }
      ]
     },
@@ -7756,8 +7754,8 @@
     },
     "measure": null
    },
-   "t": 183530,
-   "te": 183530
+   "t": 171467,
+   "te": 171467
   },
   {
    "step": 40,
@@ -7768,10 +7766,10 @@
     }
    },
    "ok": true,
-   "ti": 183530,
-   "tmove": 183554,
+   "ti": 171467,
+   "tmove": 171494,
    "moves": 1,
-   "tdown": 183883,
+   "tdown": 171823,
    "at": [
     600,
     58
@@ -8054,8 +8052,8 @@
     },
     "measure": null
    },
-   "t": 186249,
-   "te": 186249
+   "t": 174016,
+   "te": 174016
   },
   {
    "step": 41,
@@ -8064,7 +8062,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 186249,
+   "ti": 174016,
    "state": {
     "focus": {
      "kind": "field",
@@ -8343,8 +8341,8 @@
     },
     "measure": null
    },
-   "t": 190597,
-   "te": 190597
+   "t": 178324,
+   "te": 178324
   },
   {
    "step": 42,
@@ -8355,10 +8353,10 @@
     }
    },
    "ok": true,
-   "ti": 190597,
-   "tmove": 190619,
+   "ti": 178324,
+   "tmove": 178354,
    "moves": 1,
-   "tdown": 191005,
+   "tdown": 178739,
    "at": [
     740,
     257
@@ -8647,8 +8645,8 @@
     },
     "measure": null
    },
-   "t": 192875,
-   "te": 192875
+   "t": 180645,
+   "te": 180645
   },
   {
    "step": 43,
@@ -8657,7 +8655,7 @@
     "key": "mod+a"
    },
    "ok": true,
-   "ti": 192875,
+   "ti": 180645,
    "pointer": {
     "at": [
      739,
@@ -8950,8 +8948,8 @@
     },
     "measure": null
    },
-   "t": 194746,
-   "te": 194746
+   "t": 182541,
+   "te": 182541
   },
   {
    "step": 44,
@@ -8960,8 +8958,8 @@
     "text": "10"
    },
    "ok": true,
-   "ti": 194746,
-   "tdown": 194746,
+   "ti": 182541,
+   "tdown": 182541,
    "state": {
     "focus": {
      "kind": "field",
@@ -9246,8 +9244,8 @@
     },
     "measure": null
    },
-   "t": 196758,
-   "te": 196758
+   "t": 184567,
+   "te": 184567
   },
   {
    "step": 45,
@@ -9256,7 +9254,7 @@
     "key": "Enter"
    },
    "ok": true,
-   "ti": 196758,
+   "ti": 184567,
    "pointer": {
     "at": [
      739,
@@ -9265,7 +9263,7 @@
     "hover": [],
     "element": "input.os-param-number.dropdown-source"
    },
-   "tdown": 196763,
+   "tdown": 184572,
    "state": {
     "focus": {
      "kind": "field",
@@ -9550,8 +9548,8 @@
     },
     "measure": null
    },
-   "t": 198624,
-   "te": 198624
+   "t": 186456,
+   "te": 186456
   },
   {
    "step": 46,
@@ -9561,7 +9559,7 @@
     "ms": 600
    },
    "ok": true,
-   "ti": 198624,
+   "ti": 186456,
    "state": {
     "focus": {
      "kind": "field",
@@ -9846,8 +9844,8 @@
     },
     "measure": null
    },
-   "t": 201033,
-   "te": 201033
+   "t": 188874,
+   "te": 188874
   },
   {
    "step": 47,
@@ -9858,10 +9856,10 @@
     }
    },
    "ok": true,
-   "ti": 201033,
-   "tmove": 201069,
+   "ti": 188874,
+   "tmove": 188917,
    "moves": 1,
-   "tdown": 201454,
+   "tdown": 189316,
    "at": [
     805,
     93
@@ -9941,8 +9939,8 @@
     },
     "measure": null
    },
-   "t": 203370,
-   "te": 203370
+   "t": 191288,
+   "te": 191288
   },
   {
    "step": 48,
@@ -9951,7 +9949,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 203370,
+   "ti": 191288,
    "state": {
     "focus": {
      "kind": "none"
@@ -10027,8 +10025,8 @@
     },
     "measure": null
    },
-   "t": 207672,
-   "te": 207672
+   "t": 195657,
+   "te": 195658
   },
   {
    "step": 49,
@@ -10043,13 +10041,13 @@
     }
    },
    "ok": true,
-   "ti": 207672,
-   "tmove": 207704,
+   "ti": 195658,
+   "tmove": 195698,
    "moves": 1,
    "hover": [
     "JHK"
    ],
-   "tdown": 209005,
+   "tdown": 197008,
    "at": [
     1359,
     449
@@ -10144,8 +10142,8 @@
      "panel": null
     }
    },
-   "t": 210900,
-   "te": 210900
+   "t": 198940,
+   "te": 198940
   },
   {
    "step": 50,
@@ -10154,7 +10152,7 @@
     "key": "shift+s"
    },
    "ok": true,
-   "ti": 210900,
+   "ti": 198940,
    "pointer": {
     "at": [
      1358,
@@ -10165,7 +10163,7 @@
     ],
     "element": "canvas#canvas"
    },
-   "tdown": 210904,
+   "tdown": 198945,
    "state": {
     "focus": {
      "kind": "none"
@@ -10272,142 +10270,10 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
-     ],
+     "entities": [],
+     "constraints": [],
      "dimensions": [],
-     "geometry": [
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         0
-        ],
-        [
-         39.9423,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
-       ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
-      }
-     ]
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -10438,8 +10304,8 @@
     },
     "measure": null
    },
-   "t": 212766,
-   "te": 212766
+   "t": 201166,
+   "te": 201167
   },
   {
    "step": 51,
@@ -10449,7 +10315,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 212766,
+   "ti": 201167,
    "state": {
     "focus": {
      "kind": "none"
@@ -10556,142 +10422,10 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
-     ],
+     "entities": [],
+     "constraints": [],
      "dimensions": [],
-     "geometry": [
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         0
-        ],
-        [
-         39.9423,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
-       ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
-      }
-     ]
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -10722,8 +10456,8 @@
     },
     "measure": null
    },
-   "t": 216083,
-   "te": 216083
+   "t": 204492,
+   "te": 204492
   },
   {
    "step": 52,
@@ -10732,7 +10466,7 @@
     "key": "shift+7"
    },
    "ok": true,
-   "ti": 216083,
+   "ti": 204492,
    "pointer": {
     "at": [
      1358,
@@ -10741,7 +10475,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 216089,
+   "tdown": 204497,
    "state": {
     "focus": {
      "kind": "none"
@@ -10848,142 +10582,10 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
-     ],
+     "entities": [],
+     "constraints": [],
      "dimensions": [],
-     "geometry": [
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         0
-        ],
-        [
-         39.9423,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
-       ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
-      }
-     ]
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -11014,8 +10616,8 @@
     },
     "measure": null
    },
-   "t": 218011,
-   "te": 218011
+   "t": 206389,
+   "te": 206389
   },
   {
    "step": 53,
@@ -11025,7 +10627,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 218011,
+   "ti": 206389,
    "state": {
     "focus": {
      "kind": "none"
@@ -11132,142 +10734,10 @@
     "tooltip": null,
     "sketch": {
      "tool": null,
-     "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
-     ],
+     "entities": [],
+     "constraints": [],
      "dimensions": [],
-     "geometry": [
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         0
-        ],
-        [
-         39.9423,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
-       ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
-      }
-     ]
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -11298,8 +10768,8 @@
     },
     "measure": null
    },
-   "t": 221307,
-   "te": 221307
+   "t": 209701,
+   "te": 209701
   },
   {
    "step": 54,
@@ -11308,7 +10778,7 @@
     "key": "u"
    },
    "ok": true,
-   "ti": 221307,
+   "ti": 209701,
    "pointer": {
     "at": [
      1358,
@@ -11319,7 +10789,7 @@
     ],
     "element": "canvas#canvas"
    },
-   "tdown": 221311,
+   "tdown": 209706,
    "state": {
     "focus": {
      "kind": "none"
@@ -11426,142 +10896,10 @@
     "tooltip": null,
     "sketch": {
      "tool": "Use",
-     "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
-     ],
+     "entities": [],
+     "constraints": [],
      "dimensions": [],
-     "geometry": [
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         0
-        ],
-        [
-         39.9423,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
-       ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
-      }
-     ]
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -11592,8 +10930,8 @@
     },
     "measure": null
    },
-   "t": 223193,
-   "te": 223193
+   "t": 211602,
+   "te": 211602
   },
   {
    "step": 55,
@@ -11603,7 +10941,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 223193,
+   "ti": 211602,
    "state": {
     "focus": {
      "kind": "none"
@@ -11710,142 +11048,10 @@
     "tooltip": null,
     "sketch": {
      "tool": "Use",
-     "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
-     ],
-     "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
-     ],
+     "entities": [],
+     "constraints": [],
      "dimensions": [],
-     "geometry": [
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         0
-        ],
-        [
-         39.9423,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
-       ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
-      }
-     ]
+     "geometry": []
     },
     "drawing": null,
     "camera": {
@@ -11876,8 +11082,8 @@
     },
     "measure": null
    },
-   "t": 225795,
-   "te": 225795
+   "t": 214218,
+   "te": 214218
   },
   {
    "step": 56,
@@ -11885,23 +11091,23 @@
     "do": "click",
     "on": {
      "edge": [
-      20,
+      12,
       0,
       10
      ]
     }
    },
    "ok": true,
-   "ti": 225795,
-   "tmove": 225827,
+   "ti": 214218,
+   "tmove": 214255,
    "moves": 1,
    "hover": [
     "JHd"
    ],
-   "tdown": 227305,
+   "tdown": 215715,
    "at": [
-    1322,
-    519
+    1302,
+    508
    ],
    "state": {
     "focus": {
@@ -12010,30 +11216,12 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
+      "line"
      ],
      "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -12048,101 +11236,8 @@
          39.9423,
          0
         ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -12175,8 +11270,8 @@
     },
     "measure": null
    },
-   "t": 229256,
-   "te": 229256
+   "t": 217637,
+   "te": 217637
   },
   {
    "step": 57,
@@ -12186,7 +11281,7 @@
     "ms": 700
    },
    "ok": true,
-   "ti": 229256,
+   "ti": 217637,
    "state": {
     "focus": {
      "kind": "none"
@@ -12294,30 +11389,12 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
-      "line",
-      "spline"
+      "line"
      ],
      "constraints": [
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -12332,101 +11409,8 @@
          39.9423,
          0
         ]
-       ]
-      },
-      {
-       "kind": "spline",
-       "points": [
-        [
-         39.9423,
-         0
-        ],
-        [
-         46.9318,
-         0
-        ],
-        [
-         49.9753,
-         10.0934
-        ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -12459,8 +11443,8 @@
     },
     "measure": null
    },
-   "t": 231775,
-   "te": 231775
+   "t": 220123,
+   "te": 220123
   },
   {
    "step": 58,
@@ -12468,23 +11452,23 @@
     "do": "click",
     "on": {
      "edge": [
-      46.9,
-      0,
+      49.4,
+      4.7,
       10
      ]
     }
    },
    "ok": true,
-   "ti": 231775,
-   "tmove": 231811,
+   "ti": 220123,
+   "tmove": 220152,
    "moves": 1,
    "hover": [
     "JHl"
    ],
-   "tdown": 233329,
+   "tdown": 221626,
    "at": [
-    1387,
-    557
+    1405,
+    554
    ],
    "state": {
     "focus": {
@@ -12593,30 +11577,16 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
       "line",
       "spline"
      ],
      "constraints": [
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -12631,7 +11601,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -12641,91 +11612,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -12758,8 +11661,8 @@
     },
     "measure": null
    },
-   "t": 235203,
-   "te": 235203
+   "t": 223628,
+   "te": 223628
   },
   {
    "step": 59,
@@ -12769,7 +11672,7 @@
     "ms": 700
    },
    "ok": true,
-   "ti": 235203,
+   "ti": 223628,
    "state": {
     "focus": {
      "kind": "none"
@@ -12877,30 +11780,16 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
-      "line",
       "line",
       "spline"
      ],
      "constraints": [
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -12915,7 +11804,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -12925,91 +11815,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         49.9753,
-         10.0934
-        ],
-        [
-         49.9753,
-         30.4499
-        ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
-       ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -13042,8 +11864,8 @@
     },
     "measure": null
    },
-   "t": 237714,
-   "te": 237714
+   "t": 226145,
+   "te": 226145
   },
   {
    "step": 60,
@@ -13052,22 +11874,22 @@
     "on": {
      "edge": [
       50,
-      20,
+      15,
       10
      ]
     }
    },
    "ok": true,
-   "ti": 237714,
-   "tmove": 237748,
+   "ti": 226145,
+   "tmove": 226182,
    "moves": 1,
    "hover": [
     "JHt"
    ],
-   "tdown": 239276,
+   "tdown": 227588,
    "at": [
-    1444,
-    533
+    1431,
+    540
    ],
    "state": {
     "focus": {
@@ -13176,10 +11998,6 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
       "line",
       "line",
       "spline"
@@ -13187,19 +12005,13 @@
      "constraints": [
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -13214,7 +12026,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -13224,24 +12037,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -13254,61 +12066,8 @@
          49.9753,
          30.4499
         ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
        ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -13341,8 +12100,8 @@
     },
     "measure": null
    },
-   "t": 241187,
-   "te": 241187
+   "t": 229514,
+   "te": 229514
   },
   {
    "step": 61,
@@ -13352,7 +12111,7 @@
     "ms": 700
    },
    "ok": true,
-   "ti": 241187,
+   "ti": 229514,
    "state": {
     "focus": {
      "kind": "none"
@@ -13460,10 +12219,6 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
-      "line",
-      "line",
       "line",
       "line",
       "spline"
@@ -13471,19 +12226,13 @@
      "constraints": [
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -13498,7 +12247,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -13508,24 +12258,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -13538,61 +12287,8 @@
          49.9753,
          30.4499
         ]
-       ]
-      },
-      {
-       "kind": "arc",
-       "points": [
-        [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
-        ]
        ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -13625,8 +12321,8 @@
     },
     "measure": null
    },
-   "t": 243723,
-   "te": 243723
+   "t": 232050,
+   "te": 232050
   },
   {
    "step": 62,
@@ -13634,23 +12330,23 @@
     "do": "click",
     "on": {
      "edge": [
-      47.1,
-      37.5,
+      43.81,
+      39.69,
       10
      ]
     }
    },
    "ok": true,
-   "ti": 243723,
-   "tmove": 243755,
+   "ti": 232050,
+   "tmove": 232079,
    "moves": 1,
    "hover": [
     "JH1"
    ],
-   "tdown": 245230,
+   "tdown": 233542,
    "at": [
-    1479,
-    504
+    1476,
+    497
    ],
    "state": {
     "focus": {
@@ -13759,30 +12455,22 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
       "line",
       "line",
-      "line",
-      "line",
+      "point",
       "spline"
      ],
      "constraints": [
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -13797,7 +12485,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -13807,24 +12496,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -13837,61 +12525,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -13924,8 +12569,8 @@
     },
     "measure": null
    },
-   "t": 247206,
-   "te": 247206
+   "t": 235453,
+   "te": 235453
   },
   {
    "step": 63,
@@ -13935,7 +12580,7 @@
     "ms": 700
    },
    "ok": true,
-   "ti": 247206,
+   "ti": 235453,
    "state": {
     "focus": {
      "kind": "none"
@@ -14043,30 +12688,22 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
       "line",
       "line",
-      "line",
-      "line",
+      "point",
       "spline"
      ],
      "constraints": [
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -14081,7 +12718,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -14091,24 +12729,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -14121,61 +12758,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         39.7644,
-         40.446
-        ],
-        [
-         0,
-         39.6005
-        ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
-       ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -14208,8 +12802,8 @@
     },
     "measure": null
    },
-   "t": 249705,
-   "te": 249705
+   "t": 237979,
+   "te": 237979
   },
   {
    "step": 64,
@@ -14217,23 +12811,23 @@
     "do": "click",
     "on": {
      "edge": [
-      20,
-      40,
+      12,
+      39.9,
       10
      ]
     }
    },
    "ok": true,
-   "ti": 249705,
-   "tmove": 249733,
+   "ti": 237979,
+   "tmove": 238011,
    "moves": 1,
    "hover": [
     "JH9"
    ],
-   "tdown": 251150,
+   "tdown": 239478,
    "at": [
-    1419,
-    463
+    1399,
+    452
    ],
    "state": {
     "focus": {
@@ -14342,30 +12936,26 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
       "line",
       "line",
       "line",
-      "line",
+      "point",
       "spline"
      ],
      "constraints": [
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -14380,7 +12970,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -14390,24 +12981,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -14420,25 +13010,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -14451,30 +13034,8 @@
          0,
          39.6005
         ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
        ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -14507,8 +13068,8 @@
     },
     "measure": null
    },
-   "t": 253038,
-   "te": 253038
+   "t": 241376,
+   "te": 241376
   },
   {
    "step": 65,
@@ -14518,7 +13079,7 @@
     "ms": 700
    },
    "ok": true,
-   "ti": 253038,
+   "ti": 241376,
    "state": {
     "focus": {
      "kind": "none"
@@ -14626,30 +13187,26 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
       "line",
       "line",
       "line",
-      "line",
+      "point",
       "spline"
      ],
      "constraints": [
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -14664,7 +13221,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -14674,24 +13232,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -14704,25 +13261,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -14735,30 +13285,8 @@
          0,
          39.6005
         ]
-       ]
-      },
-      {
-       "kind": "line",
-       "points": [
-        [
-         0,
-         39.6005
-        ],
-        [
-         0,
-         0
-        ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
        ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -14791,8 +13319,8 @@
     },
     "measure": null
    },
-   "t": 255570,
-   "te": 255570
+   "t": 243869,
+   "te": 243869
   },
   {
    "step": 66,
@@ -14801,22 +13329,22 @@
     "on": {
      "edge": [
       0,
-      20,
+      12,
       10
      ]
     }
    },
    "ok": true,
-   "ti": 255570,
-   "tmove": 255607,
+   "ti": 243869,
+   "tmove": 243899,
    "moves": 1,
    "hover": [
     "KHFB"
    ],
-   "tdown": 257107,
+   "tdown": 245352,
    "at": [
-    1322,
-    463
+    1302,
+    474
    ],
    "state": {
     "focus": {
@@ -14925,12 +13453,11 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -14938,17 +13465,18 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -14963,7 +13491,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -14973,24 +13502,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -15003,25 +13531,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -15034,7 +13555,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -15047,17 +13569,8 @@
          0,
          0
         ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
        ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -15090,8 +13603,8 @@
     },
     "measure": null
    },
-   "t": 258990,
-   "te": 258990
+   "t": 247282,
+   "te": 247282
   },
   {
    "step": 67,
@@ -15101,7 +13614,7 @@
     "ms": 700
    },
    "ok": true,
-   "ti": 258990,
+   "ti": 247282,
    "state": {
     "focus": {
      "kind": "none"
@@ -15209,12 +13722,11 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
-      "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -15222,17 +13734,18 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -15247,7 +13760,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -15257,24 +13771,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -15287,25 +13800,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -15318,7 +13824,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -15331,17 +13838,8 @@
          0,
          0
         ]
-       ]
-      },
-      {
-       "kind": "circle",
-       "points": [
-        [
-         20.0107,
-         20.1382
-        ]
        ],
-       "radius": 5.9123
+       "used": true
       }
      ]
     },
@@ -15374,8 +13872,8 @@
     },
     "measure": null
    },
-   "t": 261496,
-   "te": 261496
+   "t": 249805,
+   "te": 249805
   },
   {
    "step": 68,
@@ -15390,13 +13888,13 @@
     }
    },
    "ok": true,
-   "ti": 261496,
-   "tmove": 261528,
+   "ti": 249805,
+   "tmove": 249842,
    "moves": 1,
    "hover": [
     "KHNB"
    ],
-   "tdown": 262967,
+   "tdown": 251292,
    "at": [
     1385,
     499
@@ -15508,12 +14006,12 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -15521,17 +14019,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -15546,7 +14046,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -15556,24 +14057,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -15586,25 +14086,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -15617,7 +14110,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -15630,7 +14124,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -15640,7 +14135,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -15673,8 +14169,8 @@
     },
     "measure": null
    },
-   "t": 264892,
-   "te": 264892
+   "t": 253204,
+   "te": 253204
   },
   {
    "step": 69,
@@ -15684,7 +14180,7 @@
     "ms": 700
    },
    "ok": true,
-   "ti": 264892,
+   "ti": 253204,
    "state": {
     "focus": {
      "kind": "none"
@@ -15792,12 +14288,12 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -15805,17 +14301,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -15830,7 +14328,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -15840,24 +14339,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -15870,25 +14368,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -15901,7 +14392,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -15914,7 +14406,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -15924,7 +14417,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -15957,8 +14451,8 @@
     },
     "measure": null
    },
-   "t": 267427,
-   "te": 267427
+   "t": 255745,
+   "te": 255746
   },
   {
    "step": 70,
@@ -15968,7 +14462,7 @@
     "ms": 1000
    },
    "ok": true,
-   "ti": 267427,
+   "ti": 255746,
    "state": {
     "focus": {
      "kind": "none"
@@ -16076,12 +14570,12 @@
     "sketch": {
      "tool": "Use",
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -16089,17 +14583,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -16114,7 +14610,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -16124,24 +14621,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -16154,25 +14650,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -16185,7 +14674,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -16198,7 +14688,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -16208,7 +14699,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -16241,8 +14733,8 @@
     },
     "measure": null
    },
-   "t": 270228,
-   "te": 270228
+   "t": 258566,
+   "te": 258566
   },
   {
    "step": 71,
@@ -16251,7 +14743,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 270228,
+   "ti": 258566,
    "pointer": {
     "at": [
      1385,
@@ -16260,7 +14752,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 270232,
+   "tdown": 258570,
    "state": {
     "focus": {
      "kind": "none"
@@ -16368,12 +14860,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -16381,17 +14873,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -16406,7 +14900,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -16416,24 +14911,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -16446,25 +14940,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -16477,7 +14964,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -16490,7 +14978,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -16500,7 +14989,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -16533,8 +15023,8 @@
     },
     "measure": null
    },
-   "t": 273555,
-   "te": 273555
+   "t": 261957,
+   "te": 261957
   },
   {
    "step": 72,
@@ -16544,7 +15034,7 @@
     "ms": 500
    },
    "ok": true,
-   "ti": 273555,
+   "ti": 261957,
    "state": {
     "focus": {
      "kind": "none"
@@ -16652,12 +15142,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -16665,17 +15155,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -16690,7 +15182,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -16700,24 +15193,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -16730,25 +15222,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -16761,7 +15246,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -16774,7 +15260,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -16784,7 +15271,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -16817,8 +15305,8 @@
     },
     "measure": null
    },
-   "t": 275857,
-   "te": 275857
+   "t": 264257,
+   "te": 264257
   },
   {
    "step": 73,
@@ -16827,7 +15315,7 @@
     "key": "n"
    },
    "ok": true,
-   "ti": 275857,
+   "ti": 264257,
    "pointer": {
     "at": [
      1385,
@@ -16836,7 +15324,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 275861,
+   "tdown": 264261,
    "state": {
     "focus": {
      "kind": "none"
@@ -16944,12 +15432,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -16957,17 +15445,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -16982,7 +15472,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -16992,24 +15483,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -17022,25 +15512,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -17053,7 +15536,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -17066,7 +15550,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -17076,7 +15561,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -17109,8 +15595,8 @@
     },
     "measure": null
    },
-   "t": 277728,
-   "te": 277728
+   "t": 266094,
+   "te": 266094
   },
   {
    "step": 74,
@@ -17120,7 +15606,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 277728,
+   "ti": 266094,
    "state": {
     "focus": {
      "kind": "none"
@@ -17228,12 +15714,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -17241,17 +15727,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -17266,7 +15754,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -17276,24 +15765,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -17306,25 +15794,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -17337,7 +15818,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -17350,7 +15832,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -17360,7 +15843,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -17393,8 +15877,8 @@
     },
     "measure": null
    },
-   "t": 281030,
-   "te": 281030
+   "t": 269405,
+   "te": 269405
   },
   {
    "step": 75,
@@ -17403,7 +15887,7 @@
     "key": "f"
    },
    "ok": true,
-   "ti": 281030,
+   "ti": 269405,
    "pointer": {
     "at": [
      1385,
@@ -17412,7 +15896,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 281035,
+   "tdown": 269409,
    "state": {
     "focus": {
      "kind": "none"
@@ -17520,12 +16004,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -17533,17 +16017,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -17558,7 +16044,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -17568,24 +16055,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -17598,25 +16084,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -17629,7 +16108,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -17642,7 +16122,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -17652,7 +16133,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -17685,8 +16167,8 @@
     },
     "measure": null
    },
-   "t": 282889,
-   "te": 282889
+   "t": 271235,
+   "te": 271235
   },
   {
    "step": 76,
@@ -17696,7 +16178,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 282889,
+   "ti": 271235,
    "state": {
     "focus": {
      "kind": "none"
@@ -17804,12 +16286,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -17817,17 +16299,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -17842,7 +16326,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -17852,24 +16337,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -17882,25 +16366,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -17913,7 +16390,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -17926,7 +16404,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -17936,7 +16415,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -17969,8 +16449,8 @@
     },
     "measure": null
    },
-   "t": 286235,
-   "te": 286235
+   "t": 274545,
+   "te": 274545
   },
   {
    "step": 77,
@@ -17979,18 +16459,18 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 286235,
+   "ti": 274545,
    "pointer": {
     "at": [
      1385,
      499
     ],
     "hover": [
-     "JPG"
+     "JKC"
     ],
     "element": "canvas#canvas"
    },
-   "tdown": 286241,
+   "tdown": 274550,
    "state": {
     "focus": {
      "kind": "none"
@@ -18098,12 +16578,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -18111,17 +16591,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -18136,7 +16618,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -18146,24 +16629,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -18176,25 +16658,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -18207,7 +16682,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -18220,7 +16696,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -18230,7 +16707,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -18263,8 +16741,8 @@
     },
     "measure": null
    },
-   "t": 289585,
-   "te": 289585
+   "t": 277870,
+   "te": 277870
   },
   {
    "step": 78,
@@ -18273,18 +16751,18 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 289585,
+   "ti": 277870,
    "pointer": {
     "at": [
      1385,
      499
     ],
     "hover": [
-     "JPG"
+     "JKC"
     ],
     "element": "canvas#canvas"
    },
-   "tdown": 289589,
+   "tdown": 277875,
    "state": {
     "focus": {
      "kind": "none"
@@ -18392,12 +16870,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -18405,17 +16883,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -18430,7 +16910,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -18440,24 +16921,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -18470,25 +16950,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -18501,7 +16974,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -18514,7 +16988,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -18524,7 +16999,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -18557,8 +17033,8 @@
     },
     "measure": null
    },
-   "t": 292889,
-   "te": 292889
+   "t": 281175,
+   "te": 281175
   },
   {
    "step": 79,
@@ -18568,7 +17044,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 292889,
+   "ti": 281175,
    "state": {
     "focus": {
      "kind": "none"
@@ -18676,12 +17152,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -18689,17 +17165,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -18714,7 +17192,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -18724,24 +17203,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -18754,25 +17232,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -18785,7 +17256,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -18798,7 +17270,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -18808,7 +17281,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -18841,8 +17315,8 @@
     },
     "measure": null
    },
-   "t": 295502,
-   "te": 295502
+   "t": 283745,
+   "te": 283745
   },
   {
    "step": 80,
@@ -18862,7 +17336,7 @@
     }
    },
    "ok": true,
-   "ti": 295502,
+   "ti": 283745,
    "dragPx": [
     [
      1582,
@@ -18875,10 +17349,10 @@
      "canvas"
     ]
    ],
-   "tmove": 295560,
+   "tmove": 283808,
    "moves": 16,
-   "tdown": 295900,
-   "tup": 297876,
+   "tdown": 284146,
+   "tup": 286098,
    "at": [
     [
      1582,
@@ -18953,37 +17427,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -19032,12 +17506,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -19045,17 +17519,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -19070,7 +17546,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -19080,24 +17557,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -19110,25 +17586,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -19141,7 +17610,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -19154,7 +17624,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -19164,7 +17635,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -19197,8 +17669,8 @@
     },
     "measure": null
    },
-   "t": 299732,
-   "te": 299732
+   "t": 287929,
+   "te": 287929
   },
   {
    "step": 81,
@@ -19208,7 +17680,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 299733,
+   "ti": 287929,
    "state": {
     "focus": {
      "kind": "none"
@@ -19273,37 +17745,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -19352,12 +17824,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -19365,17 +17837,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -19390,7 +17864,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -19400,24 +17875,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -19430,25 +17904,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -19461,7 +17928,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -19474,7 +17942,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -19484,7 +17953,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -19517,8 +17987,8 @@
     },
     "measure": null
    },
-   "t": 302354,
-   "te": 302354
+   "t": 290523,
+   "te": 290523
   },
   {
    "step": 82,
@@ -19532,13 +18002,13 @@
     }
    },
    "ok": true,
-   "ti": 302354,
-   "tmove": 302383,
+   "ti": 290523,
+   "tmove": 290549,
    "moves": 1,
    "hover": [
-    "IO"
+    "JJB"
    ],
-   "tdown": 303686,
+   "tdown": 291846,
    "at": [
     1386,
     519
@@ -19627,37 +18097,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -19706,12 +18176,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -19719,17 +18189,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -19744,7 +18216,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -19754,24 +18227,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -19784,25 +18256,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -19815,7 +18280,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -19828,7 +18294,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -19838,7 +18305,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -19871,8 +18339,8 @@
     },
     "measure": null
    },
-   "t": 305720,
-   "te": 305720
+   "t": 293897,
+   "te": 293897
   },
   {
    "step": 83,
@@ -19882,7 +18350,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 305720,
+   "ti": 293897,
    "state": {
     "focus": {
      "kind": "none"
@@ -19967,37 +18435,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -20046,12 +18514,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -20059,17 +18527,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -20084,7 +18554,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -20094,24 +18565,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -20124,25 +18594,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -20155,7 +18618,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -20168,7 +18632,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -20178,7 +18643,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -20211,8 +18677,8 @@
     },
     "measure": null
    },
-   "t": 308336,
-   "te": 308336
+   "t": 296512,
+   "te": 296512
   },
   {
    "step": 84,
@@ -20224,8 +18690,8 @@
     "ms": 900
    },
    "ok": true,
-   "ti": 308336,
-   "tmove": 308373,
+   "ti": 296512,
+   "tmove": 296549,
    "moves": 1,
    "at": [
     1484,
@@ -20291,6 +18757,9 @@
     "list": {
      "kind": "context-menu",
      "rows": [
+      "Tangent connected edges",
+      "Equal length/radius edges",
+      "Parallel edges",
       "Create selection\u2026"
      ],
      "highlighted": null,
@@ -20321,6 +18790,9 @@
      {
       "kind": "context-menu",
       "rows": [
+       "Tangent connected edges",
+       "Equal length/radius edges",
+       "Parallel edges",
        "Create selection\u2026"
       ],
       "highlighted": null,
@@ -20333,37 +18805,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -20412,12 +18884,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -20425,17 +18897,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -20450,7 +18924,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -20460,24 +18935,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -20490,25 +18964,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -20521,7 +18988,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -20534,7 +19002,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -20544,7 +19013,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -20577,8 +19047,8 @@
     },
     "measure": null
    },
-   "t": 310921,
-   "te": 310921
+   "t": 299124,
+   "te": 299124
   },
   {
    "step": 85,
@@ -20588,7 +19058,7 @@
     "ms": 400
    },
    "ok": true,
-   "ti": 310921,
+   "ti": 299124,
    "state": {
     "focus": {
      "kind": "none"
@@ -20649,6 +19119,9 @@
     "list": {
      "kind": "context-menu",
      "rows": [
+      "Tangent connected edges",
+      "Equal length/radius edges",
+      "Parallel edges",
       "Create selection\u2026"
      ],
      "highlighted": null,
@@ -20679,6 +19152,9 @@
      {
       "kind": "context-menu",
       "rows": [
+       "Tangent connected edges",
+       "Equal length/radius edges",
+       "Parallel edges",
        "Create selection\u2026"
       ],
       "highlighted": null,
@@ -20691,37 +19167,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -20770,12 +19246,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -20783,17 +19259,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -20808,7 +19286,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -20818,24 +19297,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -20848,25 +19326,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -20879,7 +19350,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -20892,7 +19364,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -20902,7 +19375,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -20935,8 +19409,8 @@
     },
     "measure": null
    },
-   "t": 313151,
-   "te": 313151
+   "t": 301316,
+   "te": 301316
   },
   {
    "step": 86,
@@ -20945,7 +19419,7 @@
     "name": "select-submenu"
    },
    "ok": true,
-   "ti": 313151,
+   "ti": 301316,
    "shot": "/root/live-scratch/uipshots/sketch-used-select-submenu-box-select-submenu.png",
    "state": {
     "focus": {
@@ -21007,6 +19481,9 @@
     "list": {
      "kind": "context-menu",
      "rows": [
+      "Tangent connected edges",
+      "Equal length/radius edges",
+      "Parallel edges",
       "Create selection\u2026"
      ],
      "highlighted": null,
@@ -21037,6 +19514,9 @@
      {
       "kind": "context-menu",
       "rows": [
+       "Tangent connected edges",
+       "Equal length/radius edges",
+       "Parallel edges",
        "Create selection\u2026"
       ],
       "highlighted": null,
@@ -21049,37 +19529,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -21128,12 +19608,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -21141,17 +19621,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -21166,7 +19648,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -21176,24 +19659,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -21206,25 +19688,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -21237,7 +19712,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -21250,7 +19726,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -21260,7 +19737,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -21293,8 +19771,8 @@
     },
     "measure": null
    },
-   "t": 315178,
-   "te": 315178
+   "t": 303297,
+   "te": 303297
   },
   {
    "step": 87,
@@ -21303,7 +19781,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 315178,
+   "ti": 303297,
    "pointer": {
     "at": [
      1484,
@@ -21312,7 +19790,7 @@
     "hover": [],
     "element": "li.context-menu-item.NO_HIGHLIGHT"
    },
-   "tdown": 315186,
+   "tdown": 303300,
    "state": {
     "focus": {
      "kind": "none"
@@ -21377,37 +19855,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -21456,12 +19934,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -21469,17 +19947,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -21494,7 +19974,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -21504,24 +19985,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -21534,25 +20014,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -21565,7 +20038,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -21578,7 +20052,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -21588,7 +20063,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -21621,8 +20097,8 @@
     },
     "measure": null
    },
-   "t": 318521,
-   "te": 318521
+   "t": 306628,
+   "te": 306628
   },
   {
    "step": 88,
@@ -21632,7 +20108,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 318521,
+   "ti": 306628,
    "state": {
     "focus": {
      "kind": "none"
@@ -21697,37 +20173,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -21776,12 +20252,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -21789,17 +20265,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -21814,7 +20292,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -21824,24 +20303,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -21854,25 +20332,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -21885,7 +20356,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -21898,7 +20370,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -21908,7 +20381,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -21941,8 +20415,8 @@
     },
     "measure": null
    },
-   "t": 321107,
-   "te": 321107
+   "t": 309230,
+   "te": 309230
   },
   {
    "step": 89,
@@ -21951,7 +20425,7 @@
     "name": "end"
    },
    "ok": true,
-   "ti": 321107,
+   "ti": 309230,
    "shot": "/root/live-scratch/uipshots/sketch-used-select-submenu-box-end.png",
    "state": {
     "focus": {
@@ -22017,37 +20491,37 @@
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOM"
+       "id": "JJR"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOU"
+       "id": "JJJ"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOE"
+       "id": "JJo"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOI"
+       "id": "JJN"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "IO"
+       "id": "JJV"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOQ"
+       "id": "JJF"
       },
       {
        "kind": "SKETCH_ENTITY",
        "owner": null,
-       "id": "JOB"
+       "id": "JJB"
       }
      ]
     },
@@ -22096,12 +20570,12 @@
     "sketch": {
      "tool": null,
      "entities": [
-      "arc",
       "circle",
       "line",
       "line",
       "line",
       "line",
+      "point",
       "spline"
      ],
      "constraints": [
@@ -22109,17 +20583,19 @@
       "COINCIDENT",
       "COINCIDENT",
       "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "COINCIDENT",
-      "HORIZONTAL",
-      "HORIZONTAL",
-      "TANGENT",
-      "TANGENT",
-      "VERTICAL",
-      "VERTICAL"
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED",
+      "PROJECTED"
      ],
      "dimensions": [],
      "geometry": [
@@ -22134,7 +20610,8 @@
          39.9423,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "spline",
@@ -22144,24 +20621,23 @@
          0
         ],
         [
-         46.9318,
-         0
+         42.6096,
+         -0.6148
+        ],
+        [
+         48.5527,
+         -1.9845
+        ],
+        [
+         49.4698,
+         5.8017
         ],
         [
          49.9753,
          10.0934
         ]
        ],
-       "derivatives": [
-        [
-         17.8292,
-         -4.1093
-        ],
-        [
-         2.7514,
-         23.3586
-        ]
-       ]
+       "used": true
       },
       {
        "kind": "line",
@@ -22174,25 +20650,18 @@
          49.9753,
          30.4499
         ]
-       ]
+       ],
+       "used": true
       },
       {
-       "kind": "arc",
+       "kind": "point",
        "points": [
         [
-         39.9769,
-         30.4499
-        ],
-        [
-         49.9753,
-         30.4499
-        ],
-        [
-         39.7644,
-         40.446
+         46.9713,
+         37.5946
         ]
        ],
-       "radius": 9.9984
+       "used": true
       },
       {
        "kind": "line",
@@ -22205,7 +20674,8 @@
          0,
          39.6005
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "line",
@@ -22218,7 +20688,8 @@
          0,
          0
         ]
-       ]
+       ],
+       "used": true
       },
       {
        "kind": "circle",
@@ -22228,7 +20699,8 @@
          20.1382
         ]
        ],
-       "radius": 5.9123
+       "radius": 5.9123,
+       "used": true
       }
      ]
     },
@@ -22261,9 +20733,9 @@
     },
     "measure": null
    },
-   "t": 323084,
-   "te": 323084
+   "t": 311210,
+   "te": 311210
   }
  ],
- "t0_epoch_ms": 1795794037051
+ "t0_epoch_ms": 1795830166924
 }
