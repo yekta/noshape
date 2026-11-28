@@ -221,6 +221,11 @@ struct NCurve {
 /// A free-form face's edges' curves on it: by (edge, a seam's second), the curve and its range.
 type PCurves = HashMap<(usize, bool), (Arc<NurbsCurve>, f64, f64)>;
 
+/// A curve on a surface's parameters moved by `by`.
+fn shifted(c: &NurbsCurve, by: DVec2) -> NurbsCurve {
+    NurbsCurve { degree: c.degree, knots: c.knots.clone(), poles: c.poles.iter().map(|q| *q + by.extend(0.0)).collect(), weights: c.weights.clone(), spans: Default::default() }
+}
+
 /// A face's edges' curves on its surface that goes round (a sphere, torus or revolved surface), OCCT's, each moved by
 /// whole turns to start where the one before it in its loop ends, then each loop by whole turns to start within the
 /// first; a degenerate edge's (`point(e)`: a sphere's pole) straight from the one before it to the one after (OCCT's
@@ -232,7 +237,6 @@ fn loops_in_one_turn(fs: &FreeSurface, edges: &[(usize, bool)], loop_lens: &[usi
         return;
     }
     let turns = |d: DVec2| DVec2::new(if pu { TAU * (d.x / TAU).round() } else { 0.0 }, if pv { TAU * (d.y / TAU).round() } else { 0.0 });
-    let moved = |c: &NurbsCurve, by: DVec2| NurbsCurve { degree: c.degree, knots: c.knots.clone(), poles: c.poles.iter().map(|q| *q + by.extend(0.0)).collect(), weights: c.weights.clone(), spans: Default::default() };
     let mut at = 0;
     for &n in loop_lens {
         // (In the loop's order: each edge from where the one before it ends (OCCT's list of them needn't be).)
@@ -285,7 +289,7 @@ fn loops_in_one_turn(fs: &FreeSurface, edges: &[(usize, bool)], loop_lens: &[usi
             }
             let by = shifts[k] + back;
             if by != DVec2::ZERO {
-                x.0 = Arc::new(moved(&x.0, by));
+                x.0 = Arc::new(shifted(&x.0, by));
             }
         }
     }
@@ -3417,7 +3421,19 @@ impl Ctx<'_> {
         for ((c, join), from) in secs.into_iter().zip(joins).zip(froms) {
             let id = self.ncurves.len() as u32;
             let cc = Arc::new(c.curve);
-            let [on0, on1] = c.on;
+            // (OCCT's curve on a face going round may be a turn off the face's parameters (a plane through a torus's
+            // axis, the meridian's v from 2π + π/2): moved by whole turns to its middle within them.)
+            let tm = 0.5 * (c.t0 + c.t1);
+            let [on0, on1] = [(fs, &c.on[0]), (ft, &c.on[1])].map(|(f, on)| {
+                let g = &self.faces[f];
+                let (Surf::Nurbs { .. }, Some(ns)) = (&g.s, g.ns.as_deref()) else { return on.clone() };
+                let [pu, pv] = ns.periodic();
+                let [u0, u1, v0, v1] = g.uvbox;
+                let m = on.at(tm).truncate();
+                let turn = |p: bool, x: f64, lo: f64, hi: f64| if p && (x < lo || x > hi) { TAU * ((0.5 * (lo + hi) - x) / TAU).round() } else { 0.0 };
+                let by = DVec2::new(turn(pu, m.x, u0, u1), turn(pv, m.y, v0, v1));
+                if by == DVec2::ZERO { on.clone() } else { shifted(on, by) }
+            });
             self.ncurves.push(NCurve { c: cc.clone(), sec: Some(([fs, ft], [Arc::new(on0), Arc::new(on1)], c.id)), from, tol: c.tol, acc: c.accuracy, boxes: Default::default() });
             let cuts = free::seam_cuts(self, [fs, ft], &cc, c.t0, c.t1);
             self.section_nurbs(fs, ft, Path::Nurbs { id, c: cc }, (c.t0, c.t1), &cuts, join)?;

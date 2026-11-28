@@ -1845,6 +1845,15 @@ fn coaxial_cones_whose_common_apex_lies_off_both_faces() {
     assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
 }
 
+/// A 265° revolve with a torus face in common with a half-space through its axis 0.955° off its end cap (qa's fuzz seed
+/// 1192, a Fillet's Boolean, recorded): OCCT's section on the torus near the cap lies a turn up in v; moved by whole turns
+/// into the face's parameters, it cuts the face there (it was outside, the cut face a slit: "a non-manifold result").
+/// Valid, OCCT's counts and volume.
+#[test]
+fn a_half_space_through_a_revolves_axis_beside_its_torus_end() {
+    valid_as_occt("9b6188a28c438ccf", 1e-9);
+}
+
 /// A cut of a threaded rod (recorded): its cylinder's faces between the thread's turns go round between rulings at one
 /// angle (helical strips, no seam), th0 there with the rulings its loop runs up on the far side (it declined "a
 /// cylinder face without curved edges"); a piece's end a tolerance round the axis past a turn is not across the
