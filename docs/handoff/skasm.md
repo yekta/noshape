@@ -1,31 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 04:10 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 05:55 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 04:40 UTC)
-- QUEUED 1249059f (skasm) and 69a56fd5 (skasm-main): no result yet.
-- COMMITTING in skasm (bg task bcwgdgbqv: waits for clippy in tdim.sh, then commits; check `git log -1` in skasm): Q on a
-  mixed selection all construction + construction_from_selection flag (sketch_mode.rs toggle_construction/set_tool/
-  construction_shown, T1 q_on_a_mixed_selection_makes_it_all_construction); refused dim text select_all + the Esc after the
-  emptying one leaves Dimension (ps-ui sketch.rs commit_dimension/sketch_cancel, T1 a_refused_new_dimension_...,
-  the_dimension_tool_flow_as_lives updated to live sketch-dim-typed-text). T1s green (scene 279, ps-ui construction 3,
-  dimension 31). NEXT: land.sh it (rebases onto main, which has live's retaken sketch-used takes d8c392368a).
-- Replays done: batch 6 (out on vibex8 ~/tmp/skasm/uip-b6): 3/14; real diffs = 1 COINCIDENT short after Trim (5/10 vs 6/11)
-  and chamfer-too-large (12 vs 13): needs live's constraint list with entities (TICKETS TRIM row annotated); rest click noise.
-  sketch-used-*: compared against OLD takes: rerun uipr.sh with the 6 sketch-used-* names after the rebase.
-  asm (vibex8 ~/tmp/skasm/uip-asm, from skasm-main 69a56fd5): 13/21. 6 misses = ASM-MC-SPLINE-FACE-ORIGIN-ENTITY: a click
-  mid spline face (52,15,10): live originQuery POINT on edge JHZ (second JHQ), field "Edge of Part 1 <1>", Z = +z (along the
-  straight vertical edge, from the Fastened transforms: live col0 (0,0,1), ours (.64,.768,0)); ours: Vertex ref, Z along the
-  curved edge (eval.rs ~2158 sorts curved edges first for corners). Fix: from a face click, the corner as its straight edge's
-  point, Z along that edge, labelled Edge (dialog label: assembly_behaviors.rs ~4725 PickKind). 2 more: fillet-edge /
-  spline-fillet-face transform 0.9999997 vs 1.0 (tolerance noise?).
-- Third replay bokbi5vff (rclick-line-circle-menu, offset-*, slot-on-spline) still waiting in vibex8's slot.
-- HORIZONTAL-RANGE: the origin's alignment is always on in ours (inference.rs ~389), so the y=0 guide exists regardless of
-  wakes; read the replay's step 8-9 ctx before changing anything.
-- Parked: SKETCH-DIM-NEGATIVE-KEPT (needs signed Length in solver/regen/state). Next: land, used rerun, asm origin-entity fix,
-  offset open bits, ASM-MATE-ERROR-ROW.
-- Scripts /root/skasm-scratch/bin: tq.sh (scene + ps-ui construction), tdim.sh (ps-ui dimension), tso, tuse, tasm, uipr.
+## NOW (11-28 05:55 UTC)
+- LANDING (skasm, re-queued after 29a170e1's handoff rebase conflict): Q on a mixed selection all construction
+  (construction_from_selection), refused dim text selected + 2 Escs leave Dimension, alignment hold at BAND_HOLD_PX 8
+  (sketch_mode.rs held_snap: is_alignment(prev); live rclick-line-circle-menu: circle centre 9.4 px off the origin's level
+  let go). T1s green (scene 279, ps-ui sketch::ui_tests 609, clippy).
+- QUEUED 3bb2265e (skasm-main): a B-spline face's corner = its straight side's end, new Inference::VertexEnd (edge end, Z
+  back into the edge; implicit.rs), "Edge of", Z +z at (40,30,0) as live (assembly 18 + assembly-ui 240 green). OPEN: ops
+  CONNECTOR_DOC / error text don't list vertex_end (needs UPDATE_DOCS regen of AGENT_API.md).
+- REPLAY running (bg, vibex8 slot, ~/tmp/skasm/uip): rclick-line-circle-menu, horizontal/vertical-key, the 19 sketch-used
+  retakes (qa: verifies the used-pick fix). Then: the asm replay (13/21 before; 6 should flip with 3bb2265e).
+- Offset/slot replay (05:0x): 3/8. offset-open-chain: live's 2nd click (10,-4), 8 px off the line, does nothing; ours hits the
+  distance label (box "5 mm"): needs live (flip arrow?); TICKETS SKETCH-OFFSET-DISTANCE-FROM-CLICK annotated. Rest click noise.
+- Batch 6: TRIM COINCIDENT short (needs live's constraint list). Parked: SKETCH-DIM-NEGATIVE-KEPT. Next: replay results,
+  asm replay, HORIZONTAL-RANGE, ASM-MATE-ERROR-ROW.
+- Scripts /root/skasm-scratch/bin: tal.sh (scene + ps-ui sketch ui), tve.sh (assembly + ops refs + clippy), tasmui.sh, uipr.sh.
 
 ## NOW (11-28 04:00 UTC)
 - QUEUED 1249059f (skasm, 11 commits incl. batch 6 43a610f3; c6081900 FAILED 03:48 on use_on_a_shelled_boxs_rim_uses_its_
