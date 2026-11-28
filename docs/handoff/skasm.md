@@ -3,6 +3,16 @@
 Updated 2026-11-28 10:0x UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
+## NEXT (lead 11-28 10:2x, in order; tests on the Mac)
+1. Offset's 2nd click in space (open chain, (10,-4) / (10,-8)): live makes nothing, tool stays, line stays selected: ours
+   must not open the distance box there (TICKETS SKETCH-OFFSET-DISTANCE-FROM-CLICK).
+2. The too-large chamfer's constraints (live rq-chamfer-too-large-constraints: 5 mm made, 9 CHAMFER COINCIDENTs, the
+   corner COINCIDENT gone; REQUESTS skasm 06:5x answer 2).
+3. Reconcile the MC corner frame (TICKETS 50: rq-1128 top corner along the vertical edge vs probe-mcq's spline end).
+4. Replay: bn02so8gg hit the 2 h background limit waiting in vibex8's slot (stopped locally; the remote wait may live on:
+   check ps on vibex8 for my uipr.sh before re-queuing). Re-queue when vibex8 frees up, then the asm replay.
+- QUEUED f5233e5e (the matrix + trim + pattern, carries everything below).
+
 ## NOW (11-28 10:0x UTC): the sketch hover × state matrix
 - docs/parity/sketch-hover-matrix.md: 48 =, 0 ?, 0 ✗, 40 L of 88 (14 new GPU cells in hover_matrix_tests, all green on
   the Mac; glyph colours `constraint_glyph_colors` + T1; used points take the constrained colour). The 40 L asked in
