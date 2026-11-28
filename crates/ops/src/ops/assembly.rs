@@ -24,7 +24,7 @@ mod standard;
 pub(crate) use positions::exploded_offsets;
 mod structure;
 
-const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name (a part inside a subassembly by its path, \"Sub <1> > Part 1 <1>\"), \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis, \"reorient\": 0–3 quarter turns of its secondary axis, \"move\": {\"x\", \"y\", \"z\", \"rotation_axis\": \"x\"|\"y\"|\"z\", \"rotation\"} moves it (the mate dialog's connector Move; expressions).";
+const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name (a part inside a subassembly by its path, \"Sub <1> > Part 1 <1>\"), \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex (an edge's start), vertex_end (its end), top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis, \"reorient\": 0–3 quarter turns of its secondary axis, \"move\": {\"x\", \"y\", \"z\", \"rotation_axis\": \"x\"|\"y\"|\"z\", \"rotation\"} moves it (the mate dialog's connector Move; expressions).";
 
 pub fn ops() -> Vec<Op> {
     let connector = json!({ "type": "object" });
@@ -714,7 +714,7 @@ fn parse_connector(a: &Assembly, od: &OpenDoc, tab: TabId, v: &Value, field: &st
                 let on = refs::parse(e).map_err(|e| e.with_param(format!("{field}.entity")))?;
                 match o.get("inference").and_then(Value::as_str) {
                     Some(name) => {
-                        let inf = refs::INFERENCES.iter().find(|i| refs::to_id(&Reference::Implicit { on: Box::new(Reference::Origin), inference: **i }).split(':').nth(1) == Some(name)).copied().ok_or_else(|| OpError::param(&format!("{field}.inference"), "center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis or origin"))?;
+                        let inf = refs::INFERENCES.iter().find(|i| refs::to_id(&Reference::Implicit { on: Box::new(Reference::Origin), inference: **i }).split(':').nth(1) == Some(name)).copied().ok_or_else(|| OpError::param(&format!("{field}.inference"), "center, centroid, midpoint, vertex, vertex_end, top_axis, mid_axis, bottom_axis or origin"))?;
                         Reference::Implicit { on: Box::new(on), inference: inf }
                     }
                     None => on,
