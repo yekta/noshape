@@ -387,8 +387,7 @@ impl Sketch {
                 }
             }
             crate::entities::Geometry::FitSpline { .. } | crate::entities::Geometry::BSpline { .. } => {
-                // Live slot-on-spline: as on a line, the sides the spline's offsets (free splines: the solver holds no
-                // OFFSET between splines), the caps on its ends.
+                // Live slot-on-spline: as on a line, the sides the spline's offsets, the caps on its ends.
                 use crate::entities::EntityKind;
                 let (start, end) = self.endpoints(id).ok_or(SketchError::InvalidGeometry("slots follow open curves".into()))?;
                 let curve = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
@@ -423,7 +422,9 @@ impl Sketch {
                 for (l, c) in [(left, start_cap), (right, start_cap), (left, end_cap), (right, end_cap)] {
                     self.c(&mut out, ConstraintKind::Tangent { a: c, b: l });
                 }
-                self.c(&mut out, ConstraintKind::Offset { reference: end_cap, curve: start_cap, master_ref: end, master: start, side: 1.0 });
+                for (curve, master, side) in [(left, id, 1.0), (right, id, -1.0), (start_cap, start, 1.0)] {
+                    self.c(&mut out, ConstraintKind::Offset { reference: end_cap, curve, master_ref: end, master, side });
+                }
             }
             _ => return Err(SketchError::InvalidGeometry("slots follow lines, arcs and splines".into())),
         }

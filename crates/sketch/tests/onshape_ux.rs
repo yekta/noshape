@@ -137,7 +137,7 @@ fn slot_around_line_and_arc() {
 }
 
 /// Live slot-on-spline: Slot on a fit spline builds two offset splines and two caps on its ends (5 curves with the
-/// spline), 6 COINCIDENT and 4 TANGENT; one cap carries the width.
+/// spline), 6 COINCIDENT, 4 TANGENT and 3 OFFSET; one cap carries the width, and the sides follow it and the spline.
 #[test]
 fn a_slot_on_a_spline_wraps_it() {
     let mut sk = Sketch::new();
@@ -148,9 +148,37 @@ fn a_slot_on_a_spline_wraps_it() {
     let kinds: Vec<EntityKind> = curves.iter().filter_map(|c| sk.kind(*c)).collect();
     assert_eq!(kinds.iter().filter(|k| **k == EntityKind::Arc).count(), 2, "{kinds:?}");
     let count = |k: fn(&ConstraintKind) -> bool| sk.constraints().skip(before).filter(|c| k(&c.kind)).count();
-    assert_eq!((count(|k| matches!(k, ConstraintKind::Coincident { .. })), count(|k| matches!(k, ConstraintKind::Tangent { .. }))), (6, 4));
-    sk.add_constraint(ConstraintKind::Diameter { curve: caps[0], value: 0.02 }).unwrap();
+    let kinds = (
+        count(|k| matches!(k, ConstraintKind::Coincident { .. })),
+        count(|k| matches!(k, ConstraintKind::Tangent { .. })),
+        count(|k| matches!(k, ConstraintKind::Offset { .. })),
+    );
+    assert_eq!(kinds, (6, 4, 3), "(COINCIDENT, TANGENT, OFFSET)");
+    let d = sk.add_constraint(ConstraintKind::Diameter { curve: caps[0], value: 0.02 }).unwrap();
     assert!(sk.solve().is_solved());
+    assert_eq!(sk.regions().len(), 1);
+    let sides: Vec<EntityId> = curves.iter().copied().filter(|c| sk.kind(*c) != Some(EntityKind::Arc)).collect();
+    let off_by = |sk: &Sketch, w: f64| {
+        let spline = sk.curve(sp).unwrap();
+        for side in &sides {
+            let c = sk.curve(*side).unwrap();
+            let (a, b) = c.domain();
+            for i in 0..=8 {
+                let e = (spline.distance(c.point(a + (b - a) * i as f64 / 8.0)) - w).abs();
+                assert!(e < 5e-5, "side {i}/8 off by {e} from {w}");
+            }
+        }
+    };
+    off_by(&sk, 0.01);
+    sk.set_dimension_value(d, 0.012).unwrap();
+    assert!(sk.solve().is_solved());
+    off_by(&sk, 0.006);
+    let Some(Geometry::FitSpline { points, .. }) = sk.entity(sp).map(|e| e.geometry.clone()) else { panic!() };
+    for y in [0.022, 0.024, 0.026] {
+        sk.set_point(points[1], v(0.03, y)).unwrap();
+        assert!(sk.solve().is_solved(), "spline's middle point at {y}");
+    }
+    off_by(&sk, 0.006);
     assert_eq!(sk.regions().len(), 1);
 }
 

@@ -239,6 +239,56 @@ pub(crate) enum EqKind {
     /// Times `scale²` (G2) or `scale³` (G3) for a residual in lengths, as
     /// [`EqKind::Curvature`] (`scale` a length of the geometry).
     FlowNum { a: FlowSide, b: FlowSide, g3: bool, scale: f64 },
+    /// A spline's offset (live's slot on a spline: its sides): component `comp` (x, y, or along the master's tangent)
+    /// of copy(u) - (master(t) + side·r·n(t)), n the master's left normal, u and t fractions of the curves' domains (a
+    /// fit spline's domain follows its points); inputs r (a circle's radius, or an arc's centre and start when
+    /// `arc_rad`), the master's inputs, then the copy's (numeric gradient).
+    OffsetNum { comp: u8, master: SplineArg, copy: SplineArg, u: f64, t: f64, side: f64, arc_rad: bool },
+}
+
+/// A spline rebuilt from its inputs: a control-point curve's points, or a fit spline's points then its handles.
+#[derive(Clone, Debug)]
+pub(crate) enum SplineArg {
+    Ctrl(Arc<Nurbs>),
+    Fit { n: usize, ends: FitEnds },
+}
+
+impl SplineArg {
+    fn arity(&self) -> usize {
+        match self {
+            SplineArg::Ctrl(t) => 2 * t.ctrl.len(),
+            SplineArg::Fit { n, ends } => 2 * n + ends.extra(),
+        }
+    }
+
+    fn curve(&self, x: &[f64]) -> Option<Nurbs> {
+        match self {
+            SplineArg::Ctrl(t) => {
+                let mut c = (**t).clone();
+                for (i, q) in c.ctrl.iter_mut().enumerate() {
+                    *q = glam::DVec2::new(x[2 * i], x[2 * i + 1]);
+                }
+                Some(c)
+            }
+            SplineArg::Fit { n, ends } => fit_curve(x, *n, *ends),
+        }
+    }
+}
+
+fn offset_num(kind: &EqKind, x: &[f64]) -> f64 {
+    let EqKind::OffsetNum { comp, master, copy, u, t, side, arc_rad } = kind else { return 0.0 };
+    let (comp, u, t, side, arc_rad) = (*comp, *u, *t, *side, *arc_rad);
+    let (r, x) = if arc_rad { (glam::DVec2::new(x[2] - x[0], x[3] - x[1]).length(), &x[4..]) } else { (x[0], &x[1..]) };
+    let nm = master.arity();
+    let (Some(m), Some(c)) = (master.curve(&x[..nm]), copy.curve(&x[nm..])) else { return 0.0 };
+    let at = |c: &Nurbs, f: f64| {
+        let (a, b) = c.domain();
+        a + (b - a) * f.clamp(0.0, 1.0)
+    };
+    let [p, d1, _] = m.eval_ders(at(&m, t));
+    let dir = d1.normalize_or_zero();
+    let q = c.point(at(&c, u)) - (p + dir.perp() * (side * r));
+    [q.x, q.y, q.dot(dir)][comp as usize]
 }
 
 #[derive(Clone, Debug)]
@@ -397,7 +447,7 @@ fn kernel<T: Num>(kind: &EqKind, x: &[T]) -> T {
             let na = a.arity();
             (curv(a, &x[..na]) + curv(b, &x[na..])) * T::cst(*scale)
         }
-        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::FitContact { .. } | EqKind::CurvatureNum { .. } | EqKind::FlowNum { .. } => {
+        EqKind::SplinePoint { .. } | EqKind::FitPoint { .. } | EqKind::FitEndDir { .. } | EqKind::FitFitDir { .. } | EqKind::FitContact { .. } | EqKind::CurvatureNum { .. } | EqKind::FlowNum { .. } | EqKind::OffsetNum { .. } => {
             // only evaluated through `eval_f64`
             T::cst(f64::NAN)
         }
@@ -815,6 +865,7 @@ impl Eq {
         match &self.kind {
             EqKind::FitContact { which, arc, ends } => fit_contact(x, *which, *arc, *ends, None),
             EqKind::SplinePoint { comp, curve } => spline_point_eval(curve, *comp as usize, x, None),
+            k @ EqKind::OffsetNum { .. } => offset_num(k, x),
             EqKind::FitPoint { comp, ends } => {
                 let n = (x.len() - 3 - ends.extra()) / 2;
                 let c = fit_curve(&x[3..], n, *ends);
@@ -862,6 +913,7 @@ impl Eq {
         match &self.kind {
             EqKind::FitContact { which, arc, ends } => return fit_contact(x, *which, *arc, *ends, Some(g)),
             EqKind::SplinePoint { comp, curve } => return spline_point_eval(curve, *comp as usize, x, Some(g)),
+            EqKind::OffsetNum { .. } => return self.numeric_grad(x, g),
             EqKind::FitPoint { comp, ends } => {
                 g.iter_mut().for_each(|v| *v = 0.0);
                 let c = *comp as usize;
@@ -1517,8 +1569,78 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 }
                 Ok(())
             }
+            (EntityKind::BSpline | EntityKind::FitSpline, EntityKind::BSpline | EntityKind::FitSpline) => self.spline_offset(d, reference, curve, master, side),
             (kc, km) => Err(format!("offset not supported between {kc:?} and {km:?}")),
         }
+    }
+
+    /// A spline `curve` offset from spline `master` by `d` on `side`: the copy's points at its Greville parameters
+    /// follow the master's offset points as far along the offset (the Offset tool fits its copies by chord length);
+    /// next to its ends only along it, the end directions being the slot caps' tangency.
+    fn spline_offset(&mut self, d: Rad, reference: EntityId, curve: EntityId, master: EntityId, side: f64) -> R {
+        let arg = |b: &Self, id: EntityId| -> Result<(SplineArg, SmallVec<[u32; 8]>), String> {
+            let pts = b.spline_points(id)?;
+            let mut inp: SmallVec<[u32; 8]> = SmallVec::new();
+            for p in &pts {
+                inp.extend_from_slice(&b.lk.point(*p));
+            }
+            if b.kind(id)? != EntityKind::FitSpline {
+                return Ok((SplineArg::Ctrl(Arc::new(b.spline_template(id)?)), inp));
+            }
+            if let Some((h0, h1)) = b.sk.entity(id).and_then(|e| e.spline_handles()) {
+                inp.extend_from_slice(&b.lk.point(h0));
+                inp.extend_from_slice(&b.lk.point(h1));
+            }
+            Ok((SplineArg::Fit { n: pts.len(), ends: b.fit_ends(id)? }, inp))
+        };
+        let ((ma, mi), (ca, ci)) = (arg(self, master)?, arg(self, curve)?);
+        let (Some(mc), Some(cc)) = (self.sk.curve(master), self.sk.curve(curve)) else { return Err(format!("{curve} has no curve")) };
+        let (rad, arc_rad): (SmallVec<[u32; 4]>, bool) = match d {
+            Rad::Param(r) => (SmallVec::from_slice(&[r]), false),
+            Rad::Dist(c, s) => (SmallVec::from_slice(&[c[0], c[1], s[0], s[1]]), true),
+        };
+        let inputs: SmallVec<[u32; 8]> = rad.iter().chain(&mi).chain(&ci).copied().collect();
+        let (u0, u1) = cc.domain();
+        let params: Vec<f64> = match &ca {
+            SplineArg::Ctrl(n) if n.degree > 0 => (0..n.ctrl.len()).map(|i| n.knots[i + 1..=i + n.degree].iter().sum::<f64>() / n.degree as f64).collect(),
+            _ => {
+                let m = (ca.arity() / 2).max(2);
+                (0..m).map(|i| u0 + (u1 - u0) * i as f64 / (m - 1) as f64).collect()
+            }
+        };
+        let m = params.len();
+        let r = match self.sk.curve(reference) {
+            Some(crate::Curve2::Arc { radius, .. } | crate::Curve2::Circle { radius, .. }) => radius,
+            _ => return Err(format!("{reference} is not a circle or arc")),
+        };
+        // The master's offset as a polyline: chord-length fractions against the master's parameter fractions.
+        const N: usize = 160;
+        let (t0, t1) = mc.domain();
+        let pts: Vec<glam::DVec2> = (0..=N).map(|i| {
+            let [p, d1, _] = mc.ders(t0 + (t1 - t0) * i as f64 / N as f64);
+            p + d1.normalize_or_zero().perp() * (side * r)
+        }).collect();
+        let mut len = vec![0.0; N + 1];
+        for i in 1..=N {
+            len[i] = len[i - 1] + (pts[i] - pts[i - 1]).length();
+        }
+        let total = len[N].max(1e-300);
+        let t_at = |f: f64| {
+            let s = f * total;
+            let i = len.partition_point(|l| *l < s).clamp(1, N);
+            let w = ((s - len[i - 1]) / (len[i] - len[i - 1]).max(1e-300)).clamp(0.0, 1.0);
+            (i as f64 - 1.0 + w) / N as f64
+        };
+        let rev = cc.point(u0).distance(mc.point(t1)) < cc.point(u0).distance(mc.point(t0));
+        for (i, &u) in params.iter().enumerate() {
+            let u = (u - u0) / (u1 - u0);
+            let t = if rev { 1.0 - t_at(1.0 - u) } else { t_at(u) };
+            let comps: &[u8] = if m > 3 && (i == 1 || i == m - 2) { &[2] } else { &[0, 1] };
+            for &comp in comps {
+                self.push(EqKind::OffsetNum { comp, master: ma.clone(), copy: ca.clone(), u, t, side, arc_rad }, inputs.clone());
+            }
+        }
+        Ok(())
     }
 
     /// The master pair's signed offset as a term of `lin` (times `k`): lines,
