@@ -8055,6 +8055,32 @@ fn the_menu_over_a_used_line_takes_the_line_not_the_edge_under_it(cx: &mut TestA
     assert!(labels.iter().any(|l| l == "Delete sketch entity") && labels.iter().any(|l| l == "Construction") && !labels.iter().any(|l| l.starts_with("Hide Part")), "{labels:?}");
 }
 
+/// Live sketch-used-ctrl-multiselect s84: Extrude… with sketch curves selected opens on the Surface tab with those
+/// curves; with nothing selected it takes the sketch's regions on the Solid tab.
+#[gpui::test]
+fn extrude_from_a_sketch_with_curves_selected_extrudes_them_as_a_surface(cx: &mut TestAppContext) {
+    for curves in [true, false] {
+        let (window, view) = sketch_with(cx, &format!("extrude-curves-{curves}"), Tool::Line);
+        click(cx, window, &view, (500., 400.));
+        click(cx, window, &view, (640., 360.));
+        keys(cx, window, &["escape", "escape"]);
+        let line = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            if let Some(ed) = &mut v.sketch {
+                ed.selection = if curves { vec![line] } else { Vec::new() };
+            }
+            v.start_feature("extrude", w, cx);
+        }))
+        .unwrap();
+        let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+        let (body, picked) = cx.update(|cx| {
+            let p = &dialog.read(cx).feature.params;
+            (p.enum_("bodyType").to_string(), p.query("surfaceEntities").len())
+        });
+        assert_eq!((body.as_str(), picked), if curves { ("SURFACE", 1) } else { ("SOLID", 0) });
+    }
+}
+
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
 fn sketch_on_top_face(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>, Reference, u32, DVec2, DVec2) {

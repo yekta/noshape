@@ -2345,6 +2345,15 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// The open sketch's selected curves, when only curves are selected.
+    pub(super) fn selected_sketch_curves(&self, cx: &App) -> Vec<Reference> {
+        let (Some(ed), Some(d)) = (self.sketch.as_ref(), self.sketch_data(cx)) else { return Vec::new() };
+        if ed.selection.is_empty() || !ed.selected_regions.is_empty() || !ed.model_selection.is_empty() || !ed.selection.iter().all(|e| d.sketch.curve(*e).is_some()) {
+            return Vec::new();
+        }
+        ed.selection.iter().map(|e| Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).collect()
+    }
+
     /// Accept the sketch and return references to all its regions.
     pub(super) fn finish_sketch(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Vec<Reference> {
         let Some(id) = self.sketch.as_ref().map(|s| s.feature) else { return Vec::new() };

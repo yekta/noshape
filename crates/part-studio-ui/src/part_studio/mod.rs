@@ -2959,9 +2959,13 @@ impl PartStudioView {
         }
         // Starting Extrude/Revolve from an open sketch finishes the sketch and
         // preselects all of its regions (Onshape behavior).
+        // Live (sketch-used-ctrl-multiselect s84): Extrude… with sketch curves selected takes those curves, as a surface.
+        let mut sketch_curves = false;
         if self.sketch.is_some() && type_id != "sketch" {
+            let curves = if type_id == "extrude" { self.selected_sketch_curves(cx) } else { Vec::new() };
             let regions = self.finish_sketch(window, cx);
-            self.selection = regions;
+            sketch_curves = !curves.is_empty();
+            self.selection = if sketch_curves { curves } else { regions };
         } else if self.edit.is_some() {
             // Live (ui-parity new-extrude-then-other-tool): the open feature is kept as with ✓.
             self.accept_open_dialog(window, cx);
@@ -2991,6 +2995,9 @@ impl PartStudioView {
                 ParamKind::Query { filter, .. } => Some(filter),
                 _ => None,
             }).collect();
+            if sketch_curves && feature.params.is("bodyType", "SOLID") {
+                feature.params.set("bodyType", ParamValue::Enum("SURFACE".into()));
+            }
             let mut sel = self.selection.clone();
             sel.extend(self.feature_preselection(&filters));
             preselected = !sel.is_empty();
