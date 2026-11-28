@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 09:3x UTC (ps79 rest). History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 11:4x UTC (qa's sketch-used rows). History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -35,13 +35,27 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 10:1x (start here)
-- NOT LANDED (land next, after 654fc768's result; origin/main..HEAD still holds the whole queued stack): 70cdee1dc9,
-  a4a3377bed (ps79 rest filed), f77dee71b3 (runner: per-format export memory + toast copy name; tools/tests/docs only).
-  Mac T1s for render + feel:: ran green on the tree (ps81; renderer change reverted after). Then: next-heaviest test memory,
-  Apply export rules (waits REQUESTS 05:3x), Realign retake (REQUESTS 09:3x).
-- QUEUED 654fc768 09:2x (lead reports; never poll): carries eb48c0df, 4562f16f, 826ae5fe (list matrix setup fix),
-  b1d690ee (test memory) and fd74228711 (Section view Items).
+## STATE 11-28 11:4x (start here)
+- QUEUED 3ff853aa 10:3x (654fc768 failed 09:44 on a rebase conflict; rebased clean on ab9dc25196, re-landed): Section view
+  Items fix, ps79 tickets, runner per-format export memory. Lead reports; never poll.
+- NOT LANDED (local, after 3ff853aa): 7569c85870 + b7de2964eb (Ctrl+click beside an open context menu: os_menu dismisses
+  and lets the press through, so the viewport reopens the menu there, as live's take s81-s84; the sketch menu and a
+  Ctrl+press take the used curve under the cursor (`used_curve_under_cursor`; the Ctrl+press sets ed.cursor from its own
+  position since the hover holds while a menu is open); tests feel::a_click_beside_an_open_context_menu_only_closes_it,
+  the_menu_over_a_used_line_takes_the_line_not_the_edge_under_it), dfc2419fb6 (used spline: no Insert spline points;
+  line + spline at its end: "Intersection angle" only; scene pair_readouts test), 912eb874e3 (ui_script reports the
+  Variable table panel's tables: hook variable_table_state -> VariableStudioView::ui_table, then the own untitled table).
+  Mac ps85/86/87/89 green (clippy + tests). ps88 replay: vs-ps-variable-table-after-edit tables match (step 1's live
+  "Where used" document.panel is a stale live state: tell qa/live); sketch-used-rclick-menu-spline and the readout match.
+- RUNNING ps90 (vibe2 replay, /root/psui-scratch/resp/ps90.log; JSONs vibe2:tmp/psui/ps90/a): check
+  sketch-used-ctrl-multiselect s81-s85 (live: menu reopened, selection 1, s84 Extrude 2 "Sketch curves to extrude" with
+  line + spline). Live's s81 menu lacks Construction/Extrude/Revolve (line + the arc?) ours may still differ there (our
+  menu reads the held hover). Then tick in TICKETS (qa rows "qa 11-28 10:5x"): SKETCH-USED-CTRL-CLICK-WITH-MENU-OPEN (if
+  s84 matches), VS-PS-VARIABLE-TABLE-EMPTY, MEASURE-LINE-SPLINE-INTERSECTION, SKETCH-USED-SPLINE-NO-INSERT-POINTS; land.
+- Open from qa's list: P3 ASM-INSERT-PANEL-PART-LIST (asm-insert-spline-part-ok s3-5; with ASM-INSERT-DIALOG-LIST).
+- TEST MEMORY DONE (ps83 on vibe2, 11-28 10:5x): the whole part-studio-ui binary peaks at 2.02 GB (was 3.75; earlyoom
+  kills were at 5.2-5.4). Heaviest single tests ~1.0-1.2 GB (two windows each): not worth more.
+- Then: Apply export rules (waits REQUESTS 05:3x), Realign retake (REQUESTS 09:3x), PICK-FACE-OVER-NEAR-EDGE (P3).
 - Section view (fd74228711): dialog fields are ui-script `field:` targets; a Parts list row goes into Items when
   active (selected till ✓), ignored with Section planes active; T1 a_part_row_goes_into_the_section_dialogs_items_field.
   ps78: section-view-exclude-part, -include-tab-part 7/8 (s2 hint: live 09:2x: a pick within ~0.6 s keeps it; a take race); SECTION-VIEW-NEXT-FIELD ticked.
@@ -60,16 +74,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - ps69 maker set: 7/13 match; the 6 that differ all have TICKETS rows (SKETCH-COINCIDENT-FREE-LINE-SLIDES,
   SKETCH-TANGENT-ARC-SPAN (skasm), SKETCH-DIM-CIRCLE-RIM-TOP (psui, waits REQUESTS 11-27 20:4x), UIP-COMPARE-*,
   extrude-offset-ring recorder owner). Nothing new.
-- TEST MEMORY (P2; earlyoom killed part-studio-ui tests at 5.2-5.4 GB on vibe2 11-27): ps70 whole binary maxrss
-  3.75 GB; the 4 heaviest tests kept a window per case alive. QUEUED b1d690ee: close_windows(cx) per case: dimension-tool
-  hover 3.2 -> 0.83 GB, dialogs matrix 1.4 -> 0.41, sketch tools matrix 1.2 -> 0.52, line-end dot 1.2 -> 0.80 (ps73).
-  Next heaviest are single-window GPU tests ~0.8-0.9 GB each (lavapipe targets); median 0.22 GB.
 - Export left open: Apply export rules live off (REQUESTS 05:3x/06:0x), EXPORT-REMEMBERED-START (Millimeter),
   export-step-spline-part s4 derived tolerances (same remembered class), import toast timing (REQUESTS 04:1x).
-- NEXT (lead 09:3x): the ps79 diffs above: pattern feature reapply titleState, Sweep thin trim row state, asm Realign
-  focus (rerun: /root/psui-scratch/resp/ps79.sh; JSONs scp from vibe2:tmp/psui/ps79/a). Commit 03593bd589 (tickets +
-  handoff, docs only) is NOT landed: land it with the next change. Then EXPORT-N-PARTS-DIALOG's Apply export rules
-  default (live), PICK-FACE-OVER-NEAR-EDGE (REQUESTS 11-27 08:46).
 - Verified before: ps55 config 7/19; ps56 33/50 681/828; ps57 export 30/38; ps60 custom-deviation, chordal-zero,
   file-name-blank, stl-download match. Left for live: REQUESTS "psui 11-28 01:5x", "04:1x", "05:3x";
   EXPORT-REMEMBERED-START (Units Meter vs live's remembered Millimeter).
