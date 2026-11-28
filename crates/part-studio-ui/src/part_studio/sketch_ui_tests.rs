@@ -1755,12 +1755,16 @@ fn renaming_a_variable_updates_its_references_unless_unticked(cx: &mut TestAppCo
             }
         }));
         draw(cx, window);
+        // Live var-rename-used-variable s16: the parity state reads the box under Name.
+        let fields = cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)["fields"].clone()).unwrap();
+        let shown: Vec<(String, serde_json::Value)> = fields.as_array().unwrap().iter().take(3).map(|f| (f["label"].as_str().unwrap_or_default().to_string(), f["checked"].clone())).collect();
         cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
         wait_until(cx, window, |cx| !view.read(cx).ui_busy());
-        before
+        (before, shown)
     };
-    let before = rename(cx, "b", false);
+    let (before, shown) = rename(cx, "b", false);
     assert_eq!((before, depth(cx)), (Some(("a".to_string(), true)), "#b".to_string()), "(the box as the dialog opened, Extrude 1's depth) after a → b ticked");
+    assert_eq!(shown[1], ("Update all references".to_string(), serde_json::json!(true)), "{shown:?}");
     rename(cx, "c", true);
     assert_eq!(depth(cx), "#b", "b → c unticked: the reference keeps b");
 }

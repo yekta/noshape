@@ -246,6 +246,12 @@ impl FeatureDialog {
                     // variable-type-number-any: "number").
                     let kind = if self.ty.id == "assignVariable" && s.id == "anyValue" { "number" } else { "text" };
                     fields.push(json!({ "label": label, "kind": kind, "text": text, "focused": focused, "state": "ok" }));
+                    // Live var-rename-used-variable s16: a renamed Variable's ticked box under its Name.
+                    if s.id == "name"
+                        && let Some(on) = self.update_references_shown()
+                    {
+                        fields.push(json!({ "label": "Update all references", "kind": "boolean", "checked": on, "state": "ok" }));
+                    }
                 }
                 ParamKind::Query { .. } => {
                     let refs = values.query(s.id).to_vec();

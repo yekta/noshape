@@ -2879,13 +2879,16 @@ impl FeatureDialog {
         }
     }
 
+    /// The "Update all references" box's tick, when it shows (the edited Variable's name changed).
+    pub(crate) fn update_references_shown(&self) -> Option<bool> {
+        let (initial, on) = self.var_rename.as_ref()?;
+        (self.feature.params.text("name").trim() != initial.trim()).then_some(*on)
+    }
+
     /// The edited Variable's "Update all references" checkbox, under its Name once that changed (live skasm
     /// variables-1125 (1): ticked, the references follow; unticked they keep the old name).
     fn render_update_references(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (initial, on) = self.var_rename.clone()?;
-        if self.feature.params.text("name").trim() == initial.trim() {
-            return None;
-        }
+        let on = self.update_references_shown()?;
         let cb = crate::ui::os_checkbox_focused(SharedString::from("var-update-refs"), "", on, false)
             .child(div().flex_1().min_w_0().ml(px(-4.)).mr(px(6.)).truncate().child("Update all references"))
             .rounded(px(2.))
