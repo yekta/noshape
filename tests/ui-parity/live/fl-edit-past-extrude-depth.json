@@ -1,6 +1,6 @@
 {
  "scenario": "fl-edit-past-extrude-depth",
- "recorded": "2026-11-28T06:50:16.582Z",
+ "recorded": "2026-11-28T15:04:04.411Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -9,15 +9,15 @@
    1919,
    992
   ],
-  "recorder": "2026-11-14.2 4002f36a + live2 2026-11-28.6"
+  "recorder": "2026-11-14.2 5ca3cf24 + live2 2026-11-28.11"
  },
  "live": {
-  "document": "644517511b64134f38edd2ae",
-  "workspace": "b3f761018dee07404eee9fb0",
-  "element": "1de092f6d9c8f79865940ce9",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "d37f106367b2c3317eb0dfaf",
   "start": "spline-parts",
-  "startElement": "4cc7f5c4bb654fbe3d052189",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "31d0399087613ead5fb4e013",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -143,7 +143,7 @@
     -120.936,
     80.624
    ],
-   "width_mm": 468.121,
+   "width_mm": 361.514,
    "height_mm": 247.911,
    "mmPerPixel": 0.279809,
    "orthographic": true
@@ -218,12 +218,12 @@
     }
    },
    "ok": true,
-   "ti": 26313,
-   "tmove": 26720,
+   "ti": 24671,
+   "tmove": 25032,
    "moves": 1,
-   "tdown": 27018,
+   "tdown": 25322,
    "at": [
-    70,
+    451,
     313
    ],
    "state": {
@@ -272,7 +272,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -370,7 +370,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -551,7 +551,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -616,8 +616,8 @@
      ]
     }
    },
-   "t": 58701,
-   "te": 58701
+   "t": 57076,
+   "te": 57077
   },
   {
    "step": 2,
@@ -626,7 +626,7 @@
     "until": "dialog"
    },
    "ok": true,
-   "ti": 58701,
+   "ti": 57077,
    "state": {
     "focus": {
      "kind": "field",
@@ -673,7 +673,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -771,7 +771,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -952,7 +952,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -1017,8 +1017,8 @@
      ]
     }
    },
-   "t": 111847,
-   "te": 111847
+   "t": 109772,
+   "te": 109772
   },
   {
    "step": 3,
@@ -1028,7 +1028,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 111847,
+   "ti": 109772,
    "state": {
     "focus": {
      "kind": "field",
@@ -1075,7 +1075,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -1173,7 +1173,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -1354,7 +1354,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -1419,8 +1419,8 @@
      ]
     }
    },
-   "t": 143826,
-   "te": 143826
+   "t": 141648,
+   "te": 141648
   },
   {
    "step": 4,
@@ -1431,12 +1431,12 @@
     }
    },
    "ok": true,
-   "ti": 143826,
-   "tmove": 143873,
+   "ti": 141648,
+   "tmove": 141697,
    "moves": 1,
-   "tdown": 144329,
+   "tdown": 142111,
    "at": [
-    359,
+    740,
     257
    ],
    "state": {
@@ -1491,7 +1491,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -1589,7 +1589,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -1770,7 +1770,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -1835,8 +1835,8 @@
      ]
     }
    },
-   "t": 175550,
-   "te": 175550
+   "t": 173518,
+   "te": 173518
   },
   {
    "step": 5,
@@ -1845,14 +1845,14 @@
     "key": "mod+a"
    },
    "ok": true,
-   "ti": 175550,
+   "ti": 173518,
    "pointer": {
     "at": [
-     358,
+     739,
      257
     ],
     "hover": [
-     "FXeUTPwNfEXKq1a_0"
+     "FhLkuz4k0hZWm5c_0"
     ],
     "element": "input.os-param-number.dropdown-source"
    },
@@ -1908,7 +1908,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -2006,7 +2006,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -2187,7 +2187,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -2252,8 +2252,8 @@
      ]
     }
    },
-   "t": 206929,
-   "te": 206929
+   "t": 204557,
+   "te": 204557
   },
   {
    "step": 6,
@@ -2262,8 +2262,8 @@
     "text": "30"
    },
    "ok": true,
-   "ti": 206929,
-   "tdown": 206930,
+   "ti": 204557,
+   "tdown": 204557,
    "state": {
     "focus": {
      "kind": "field",
@@ -2316,7 +2316,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -2414,7 +2414,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -2595,7 +2595,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -2660,8 +2660,8 @@
      ]
     }
    },
-   "t": 238254,
-   "te": 238254
+   "t": 235694,
+   "te": 235694
   },
   {
    "step": 7,
@@ -2670,18 +2670,18 @@
     "key": "Enter"
    },
    "ok": true,
-   "ti": 238254,
+   "ti": 235694,
    "pointer": {
     "at": [
-     358,
+     739,
      257
     ],
     "hover": [
-     "FXeUTPwNfEXKq1a_0"
+     "FhLkuz4k0hZWm5c_0"
     ],
     "element": "input.os-param-number.dropdown-source"
    },
-   "tdown": 238261,
+   "tdown": 235700,
    "state": {
     "focus": {
      "kind": "field",
@@ -2734,7 +2734,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -2832,7 +2832,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -3013,7 +3013,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -3078,8 +3078,8 @@
      ]
     }
    },
-   "t": 269374,
-   "te": 269374
+   "t": 267109,
+   "te": 267109
   },
   {
    "step": 8,
@@ -3089,7 +3089,7 @@
     "ms": 2000
    },
    "ok": true,
-   "ti": 269374,
+   "ti": 267109,
    "state": {
     "focus": {
      "kind": "field",
@@ -3142,7 +3142,7 @@
        "label": "Faces and sketch regions to extrude",
        "kind": "query",
        "items": [
-        "Faces of Sketch 1"
+        "Face of Sketch 1"
        ],
        "active": true,
        "state": "ok"
@@ -3240,7 +3240,7 @@
         "label": "Faces and sketch regions to extrude",
         "kind": "query",
         "items": [
-         "Faces of Sketch 1"
+         "Face of Sketch 1"
         ],
         "active": true,
         "state": "ok"
@@ -3421,7 +3421,7 @@
       -114.478,
       76.318
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -3486,8 +3486,8 @@
      ]
     }
    },
-   "t": 302450,
-   "te": 302450
+   "t": 300230,
+   "te": 300230
   },
   {
    "step": 9,
@@ -3498,12 +3498,12 @@
     }
    },
    "ok": true,
-   "ti": 302450,
-   "tmove": 302500,
+   "ti": 300230,
+   "tmove": 300281,
    "moves": 1,
-   "tdown": 302900,
+   "tdown": 300678,
    "at": [
-    424,
+    805,
     93
    ],
    "state": {
@@ -3630,7 +3630,7 @@
       -120.936,
       80.624
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -3695,8 +3695,8 @@
      ]
     }
    },
-   "t": 304904,
-   "te": 304904
+   "t": 302729,
+   "te": 302729
   },
   {
    "step": 10,
@@ -3705,7 +3705,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 304904,
+   "ti": 302729,
    "state": {
     "focus": {
      "kind": "none"
@@ -3830,7 +3830,7 @@
       -120.936,
       80.624
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -3895,8 +3895,8 @@
      ]
     }
    },
-   "t": 309285,
-   "te": 309285
+   "t": 307115,
+   "te": 307115
   },
   {
    "step": 11,
@@ -3906,7 +3906,7 @@
     "ms": 1200
    },
    "ok": true,
-   "ti": 309285,
+   "ti": 307115,
    "state": {
     "focus": {
      "kind": "none"
@@ -4031,7 +4031,7 @@
       -120.936,
       80.624
      ],
-     "width_mm": 468.121,
+     "width_mm": 361.514,
      "height_mm": 247.911,
      "mmPerPixel": 0.279809,
      "orthographic": true
@@ -4096,11 +4096,11 @@
      ]
     }
    },
-   "t": 312354,
-   "te": 312354
+   "t": 310141,
+   "te": 310141
   }
  ],
- "t0_epoch_ms": 1795848596274,
+ "t0_epoch_ms": 1795878225197,
  "end_data": {
   "features": [
    {
