@@ -2605,7 +2605,7 @@ fn torus_face_inferences_lie_on_the_axis() {
 }
 
 /// Live probe-mcq (11-27): on a fit spline's extruded side (a B-spline face) the connector snaps to its edges' ends and
-/// midpoints, Z along the edge (the end vertex is the edge with the vertex, POINT), never the face's centroid.
+/// midpoints, Z along the edge (a corner is its straight side's point, POINT), never the face's centroid.
 #[test]
 fn spline_face_inferences_are_its_edges_points() {
     use super::eval::inference_candidates;
@@ -2624,10 +2624,10 @@ fn spline_face_inferences_are_its_edges_points() {
     let show = || pts.iter().map(|p| (p.reference.clone(), p.frame.origin * 1e3, p.frame.z())).collect::<Vec<_>>();
     assert!(pts.iter().all(|p| !matches!(&p.reference, Reference::Implicit { inference: Inference::Centroid, .. })), "{:#?}", show());
     let end = pts.iter().find(|p| p.frame.origin.distance(DVec3::new(0.04, 0.03, 0.0)) < 1e-7).unwrap_or_else(|| panic!("the spline's end: {:#?}", show()));
-    assert!(matches!(end.align, Some(Reference::Edge(_))) && matches!(&end.reference, Reference::Implicit { inference: Inference::Vertex, .. }));
+    // Live asm-mc-on-spline-face: "Edge of Part 1 <1>", the straight side's point, Z up that side.
+    assert!(matches!(&end.reference, Reference::Implicit { inference: Inference::Vertex | Inference::VertexEnd, on } if matches!(**on, Reference::Edge(_))), "{:#?}", show());
     assert_eq!(pts.iter().filter(|p| p.frame.origin.distance(end.frame.origin) < 1e-7).count(), 1, "the corner once: {:#?}", show());
-    // The natural spline's end tangent: (-18, 15) per unit of its parameter.
-    assert!(end.frame.z().dot(DVec3::new(-18.0, 15.0, 0.0).normalize()) > 1.0 - 1e-6, "{:#?}", end.frame.z());
+    assert!(end.frame.z().dot(DVec3::Z) > 1.0 - 1e-6, "{:#?}", end.frame.z());
     // Edge midpoints run the way the side's loop does (live spline-fillet-asm: bottom +y, top -y).
     for (z, y) in [(0.0, 1.0), (0.02, -1.0)] {
         let mid = pts.iter().find(|p| (p.frame.origin - DVec3::new(0.052, 0.015, z)).length() < 2e-4).unwrap_or_else(|| panic!("the midpoint at z {z}: {:#?}", show()));

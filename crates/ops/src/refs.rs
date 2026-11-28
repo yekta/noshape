@@ -81,10 +81,11 @@ fn inference_name(i: Inference) -> &'static str {
         Inference::MidAxis => "mid_axis",
         Inference::BottomAxis => "bottom_axis",
         Inference::Origin => "origin",
+        Inference::VertexEnd => "vertex_end",
     }
 }
 
-pub const INFERENCES: [Inference; 10] = [Inference::Centroid, Inference::CenterRim, Inference::CenterOutward, Inference::Center, Inference::Midpoint, Inference::Vertex, Inference::TopAxis, Inference::MidAxis, Inference::BottomAxis, Inference::Origin];
+pub const INFERENCES: [Inference; 11] = [Inference::Centroid, Inference::CenterRim, Inference::CenterOutward, Inference::Center, Inference::Midpoint, Inference::Vertex, Inference::TopAxis, Inference::MidAxis, Inference::BottomAxis, Inference::Origin, Inference::VertexEnd];
 
 /// The id of a reference.
 pub fn to_id(r: &Reference) -> String {

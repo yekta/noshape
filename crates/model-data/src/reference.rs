@@ -211,6 +211,9 @@ pub enum Inference {
     MidAxis,
     BottomAxis,
     Origin,
+    /// An edge's end ([`Inference::Vertex`] is its start), Z back along the edge from that end (live asm-mc-on-spline-
+    /// face: a corner as its straight side's POINT, Z up the side from it).
+    VertexEnd,
 }
 
 /// A persistent selection of one entity.

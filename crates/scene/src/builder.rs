@@ -2340,7 +2340,7 @@ impl InferenceMark {
     pub fn new(origin: DVec3, x: DVec3, z: DVec3, of: &Reference) -> Self {
         use noshape_model::reference::Inference;
         let shape = match of {
-            Reference::Implicit { inference: Inference::Vertex, .. } => MarkShape::Corner,
+            Reference::Implicit { inference: Inference::Vertex | Inference::VertexEnd, .. } => MarkShape::Corner,
             Reference::Implicit { inference: Inference::Midpoint, on } if matches!(**on, Reference::Edge(_)) => MarkShape::Midpoint,
             _ => MarkShape::Point,
         };

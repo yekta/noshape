@@ -2156,8 +2156,9 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                             .filter(|(_, faces)| faces.contains(&fi))
                             .filter_map(|(ei, _)| Some((ei, b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei).ok()?.edge_info().ok()?)))
                             .collect();
-                        // A corner once, Z along its curved edge (live: the spline's end, not the straight side's).
-                        edges.sort_by_key(|(_, info)| matches!(info.curve, noshape_kernel::Curve::Line { .. }));
+                        // A corner once, as its straight side's point, Z along that side (live asm-mc-on-spline-face: "Edge
+                        // of Part 1 <1>", a POINT on the straight edge, the block Fastened there turned Z up the side).
+                        edges.sort_by_key(|(_, info)| !matches!(info.curve, noshape_kernel::Curve::Line { .. }));
                         let mut corners: HashSet<usize> = HashSet::new();
                         for (ei, info) in edges {
                             let Some(en) = b.edges.get(ei) else { continue };
@@ -2169,12 +2170,23 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                             if info.closed {
                                 continue;
                             }
+                            let line = matches!(info.curve, noshape_kernel::Curve::Line { .. });
                             for (vi, edges) in vertex_edges.iter().enumerate() {
                                 if edges.contains(&(ei as u32))
                                     && let Some(vn) = b.vertices.get(vi)
                                     && corners.insert(vi)
                                 {
-                                    refs.push((implicit(&Reference::Vertex((**vn).clone()), Inference::Vertex), Some(edge_ref.clone())));
+                                    let at = b.shape.sub_shape(noshape_kernel::ShapeType::Vertex, vi).ok().and_then(|v| v.vertex_point().ok());
+                                    let side_end = at.and_then(|p| match () {
+                                        _ if p.distance(info.start) < 1e-9 => Some(Inference::Vertex),
+                                        _ if p.distance(info.end) < 1e-9 => Some(Inference::VertexEnd),
+                                        _ => None,
+                                    });
+                                    if line && let Some(inf) = side_end {
+                                        refs.push((implicit(&edge_ref, inf), None));
+                                    } else {
+                                        refs.push((implicit(&Reference::Vertex((**vn).clone()), Inference::Vertex), Some(edge_ref.clone())));
+                                    }
                                 }
                             }
                         }

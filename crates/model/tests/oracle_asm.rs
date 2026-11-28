@@ -447,7 +447,7 @@ fn connectors(p: usize) -> Vec<(&'static str, &'static str, [f64; 3], Inference,
 fn onshape_inference(i: Inference) -> &'static str {
     match i {
         Inference::Centroid => "CENTROID",
-        Inference::Vertex => "POINT",
+        Inference::Vertex | Inference::VertexEnd => "POINT",
         Inference::Midpoint => "MID_POINT",
         Inference::Center | Inference::CenterOutward | Inference::CenterRim => "CENTER",
         Inference::MidAxis => "MID_AXIS_POINT",

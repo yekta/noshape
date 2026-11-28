@@ -66,7 +66,7 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             match info.curve {
                 // Arcs and circles: the center, except an arc's midpoint
                 // (Onshape offers center, midpoint and ends on an arc).
-                k::Curve::Circle { center, axis, .. } if !matches!(inference, Inference::Midpoint | Inference::Vertex) => {
+                k::Curve::Circle { center, axis, .. } if !matches!(inference, Inference::Midpoint | Inference::Vertex | Inference::VertexEnd) => {
                     let outward = match inference {
                         Inference::CenterRim => rim_z(ev, bi, ei, info.start),
                         Inference::CenterOutward => rim_normal(ev, bi, ei, info.start, axis.normalize()),
@@ -76,9 +76,12 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
                 }
                 _ => {
                     let mid = e.point_at((info.first_param + info.last_param) * 0.5).ok()?;
-                    let p = if matches!(inference, Inference::Vertex) { info.start } else { mid };
                     let t = e.tangent_at((info.first_param + info.last_param) * 0.5).ok().unwrap_or(DVec3::X);
-                    Some(mk(p, t))
+                    match inference {
+                        Inference::Vertex => Some(mk(info.start, t)),
+                        Inference::VertexEnd => Some(mk(info.end, -e.tangent_at(info.last_param).ok().unwrap_or(t))),
+                        _ => Some(mk(mid, t)),
+                    }
                 }
             }
         }

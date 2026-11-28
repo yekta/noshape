@@ -42,7 +42,7 @@ pub fn choose(s: &OnScreen, pointer: DVec2, entered: bool) -> Option<usize> {
         Reference::Edge(_) if matches!(s.points.first(), Some((Reference::Implicit { inference: Inference::CenterRim, .. }, _))) => {
             near.filter(|(i, r, _)| *i == 0 || matches!(r, Reference::Implicit { inference: Inference::Midpoint, .. })).min_by(|a, b| a.2.length().total_cmp(&b.2.length()))
         }
-        Reference::Edge(_) => near.filter(|(i, r, _)| *i == 0 || matches!(r, Reference::Implicit { inference: Inference::Vertex, .. })).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
+        Reference::Edge(_) => near.filter(|(i, r, _)| *i == 0 || matches!(r, Reference::Implicit { inference: Inference::Vertex | Inference::VertexEnd, .. })).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
         _ => None,
     };
     Some(best.map_or(0, |(i, ..)| i))

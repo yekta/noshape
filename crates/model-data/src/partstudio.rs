@@ -61,7 +61,7 @@ impl ConnectorOrigin {
         use crate::reference::Inference as I;
         let Reference::Implicit { on, inference } = point else { return Self::plain(point.clone()) };
         let kind = match (inference, align.is_some()) {
-            (I::Vertex, _) => "POINT",
+            (I::Vertex | I::VertexEnd, _) => "POINT",
             (I::Midpoint, _) => "MID_POINT",
             (I::Center | I::CenterOutward | I::CenterRim, _) => "CENTER",
             (I::Centroid, true) => "LOOP_CENTER",
