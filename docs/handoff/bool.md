@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-28 00:40 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-28 04:20 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -12,20 +12,23 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
+## qa v0.4.74 compat GO (11-28, TICKETS 78f2947df6): BOOL-FREEFORM-SECTIONS-SLOWER closed, BOOL-TURN-SPLIT-SLOWER P0 -> P2
+(standoffs 1.40 -> 1.23 s, nuts 0.62 -> 0.66, helical 0.31 -> 0.37). Watch rows: gamma-imported 2.98 -> 3.31 s (+11 %),
+wire-clip-imported 2.87 -> 3.42 s (+19 %): under the human-scale bar (>= 2x); look only if they grow.
+
 ## P0 SPEED vs 0.4.73: LANDED (ccf1a1ed4d marcher opt-in NOSHAPE_BOOL_MARCH=1, f06939ddf6, fd7f64569e; 11-27 21:16)
 - GAMMA lens LANDED 36f67e584d (gamma / wire-clip Boolean 2 886 -> 884 faces as live).
 
-## DECLINES (state 11-28 00:40 UTC; lead: fix the 4 still declining, re-run the 21 inconclusive on green)
+## DECLINES (state 11-28 04:20 UTC; lead: fix the 4 still declining, re-run the 21 inconclusive on green)
 - Recheck dir /root/bool-scratch/nf (own copies of qa's nfrecheck.py / clifuzz_nf.py; bin/nfrecheck2.py = OTHER-OP rows
   only (NFONLY=<earlier out>) + "seen n": the reason anywhere in the run). 0.4.73: 16 GONE, 21 OTHER-OP, 4 STILL.
-- 1846 "cones meeting at an apex": FIXED 8eae4ef17c (brep cyl_cyl), LANDING 00:40 (gate clean: replay +0 -0, decline
-  reasons 0, suite 138 = 138 (its 2 changed docs = the lens already on main), shells 6 = 6, crates pass; knurls 5/5 0).
+- 1846 "cones meeting at an apex": LANDED f717eee428 (brep cyl_cyl).
 - 1192 "a non-manifold result" (a Fillet's common: 265 deg revolve with a torus face x half-space through its axis 0.955
   deg off its end cap): OCCT's section pcurve on the torus a turn up in v (2pi + pi/2), judged outside the face -> cut
   face a slit. FIXED 96623e8260 (section pcurves on a periodic free-form face moved by whole turns into its uvbox; T1
   bool_patterns::a_half_space_through_a_revolves_axis_beside_its_torus_end, recorded 9b6188a28c438ccf, fails without;
-  bool_patterns 179, brep 68). GATING on vibex8 (unit bool-gate-96623e8260 from 00:35, chain-96623e8260.out); then
-  knurls (kn-after.sh is vibex7-pathed: adapt to vibex8's gate dirs), then land both (bool-fb) and report.
+  bool_patterns 179, brep 68). LANDING 04:20 (gate 96623e826: replay +0 -0, decline
+  reasons 0, suite 138 = 138 (its 2 changed docs = the lens already on main), shells 6 = 6, crates pass; knurls 5/5 0).
 - 1247 "an internal face": left to OCCT (Draft's defeaturing leaves 2 INTERNAL faces; OCCT's common keeps them).
 - 1256 "no clean ray": no longer reached (path changes at step 36).
 - 1234 "no point inside a face piece": minimised 69 -> 4 args (dump1234 decl7-{1,28,29,49}); arg 1 carries 4.7 um
@@ -33,8 +36,13 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
   its inside. Needs a tolerant arrangement: left to OCCT for now.
 - 21 OTHER-OP rerun on green 291923892 (nfrecheck-green.out): all still OTHER-OP (path build-dependent). Seen elsewhere in
   the run: 1192 non-manifold x4 (fixed above), 1192 "an edge on another argument's free-form face" x2 (its dumped cut
-  dump1192/decl0 is ours and valid with default options on bool-fb, OCCT's invalid: recheck with a CLI of 96623e8260),
+  dump1192/decl0 is ours and valid with default options on bool-fb, OCCT's invalid: recheck with a CLI of the 1192 fix: NEXT),
   2282 "OCCT's section failed" x1 (OCCT's). The other 18 not reached by their seeds.
+- core's IMPELLER-FILLET-FAILS-SLOWER (P2; c2-impeller-loft "Extrude Bohrungssitz Ansaugflansch" 2.9 s vs 0.5 s): real
+  run's fuse (1 + 9) declines "a face's vertex off its plane": feature 43 "Fillet Flansch zum Stroemungskanal" leaves 6
+  vertices at z -3.6 mm on the z -4 mm floor face, tolerance 1.14 mm (over our 1 mm cap). Core owns it (01:15: OCCT's fillet kept as-is
+  after its tightening failed; core now rejects one with a vertex looser than the radius). Case vibex8 ~/tmp/bool/imp/rec/37856d1eca7a031b; tools /root/bool-scratch/bin/plane_vertices.py (a .brep's
+  plane faces' vertex distances), imp-vx.py / imp-tol.py (per-feature rollback + query).
 - Probe tools (never commit): probe diffs /root/bool-scratch/probe-nm-1192.diff, probe-nm2-1192.diff (brep),
   probe-test-1192.diff (bool_replay probe_decl_pairs); dump CLI /root/bool-scratch/nf/cli-nf (catch(...) decline dump,
   NOSHAPE_PROBE_DECLINE_DUMP=<dir>, stderr "PROBE decl<n> op <0 fuse|1 cut|2 common>").
