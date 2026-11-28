@@ -13901,6 +13901,263 @@ bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, bool periodic)
 }
 } // namespace
 
+namespace
+{
+// A rigid map T of face `f`'s (u, v) onto surface `s`'s, s(T(u, v)) = f's surface at (u, v) at nine points inside f:
+// a shift, or a mirror where `flips` (a mirrored copy of a torus or revolved surface runs its (u, v) the other way).
+bool uv_onto(const TopoDS_Face& f, const occ::handle<Geom_Surface>& s, const TopLoc_Location& sl, gp_Trsf2d& T, bool& flips)
+{
+  TopLoc_Location                 fl;
+  const occ::handle<Geom_Surface> fs = BRep_Tool::Surface(f, fl);
+  double                          u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  const gp_Trsf  to_s = sl.Transformation().Inverted() * fl.Transformation();
+  auto           at   = [&](double a, double b) { return gp_Pnt2d(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b); };
+  const gp_Pnt2d mid  = at(0.5, 0.5);
+  GeomAPI_ProjectPointOnSurf pr(fs->Value(mid.X(), mid.Y()).Transformed(to_s), s);
+  if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > 1e-7)
+    return false;
+  double mu, mv;
+  pr.LowerDistanceParameters(mu, mv);
+  for (const auto& [su, sv] : {std::pair{1, 1}, {-1, 1}, {1, -1}, {-1, -1}})
+  {
+    gp_Trsf2d m;
+    if (su < 0 && sv < 0)
+      m.SetMirror(gp::Origin2d());
+    else if (su < 0)
+      m.SetMirror(gp_Ax2d(gp::Origin2d(), gp_Dir2d(0, 1)));
+    else if (sv < 0)
+      m.SetMirror(gp_Ax2d(gp::Origin2d(), gp_Dir2d(1, 0)));
+    gp_Trsf2d t;
+    t.SetTranslation(mid.Transformed(m), gp_Pnt2d(mu, mv));
+    const gp_Trsf2d c  = t * m;
+    bool            ok = true;
+    for (const double a : {0.2, 0.5, 0.8})
+      for (const double b : {0.2, 0.5, 0.8})
+      {
+        const gp_Pnt2d p = at(a, b), q = p.Transformed(c);
+        ok = ok && s->Value(q.X(), q.Y()).Distance(fs->Value(p.X(), p.Y()).Transformed(to_s)) <= 1e-7;
+      }
+    if (ok)
+    {
+      T     = c;
+      flips = su * sv < 0;
+      return true;
+    }
+  }
+  return false;
+}
+} // namespace
+
+OpOut op_merge_coincident_revolutions(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  auto kind = [](const TopoDS_Shape& f) {
+    const occ::handle<Geom_Surface> g = untrimmed(BRep_Tool::Surface(TopoDS::Face(f)));
+    return g.IsNull() ? 0 : g->IsKind(STANDARD_TYPE(Geom_ToroidalSurface)) ? 1 : g->IsKind(STANDARD_TYPE(Geom_SurfaceOfRevolution)) ? 2
+                     : g->IsKind(STANDARD_TYPE(Geom_CylindricalSurface))  ? 3
+                                                                             : 0;
+  };
+  BRepBuilderAPI_Copy cp(s.shape, false, false);
+  const TopoDS_Shape  c  = cp.Shape();
+  HHist               hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s.shape}), cp);
+  carry_kept_marks(s.shape, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
+  ShapeIMap faces;
+  TopExp::MapShapes(c, TopAbs_FACE, faces);
+  ShapeAncMap ef;
+  unique_ancestors(c, TopAbs_EDGE, TopAbs_FACE, ef);
+  // Each face's group (its first face's index; 0: none), and how a face moved onto the group's surface maps onto it.
+  const int              n = faces.Extent();
+  std::vector<int>       group(n + 1, 0);
+  std::vector<bool>      moved(n + 1, false), flipped(n + 1, false);
+  std::vector<gp_Trsf2d> uv(n + 1);
+  // Each group's surface (the whole one under a trim: a pipe's torus is trimmed to its face) at its first face's index.
+  std::vector<occ::handle<Geom_Surface>> surf(n + 1);
+  std::vector<TopLoc_Location>           surf_loc(n + 1);
+  bool                                   any = false;
+  for (int i = 1; i <= n; ++i)
+  {
+    if (group[i] != 0 || kind(faces(i)) == 0)
+      continue;
+    group[i] = i;
+    TopLoc_Location                 sl;
+    const occ::handle<Geom_Surface> own = BRep_Tool::Surface(TopoDS::Face(faces(i)), sl);
+    const occ::handle<Geom_Surface> S   = untrimmed(own);
+    surf[i]                             = S;
+    surf_loc[i]                         = sl;
+    moved[i]                            = S != own;
+    bool             joined             = false;
+    std::vector<int> todo{i};
+    while (!todo.empty())
+    {
+      const int f = todo.back();
+      todo.pop_back();
+      for (TopExp_Explorer e(faces(f), TopAbs_EDGE); e.More(); e.Next())
+      {
+        const ShapeList* fs = ef.Seek(e.Current());
+        if (fs == nullptr || fs->Extent() != 2)
+          continue;
+        const int j = faces.FindIndex(fs->First().IsSame(faces(f)) ? fs->Last() : fs->First());
+        if (j == 0 || group[j] != 0 || kind(faces(j)) != kind(faces(i)))
+          continue;
+        TopLoc_Location                 l;
+        const occ::handle<Geom_Surface> js = BRep_Tool::Surface(TopoDS::Face(faces(j)), l);
+        bool                            flips = false;
+        if (untrimmed(js) == S && l.IsEqual(sl))
+          moved[j] = js != S;
+        else if (uv_onto(TopoDS::Face(faces(j)), S, sl, uv[j], flips))
+          moved[j] = true;
+        else
+          continue;
+        group[j]   = i;
+        flipped[j] = flips;
+        joined     = true;
+        todo.push_back(j);
+      }
+    }
+    // (A face alone stays on its own surface.)
+    moved[i] = moved[i] && joined;
+    any      = any || joined;
+  }
+  if (!any)
+    return make_result({s.shape}, s.shape, nullptr);
+  BRep_Builder B;
+  // Per edge, its curve on the group's surface and its orientation in the face that put it there.
+  std::map<std::pair<const TopoDS_TShape*, const Geom_Surface*>, std::pair<occ::handle<Geom2d_Curve>, TopAbs_Orientation>> on;
+  for (int i = 1; i <= n; ++i)
+  {
+    if (group[i] == 0 || moved[i])
+      continue;
+    const TopoDS_Face f = TopoDS::Face(faces(i).Oriented(TopAbs_FORWARD));
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge ed = TopoDS::Edge(e.Current());
+      double            a, b;
+      if (!BRep_Tool::IsClosed(ed, f))
+        on[{ed.TShape().get(), surf[group[i]].get()}] = {BRep_Tool::CurveOnSurface(ed, f, a, b), ed.Orientation()};
+    }
+  }
+  occ::handle<BRepTools_ReShape>      rs = new BRepTools_ReShape;
+  std::map<const TopoDS_TShape*, int> group_of;
+  for (int i = 1; i <= n; ++i)
+  {
+    if (group[i] == 0)
+      continue;
+    if (!moved[i])
+    {
+      group_of[faces(i).TShape().get()] = group[i];
+      continue;
+    }
+    const occ::handle<Geom_Surface>& S  = surf[group[i]];
+    const TopLoc_Location&           sl = surf_loc[group[i]];
+    const TopoDS_Face                f  = TopoDS::Face(faces(i).Oriented(TopAbs_FORWARD));
+    TopoDS_Face                     g;
+    B.MakeFace(g, S, sl, BRep_Tool::Tolerance(f));
+    for (TopoDS_Iterator w(f); w.More(); w.Next())
+      B.Add(g, flipped[i] ? w.Value().Reversed() : w.Value());
+    g.Orientation(flipped[i] ? TopAbs_REVERSED : TopAbs_FORWARD);
+    // Whole periods along the surface to meet a face already on it across an edge (the map lands a face's middle within
+    // the surface's first period: the other half of a revolve met its first a turn away), the other edges seams.
+    gp_Trsf2d T = uv[i];
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge ed = TopoDS::Edge(e.Current());
+      const auto        it = on.find({ed.TShape().get(), S.get()});
+      if (it == on.end() || BRep_Tool::IsClosed(ed, f))
+        continue;
+      double     f0, f1;
+      const auto c1 = BRep_Tool::CurveOnSurface(ed, f, f0, f1);
+      if (c1.IsNull())
+        break;
+      const double   mid = (f0 + f1) / 2;
+      const gp_Pnt2d a = it->second.first->Value(mid), p = c1->Value(mid).Transformed(T);
+      const double   du = S->IsUPeriodic() ? std::round((a.X() - p.X()) / S->UPeriod()) * S->UPeriod() : 0.0;
+      const double   dv = S->IsVPeriodic() ? std::round((a.Y() - p.Y()) / S->VPeriod()) * S->VPeriod() : 0.0;
+      gp_Trsf2d      shift;
+      shift.SetTranslation(gp_Vec2d(du, dv));
+      T = shift * T;
+      break;
+    }
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge ed = TopoDS::Edge(e.Current());
+      double            f0, f1;
+      const auto        c1 = BRep_Tool::CurveOnSurface(ed, f, f0, f1);
+      if (c1.IsNull())
+        return make_result({s.shape}, s.shape, nullptr);
+      const occ::handle<Geom2d_Curve> m1  = occ::down_cast<Geom2d_Curve>(c1->Transformed(T));
+      const TopAbs_Orientation        o   = flipped[i] ? TopAbs::Reverse(ed.Orientation()) : ed.Orientation();
+      const double                    tol = BRep_Tool::Tolerance(ed);
+      if (BRep_Tool::IsClosed(ed, f))
+      {
+        // A seam of this face: both its curves mapped.
+        const auto c2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(ed.Reversed()), f, f0, f1);
+        if (c2.IsNull())
+          return make_result({s.shape}, s.shape, nullptr);
+        const occ::handle<Geom2d_Curve> m2 = occ::down_cast<Geom2d_Curve>(c2->Transformed(T));
+        B.UpdateEdge(ed, o == TopAbs_FORWARD ? m1 : m2, o == TopAbs_FORWARD ? m2 : m1, S, sl, tol);
+        B.Range(ed, S, sl, f0, f1);
+        continue;
+      }
+      const auto key = std::make_pair(ed.TShape().get(), S.get());
+      const auto it  = on.find(key);
+      if (it == on.end())
+      {
+        B.UpdateEdge(ed, m1, S, sl, tol);
+        B.Range(ed, S, sl, f0, f1);
+        on[key] = {m1, o};
+        continue;
+      }
+      // Met before from another face of the group: the same place in (u, v), or across the period (a seam of the merged face).
+      const auto& [other, oo] = it->second;
+      const double mid        = (f0 + f1) / 2;
+      if (other->Value(mid).Distance(m1->Value(mid)) <= 1e-7)
+        continue;
+      const bool first = oo == TopAbs_FORWARD;
+      B.UpdateEdge(ed, first ? other : m1, first ? m1 : other, S, sl, tol);
+      B.Range(ed, S, sl, f0, f1);
+    }
+    rs->Replace(f, g);
+    group_of[g.TShape().get()] = group[i];
+  }
+  const TopoDS_Shape in = rs->Apply(c);
+  // Only edges between two faces of one group go, and the vertices only they reach.
+  ShapeAncMap re;
+  unique_ancestors(in, TopAbs_EDGE, TopAbs_FACE, re);
+  auto group_at = [&](const TopoDS_Shape& f) {
+    const auto it = group_of.find(f.TShape().get());
+    return it == group_of.end() ? 0 : it->second;
+  };
+  ShapeUpgrade_UnifySameDomain u(in, true, true, false);
+  ShapeIMap                    free;
+  for (int i = 1; i <= re.Extent(); ++i)
+  {
+    const ShapeList& fs = re(i);
+    const int        a  = fs.Extent() == 2 ? group_at(fs.First()) : 0;
+    if (a != 0 && a == group_at(fs.Last()))
+      TopExp::MapShapes(re.FindKey(i), TopAbs_VERTEX, free);
+    else
+      u.KeepShape(re.FindKey(i));
+  }
+  ShapeIMap vs;
+  TopExp::MapShapes(in, TopAbs_VERTEX, vs);
+  for (int i = 1; i <= vs.Extent(); ++i)
+    if (!free.Contains(vs(i)))
+      u.KeepShape(vs(i));
+  keep_marked_edges(u, in);
+  u.Build();
+  carry_kept_marks(in, u);
+  if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+    return make_result({s.shape}, s.shape, nullptr);
+  HHist hist = new BRepTools_History();
+  hist->Merge(hc);
+  if (!rs->History().IsNull())
+    hist->Merge(rs->History());
+  if (!u.History().IsNull())
+    hist->Merge(u.History());
+  return make_result({s.shape}, u.Shape(), hist.get());
+}
+
 // Every face on a cylinder, cone, sphere or torus bounded, its seams left out, by loops that close (each vertex begins
 // as many of its edges as it ends): a Parasolid face has no seams (a cylinder merged across a thread's helix pieces is
 // bounded through its seam: NIST's cap screw).

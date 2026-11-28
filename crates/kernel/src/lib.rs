@@ -62,7 +62,7 @@ pub use noshape_brep::nurbs::NurbsSurface;
 pub use brep_bridge::{brep_body, stop_state, with_stop_state, StopState, last_ahead, last_blend_decline, last_marched, last_rust_decline, reset_blend_decline, set_boolean_march, set_boolean_no_tree, set_boolean_slab, set_rust_blend, set_rust_boolean, set_rust_boolean_only};
 pub use boolean::{
     BooleanOp, BooleanOptions, Glue, boolean, common, cut, fuse, fuse_all, imprint, imprint_kept, mark_kept_edges, project_curves, section, face_pair_sections,
-    kernel_profile_mark, last_boolean_path, set_kernel_profile, exit_now, last_unify_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, split_on, unify_same_domain, unify_same_domain_whole, unify_same_domain_precise, join_edges, join_edges_at, merge_on_surfaces, collapse_short_edges, canonical_edges, Conic, join_target_seam_splits, unify_edges, with_blend_budget, with_call_budget, with_section_work, with_work, last_section_work, with_cancel, with_deadline, thread_cancelled, DeclineMemo, DeclineScope,
+    kernel_profile_mark, last_boolean_path, set_kernel_profile, exit_now, last_unify_path, section_caps, set_parallel_booleans, section_plane, section_wires, split, split_by_plane, split_on, unify_same_domain, unify_same_domain_whole, unify_same_domain_precise, join_edges, join_edges_at, merge_on_surfaces, merge_coincident_revolutions, collapse_short_edges, canonical_edges, Conic, join_target_seam_splits, unify_edges, with_blend_budget, with_call_budget, with_section_work, with_work, last_section_work, with_cancel, with_deadline, thread_cancelled, DeclineMemo, DeclineScope,
 };
 pub use construct::*;
 pub use error::{KernelError, Result};

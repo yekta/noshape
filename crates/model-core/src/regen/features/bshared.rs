@@ -6,7 +6,7 @@ use crate::display::BodyKind;
 use crate::naming::{Name, ShapeNames};
 use crate::reference::{BodyId, FeatureId, Reference, Role, Source, TopoName};
 use crate::regen::context::Body;
-use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, kernel_plane, split_solids};
+use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, kernel_plane, names_for, split_solids};
 use glam::{DVec2, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
@@ -271,7 +271,13 @@ pub fn join_surface(ev: &mut EvalCtx, tool: NamedShape, scope: Vec<usize>) -> FR
     let mut args: Vec<ShapeNames> = targets.iter().map(|&i| ev.ctx.bodies[i].shape_names()).collect();
     args.push(tool.names.clone());
     let arg_refs: Vec<&ShapeNames> = args.iter().collect();
-    let names = ev.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
+    let sewn = ev.name_result(&arg_refs, &res.history, &res.shape, &BTreeMap::new(), None);
+    // Mirrored or rotated copies of one revolved surface that the join brings together are one face, as live's
+    // (c2-surf-workshop-britatap's Fill - Top: the pipe's and head's halves on each side of Mirror 1's plane); coplanar
+    // faces stay apart (c2-surf-intro-mutualtrim's Ruled surface 3).
+    let revs = k::merge_coincident_revolutions(&res.shape)?;
+    let names = ev.name_result(&[&names_for(&res.shape, sewn)], &revs.history, &revs.shape, &BTreeMap::new(), None);
+    let res = revs;
     let first = ev.ctx.bodies[targets[0]].clone();
     let kind = if res.shape.count(ShapeType::Solid) > 0 { BodyKind::Solid } else { BodyKind::Surface };
     let pieces = split_solids(&res.shape, &names, Some(ev.feature));

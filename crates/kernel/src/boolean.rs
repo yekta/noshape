@@ -595,6 +595,13 @@ pub fn merge_on_surfaces(shape: &Shape, ons: &[Shape], tol: f64) -> Result<OpRes
     Ok(OpResult::from_ffi(ck(ffi::op_merge_on_surfaces(shape.raw(), &l, tol))?))
 }
 
+/// Neighbouring faces on one cylinder, torus or surface of revolution held by copies of it, mirrored ones too, put on one
+/// and merged (Mirror's half of a pipe joined to the other: OCCT's unify merges tori and revolved faces only on one
+/// surface); the shape as it was where there are none or the result isn't valid.
+pub fn merge_coincident_revolutions(shape: &Shape) -> Result<OpResult> {
+    Ok(OpResult::from_ffi(ck(ffi::op_merge_coincident_revolutions(shape.raw()))?))
+}
+
 /// A conic: an ellipse (a circle where its radii are equal) in the plane through `centre` across `normal`, its major
 /// axis along `major_dir`.
 #[derive(Debug, Clone, Copy)]

@@ -2115,6 +2115,46 @@ fn boundary_surface_profiles_are_trimmed_where_they_meet() {
     assert!((area - 1200.0).abs() < 1e-6, "{area} mm²");
 }
 
+/// Faces of one revolved surface that a surface Add brings together are one face, as live's (c2-surf-workshop-britatap's
+/// Fill - Top joins Mirror 1's halves of the head and the pipe to the others: one face each): half an ellipse, or a line
+/// along the axis, revolved 90° and, added, 90° the other way (on a surface whose u runs the other way) is one face of
+/// both halves' area.
+#[test]
+fn a_surface_add_merges_the_faces_of_one_revolved_surface() {
+    let revolved = |cylinder: bool, both: bool| {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let arc = if cylinder {
+            sk.add_line(DVec2::new(0.03, -0.01), DVec2::new(0.03, 0.01)).0
+        } else {
+            sk.add_elliptical_arc(DVec2::new(0.03, 0.0), DVec2::new(0.01, 0.0), 0.006, -PI / 2.0, PI / 2.0).0
+        };
+        let axis = sk.add_line(DVec2::new(0.0, -0.02), DVec2::new(0.0, 0.02)).0;
+        let sk = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        for add in [false, true].into_iter().take(if both { 2 } else { 1 }) {
+            s.add("revolve", move |p| {
+                p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+                p.set("surfaceOperationType", ParamValue::Enum(if add { "ADD" } else { "NEW" }.into()));
+                p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sk, entity: arc }]));
+                p.set("axis", ParamValue::Query(vec![Reference::SketchEntity { sketch: sk, entity: axis }]));
+                p.set("fullRevolve", ParamValue::Bool(false));
+                p.set("angle", expr("90 deg"));
+                p.set("oppositeDirection", ParamValue::Bool(add));
+            });
+        }
+        let r = s.ok();
+        let sheets: Vec<usize> = r.context.bodies.iter().enumerate().filter(|(_, b)| b.kind == BodyKind::Surface).map(|(i, _)| i).collect();
+        assert_eq!(sheets.len(), 1);
+        (r.context.bodies[sheets[0]].shape.faces().len(), surface_area(&r, sheets[0]))
+    };
+    for cylinder in [false, true] {
+        let (faces, area) = revolved(cylinder, true);
+        assert_eq!(faces, 1, "cylinder {cylinder}");
+        let half = revolved(cylinder, false).1;
+        assert!((area - 2.0 * half).abs() < 1e-6 * area, "cylinder {cylinder}: {area} m², halves {half}");
+    }
+}
+
 /// A surface Extrude of one sketch curve (blind, symmetric when `both`), Add or New.
 fn sheet_of(s: &mut Studio, plane: DatumPlane, a: (f64, f64), b: (f64, f64), depth: &'static str, both: bool, add: bool) {
     let mut sk = noshape_sketch::Sketch::new();

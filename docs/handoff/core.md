@@ -1,30 +1,35 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-28 06:42 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-28 07:32 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 11-28 06:42
-QUEUED (vibe2): 57ac5e13 (core-g2mac: impeller round tol, slanted-end test, britatap Delete face 2), 96b23e35 (core-uip3
-stack: + a4b415977f britatap Split 3 and 6788d1346d parity cPoint sub-feature vertex before live's id; carries
-features.cpp from 57ac5e13, queued before the Mac rule), bc95a9cf (core-g2mac2 from main: G2 sphere-fill T1 band
-5 % -> 10 %: Mac arm64 gives 5.8 %, Linux 1.2 %, G1 26 %; Mac kernel tests 617/1 before, the test passes after).
+## IN FLIGHT 11-28 07:32
+QUEUED (vibe2): 57ac5e13 (core-g2mac: impeller round tol, slanted-end test, britatap Delete face 2), 96b23e35 (Split 3 +
+parity cPoint vertex), bc95a9cf (core-g2mac2: G2 sphere-fill T1 band 5 % -> 10 %: Mac arm64 5.8 %, Linux 1.2 %, G1 26 %),
+3a62fc14 (core-uip3, 7 commits incl. the 96b23e35 stack: Boundary surface trim_profiles(): in a 2x2 network each profile
+split where the other direction's profiles meet it inside, overhangs pruned; T1 features_b::boundary_surface_profiles_
+are_trimmed_where_they_meet fails without it; corpus A/B ALL-SAME; model 672/0). No kernel change -> no Mac run.
 NEW RULE (lead 11-28, DECISIONS): any crates/kernel or crates/brep change (or their tests) runs that crate's tests once on
 the Mac (NOSHAPE_RB_HOST=mac, .mk.sh in core-uip3) before land.sh.
-britatap (parity 14/22): #14 Side blend curve now matches. #15 Bridge patch - Top WIP UNCOMMITTED in core-uip3:
-surfaces.rs trim_profiles(): in a 2x2 network each profile is split (k::split by vertices) where the other direction's
-profiles meet it inside, overhangs pruned; held conditions use the original edge's support for its pieces. Britatap: #15
-builds with live's 5/20/16 (was ERROR), area 25577.80 vs live 25621.04 (-0.17 %); #16 same; next diffs Fill - Top
-13/31/18 vs live 9/17/8 (live merges mirrored same-surface faces?), Fill - Bottom/Pipe end "not a closed loop".
-New T1 features_b::boundary_surface_profiles_are_trimmed_where_they_meet (planar 40x30 rectangle) RUNNING (.bst.sh,
-vibex7): check it passes, and fails without the fix; then corpus A/B (.bab.sh pattern) + commit + land.
-Remaining #15 gap: the V1 NORMAL_TO_PROFILE row is unheld (warning). Tried support = V1 piece extruded both ways along
-its sketch normal (Tangent): warning gone but area identical to 1e-6 -> unverified, removed. Live's bsurf likely a
-Hermite Coons with magnitude 1, not our fair fill: a bigger item.
-Probe: vibex7 ~/tmp/core/pbt/{cli (debug build, rebuild), save/ (britatap, 600)}, ~/tmp/core/lib (bp.py edges of a
-feature's profiles, parts.py, sg.py). features.cpp debug prints were restored (orig copy /root/core-scratch).
-#12 Extrude 1 PARKED (sketch solve minimal-move choice: live's control points <= 9 um off ours).
-Cleanup when done: vibex7 ~/tmp/core/pbt, vibex8 ~/tmp/core/bt (cli + britatap copy), worktrees core-g2mac/core-g2mac2
-after their lands.
+LEAD NOT TOLD (lead at 601k at 07:00): the lands above; Mac rule applied (bc95a9cf); #14 done; #15 trimmed (live's 5/20/16,
+area -0.17 %).
+britatap (parity 14/22, first diff #12 Extrude 1 PARKED: sketch minimal-move choice). #15 Bridge patch - Top builds;
+remaining gap: V1 NORMAL_TO_PROFILE unheld (warning; live's bsurf likely Hermite Coons, bigger item).
+WIP UNCOMMITTED core-uip3 (kernel change: Mac run .mk.sh needed): bshared.rs join_surface() after the sew runs
+k::merge_coincident_revolutions (NEW boolean.cpp op_merge_coincident_revolutions: neighbouring torus / revolution faces
+whose surface coincides (uv_onto: a rigid (u, v) map, shift or mirror, 9 points, onto the group's UNTRIMMED surface) put
+on one surface, pcurves mapped, loops reversed where mirrored, whole-period shift to meet a placed neighbour, seams
+across the period; unify of only those edges) then k::unify_same_domain (cylinders). britatap Fill - Top 9/17/8 = live
+(was 13/31/18); head 11944.27 vs live 11934.85; Fill - Pipe end builds; Fill - Bottom "Select laminar edges" (stale
+refs in the 07:02 save? re-save). T1 features_b::a_surface_add_merges_the_faces_of_one_revolved_surface (half ellipse
+revolved +-90 deg, Add: 1 face, area 2 x half; fails without: 2 faces; a circle's arc doesn't: OCCT merges tori).
+LANDING 08:12: "core: a surface Add merges faces of one revolved surface, torus or cylinder" (merge_coincident_revolutions,
+called from join_surface; no general unify there: live keeps coplanar planes apart, c2-surf-intro-mutualtrim). Checks:
+britatap Fill - Top 9 faces, kernel 624/0, model 673/0, g++-13 ok, corpus ALL-SAME, Mac kernel 617/1 (only the G2
+sphere test, fixed by queued bc95a9cf). Log /root/core-scratch/land-mcr.log.
+Probe: vibex7 ~/tmp/core/pbt/{cli, save/ (britatap re-saved 07:02 with the trim, 600)}, ~/tmp/core/lib (fq.py faces
+after features with type/area, parts.py, bp.py, fg.py). Live data: vibex7 ~/parity/models/c2-surf-workshop-britatap.
+Cleanup when done: vibex7 ~/tmp/core/pbt, vibex8 ~/tmp/core/bt, worktrees core-g2mac/core-g2mac2 after their lands.
 ## REPORT PENDING (lead at 395k at 20:40: not messaged): pulleys fix QUEUED 96280303. Earlier (16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
 (errors only when pieces < 2 AND an INTERNAL face/edge remains = a slit). Both said to lead 17:3x in thread.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
