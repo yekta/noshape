@@ -1,29 +1,26 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-27 18:20 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 00:35 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## P0 NOW (11-27 23:36 UTC): SKETCH-USED-CURVES-NOT-SELECTABLE (lead: land by ~03:00 for the 05:00 cut; then the 2 mate-connector P2s)
-- ROOT CAUSES (replay of qa's sketch-used-click-line / box-select-window on a debug build, /root/skasm-scratch/bin/uipdbg.sh <ps-ui test> <names>):
-  (1) CLICK: the press finds the used line (hovered = near = entity 2) but the editor takes a constraint GLYPH press instead:
-      tool_up drag = Glyph { constraint: ConstraintId(3221225474) (0xC0000002, a synthetic glyph id: the used/projected glyph at the curve's
-      middle?), entity 2, moved: false } -> no selection. FIX NEXT: find that glyph (scene sketch_mode.rs: who makes ids 0xC000_0000+, its hit
-      test in tool_down before the Pending arm ~2918) and let a press on a used curve's glyph select the curve (live: SKETCH_ENTITY), or not hit it.
-  (2) BOX: works in-app (6 entities selected); the report said "EDGE Part 1": ui_script.rs mapped a selected external entity to its source ref.
-      FIXED (skasm, uncommitted): only reference_only entities read as their linked ref.
-  (3) Use on the hole's rim (25.9,20.1,10, iso): hover = Sketch 1's circle REGION seen through the hole -> "That geometry can't be used".
-      Fix tried (sketch.rs Use press: Face/SketchRegion/None hover -> model_edge_at) did NOT help: model_edge_at returned None there. Debug next.
-- GPU test a_used_edges_line_is_clicked_and_boxed_in_its_sketch (sketch_ui_tests.rs, in BOTH skasm and skasm-main; skasm copy updated: click
-  toggles twice per hover case, window box round the line ends, ui_state SKETCH_ENTITY check) PASSES in skasm: it doesn't hit the glyph (top
-  view, injected events). Add a case pressing where the glyph is drawn.
-- TEMP DEBUG in skasm to REMOVE before commit: eprintln "DBG" in part_studio/sketch.rs (ToolDown, ToolUp x2, use_reference failure) and
-  scene sketch_mode.rs (tool_up, finish_dimension).
-- Land plan: port ui_script.rs fix + glyph fix + test to skasm-main (branch skasm-used-pick), commit "skasm: ...", land.sh from there.
-- Batch-6 open in skasm: a_lines_length_takes_zero: the first solve doesn't converge (LM; Length row at 0, comp_conflicts -> retry excludes it ->
-  Overconstrained [len]), solver.rs redundant patch is NOT the path (revert it). Zero-size rect test fixed (the Point was the Origin reference).
-- Queued after the P0 (qa): ASM-MC-FRAME-ON-CURVED-FACES (P2, TICKETS 5e91031091), ASM-MATE-ERROR-ROW (P3), ASM-MC-SPLINE-FACE-ORIGIN-ENTITY
-  (P2, TICKETS 0b38b93171: live snaps the B-spline face click at (52,15,10) to an inferred POINT on a nearby edge; probe
-  /root/live2-scratch/l24/mcq/out/probe-mcq.json), qa P2 SKETCH-INFERENCE-TANGENT-AND-SPLINE-HORIZONTAL.
+## NOW (11-28 00:35 UTC): P0 SKETCH-USED-CURVES-NOT-SELECTABLE QUEUED 258b4169 (skasm-main, branch skasm-used-pick, 3c88f1b8a2)
+- Cause: a Select press on a used curve's middle hit its use glyph (ids 0xC000_0000|entity, scene sketch_mode.rs use_glyph_id) and
+  released as a constraint-glyph click (no selection). Fix: tool_down turns a press on a curve's own use glyph into DragState::Pending
+  (toggles the curve). Scene test in used_geometry_shows_use_glyphs_and_deleting_one_unlinks_it; GPU test
+  a_used_edges_line_is_clicked_and_boxed_in_its_sketch. The box report fix (ui_script) was already on main (psui), dropped.
+- Not verified before queuing (vibex8 suite lock held by qa); replay run p0v.sh (/root/skasm-scratch/bin) queued on vibex8 for the
+  6 sketch-used-* takes. After it lands: drop the duplicate test/fix from skasm when rebasing; rm skasm-main's target if idle.
+- Still open: Use on the hole's rim (25.9,20.1,10): hover = Sketch 1's circle REGION seen through the hole; model_edge_at returned None
+  there (skasm sketch.rs Use press change kept, uncommitted; debug entities_along_ray hits next).
+- ASM-MC-SPLINE-FACE-ORIGIN-ENTITY (P2) drafted in skasm, untested: assembly eval.rs inference_candidates, B-spline/Bezier/Extrusion
+  faces offer their edges' midpoints and ends (end = POINT on the edge, align the edge), no centroid. Evidence: qa's FRAME rows decode
+  to live's connector at the spline end vertex (40,30,0) with Z = the natural spline's end tangent (-18,15) (block fastened), and at
+  Fillet 2's top edge midpoint (50,15,20), Z along it. Test spline_face_inferences_are_its_edges_points (assembly tests.rs). Then
+  ASM-MC-FRAME-ON-CURVED-FACES (likely mostly the same root), ASM-MATE-ERROR-ROW (P3).
+- Batch-6 open in skasm: a_lines_length_takes_zero: the first solve doesn't converge (LM; Length row at 0, comp_conflicts -> retry
+  excludes it -> Overconstrained [len]); solver.rs redundant patch is NOT the path (revert it). DBG prints removed.
+- qa P2 SKETCH-INFERENCE-TANGENT-AND-SPLINE-HORIZONTAL queued.
+
 ## NOW (11-27 19:50 UTC)
 - QUEUED (lead reports): 1748d8ca (skasm-base, ASM-MISTAKE-ERRORS), fdd7c592 (spline Horizontal). Landed: f06aa0b2.
 - A/B NOT RUN: the abrun.sh task hit the 2 h background limit at 20:2x still waiting for vibex8's slot (qa's 17:48 suite held it). Restart it step by step after the tests (each abb.sh / abs2.sh call its own background run; skasm-main is on branch skasm-snap-wake2 or detached main, check before building): ~/tmp/skasm/ab-base/score.log vs ab-new/score.log on vibex8; land skasm-snap-wake2 only if new >= base; then rm ~/tmp/skasm/ns-base ns-new.
