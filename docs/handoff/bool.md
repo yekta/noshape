@@ -75,32 +75,21 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   133 -> 133, speed 1.00-1.01x, shells 6, crates pass, knurls 0. Rebased onto main as ab9ee9b3f (brep_bridge/lib.rs
   conflict with stage 2's MARCH resolved: AHEAD counted at the top of Occt::ahead, last_ahead next to last_marched).
   ab9ee9b3f retested 11:23: impeller test 0.18 s, kernel 621/621, brep 68/68; landing (land.sh vibe2).
-- GAMMA EDGES (11-28 06:09): main 884/2409/1348 vs live 884/2405/1344 = 4 degree-2 vertices (probe dump
-  /root/bool-scratch/gamma-topo-before.txt). (1)+(2) x 47.765 y -35.533/-29.533: 52 mm line + 20 um of a 12 mm circle
-  between two planes -> FIX COMMITTED b037dba73 (worktree bool-uv, branch bool-gline on main 176b711a5; merge_planar's
-  line_of takes a curve within 1e-7 m of its chord; T1 boolean_groups::a_round_twenty_microns_under_a_flat_top_joins_its_line,
-  fails without the fix; GCC 13 ok). GATE RUNNING: unit bool-gate-b037dba73 (vibex8, /root/bool-hat-scratch/
-  chain-b037dba73.out; restarted 06:15); then knurls: bash /root/bool-scratch/kn-after8.sh b037dba73 kn6; Mac kernel tests
-  (DECISIONS 11-28): DONE 618/619, the one failure surfacing::a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere
-  (5.836 % off) also without b037dba73 (Mac-only, not ours). When all clean: land from bool-uv (this handoff commit on top), report.
-  (3) x 132.031 y 294.267 z -7.764: two 2 mm collinear lines between plane x 132.03 and a quarter cylinder USD merged
-  from two; probe (env NOSHAPE_PROBE_V): neither kept nor input; OCCT USD (even edges-only, again) won't join them:
-  IsMergingPossible checks the chain's chord against the first piece's direction within Precision::Angular 1e-12 rad,
-  and the lines are 1e-12 m apart (2.5e-10 rad over 4 mm). FIX COMMITTED 032db5675c in worktree bool-fb (branch
-  bool-probe3 on b037dba73; brep_replay.rs there holds an uncommitted probe: never commit): join_collinear_lines(s,
-  hist) in boolean.cpp, run at the end of unify_faces_in on rest()'s result always (also when rest changed nothing:
-  reversed profiles merge their faces earlier) and in the shared branch. Gamma probe: vertex (3) gone. T1
-  boolean_groups::stacked_rounded_blocks_unify_as_one_block (upper block 1e-12 m off) passes with, fails without
-  (/root/bool-scratch/jl-t1.sh); GCC 13 ok (/root/bool-scratch/gcc13-fb.sh). NEXT: after b037dba73 lands, cherry-pick
-  onto bool-uv, gate + knurls + Mac kernel tests, land.
-  (4) x -281.969: 2.5 um edge + 1.95 mm edge at an angle: two plates overlapping 50 um in z (-7.8136..-7.7636), each
-  with an r 4 quarter round, axes 2.5 um apart in y (path rust; input tolerances all 1e-7). Live (KIuD upper 2 mm,
-  KISF lower 1.95 mm) gives the overlap to the upper and puts the lower round's line at the upper's y (KISF box min y
-  294.264587 = upper's): a 2.5 um snap past the inputs' 1e-7. Ours keeps both lines and a 2.5 um step. To lead as
-  "decision needed: chase a 2.5 um snap?" with the b037dba73 report. Probe: probe_case_topo PROBE_SWAP (bool-fb,
-  uncommitted); case copy Mac ~/noshape-host/bool-keep/gam-rec (700).
-  Probe build: /root/bool-scratch/gv3.sh via rb.sh vibex7 from bool-fb (kt-gv3, case vibex7 ~/tmp/bool/gam-rec).
-- Cleanup after: vibex8 ~/tmp/bool/imp/rec; bool-uv / bool-ms2 / bool-fb targets once landed.
+- GAMMA EDGES (11-28 13:08): main was 884/2409/1348 vs live 884/2405/1344 = 4 degree-2 vertices (probe dump
+  /root/bool-scratch/gamma-topo-before.txt). (1)+(2) (52 mm line + 20 um of a 12 mm circle between two planes:
+  merge_planar's line_of takes a curve within 1e-7 m of its chord) LANDED 260e83c2cb. (3) (two 2 mm lines 1e-12 m apart
+  beside a USD-merged round: USD joins edges only within 1e-12 rad of the chord) join_collinear_lines, LANDING
+  8834ce750 (gate 27cb07f2d on vibex7: replay +0 -0, knurls 0, gamma/wire-clip -> 884/2406/1345; Mac kernel 619/620,
+  brep 68/68). (4) x -281.969: two plates overlapping 50 um in z (-7.8136..-7.7636), each with an r 4 quarter round,
+  axes 2.5 um apart in y (path rust; input tolerances all 1e-7). Live (KIuD upper 2 mm, KISF lower 1.95 mm) gives the
+  overlap to the upper and puts the lower round's line at the upper's y (KISF box min y 294.264587 = upper's): a 2.5 um
+  snap past the inputs' 1e-7; ours keeps both lines and a 2.5 um step. Asked lead "decision needed: chase a 2.5 um
+  snap?" (proposed: park). Probes (never commit): bool-fb brep_replay.rs probe_case_topo (PROBE_SWAP, PROBE_RAW),
+  probe_case_args; case copies Mac ~/noshape-host/bool-keep/gam-rec, vibex7 ~/tmp/bool/gam-rec (700).
+- MAC (DECISIONS 11-28): kernel + brep crate tests once on the Mac (NOSHAPE_RB_HOST=mac, one 6-job slot shared with skasm)
+  before land.sh. Main c2650a9a12 on the Mac: surfacing::a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere fails (5.836 %
+  off; not ours), the rest pass. Worktree bool-main (detached at main) for Mac main checks.
+- Cleanup after: vibex8 ~/tmp/bool/imp/rec, kt-gam; vibex7 ~/tmp/bool/kt-gv3, imp1; bool-uv / bool-ms2 / bool-fb targets once landed.
 
 ## NEXT (state 11-26 22:40 UTC)
 - IMPELLER MOVE FACE 1 (core P0 via lead): reported 22:15, NOT ours: the regen records the fuse as path occt, empty; ours
