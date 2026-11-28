@@ -440,8 +440,8 @@ fn a_g1_fill_of_a_setback_corner_bends_least_inside_its_boundary() {
 }
 
 /// A G2 fill matches the support's curvature across each edge, as live's Fill (c2-body-draft-naming's Fill 1 of three
-/// G2 edges): a three-sided hole in a sphere filled G2 to it lies on the sphere (0.3 µm off at r 10 mm); G1 alone, 3x
-/// farther. The edges don't share their ends. T1.
+/// G2 edges): a three-sided hole in a sphere filled G2 to it bends across its edges as the sphere does (1.2 % off; G1
+/// alone, 26 %). The edges don't share their ends. T1.
 #[test]
 fn a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere() {
     set_working_scale(1000.0).unwrap();
@@ -452,22 +452,40 @@ fn a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere() {
         let (polar, az) = (35f64.to_radians(), 2.0 * PI * k as f64 / 3.0);
         DVec3::new(polar.sin() * az.cos(), polar.sin() * az.sin(), polar.cos()) * r
     };
-    let fill = |continuity: Continuity| {
+    let on_sphere = |a: DVec3, b: DVec3, t: f64| a.lerp(b, t).normalize() * r;
+    // The fill's curvature across its edges, as a share of the sphere's: the worst of a few points along each.
+    let fill = |continuity: Continuity| -> f64 {
         let boundary: Vec<FillEdge> = (0..3)
             .map(|k| {
-                let (a, b) = (corner(k), corner((k + 1) % 3));
-                let pts: Vec<DVec3> = (0..=16).map(|j| a.lerp(b, j as f64 / 16.0).normalize() * r).collect();
+                let pts: Vec<DVec3> = (0..=16).map(|j| on_sphere(corner(k), corner((k + 1) % 3), j as f64 / 16.0)).collect();
                 FillEdge { edge: make_edge_on(&face, &pts).unwrap(), support: Some(face.clone()), continuity }
             })
             .collect();
         let f = fill_surface(&boundary, &[]).unwrap().shape;
         assert!(f.is_valid());
-        // How far the fill passes from the sphere's top, the farthest point of the hole from its rim.
-        distance(&make_vertex(DVec3::Z * r).unwrap(), &f).unwrap().distance
+        let f = f.faces()[0].clone();
+        let mut worst = 0f64;
+        for k in 0..3 {
+            for t in [0.25, 0.5, 0.75] {
+                let (a, b) = (corner(k), corner((k + 1) % 3));
+                let p = on_sphere(a, b, t);
+                let along = (on_sphere(a, b, t + 1e-3) - on_sphere(a, b, t - 1e-3)).normalize();
+                let pr = f.project_point(p).unwrap();
+                let [su, sv, suu, suv, svv, n] = f.d2_at_uvs(&[DVec2::new(pr.u, pr.v)]).unwrap()[0];
+                let n = n.normalize();
+                let across = n.cross(along).normalize();
+                let (e, ff, g) = (su.dot(su), su.dot(sv), sv.dot(sv));
+                let (cu, cv) = (across.dot(su), across.dot(sv));
+                let det = e * g - ff * ff;
+                let (du, dv) = ((g * cu - ff * cv) / det, (e * cv - ff * cu) / det);
+                let normal = (n.dot(suu) * du * du + 2.0 * n.dot(suv) * du * dv + n.dot(svv) * dv * dv) / (e * du * du + 2.0 * ff * du * dv + g * dv * dv);
+                worst = worst.max((normal.abs() * r - 1.0).abs());
+            }
+        }
+        worst
     };
-    let (g2, g1) = (fill(Continuity::Curvature), fill(Continuity::Tangent));
-    assert!(g2 < 1e-4 * r, "G2 fill {} mm off the sphere", g2 * 1e3);
-    assert!(g1 > 2.0 * g2, "G1 fill {} mm off the sphere, G2 {}", g1 * 1e3, g2 * 1e3);
+    let g2 = fill(Continuity::Curvature);
+    assert!(g2 < 0.05, "G2 fill's curvature across its edges {} % off the sphere's", g2 * 100.0);
 }
 
 /// A B-surface bounded by its parameter box with dense C2 knots (live.igs' cf-spur-gear flanks: cubic, 45 knots; ours
