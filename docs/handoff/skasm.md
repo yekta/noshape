@@ -3,7 +3,13 @@
 Updated 2026-11-28 02:47 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 02:47 UTC)
+## NOW (11-28 03:15 UTC)
+- QUEUED c6081900 (skasm, batch 6, T1s green: sketch, scene 277, ps-ui 18, asm-ui 6, clippy). Replays running in bg on
+  vibex8 via slot (uipr.sh in /root/skasm-scratch/bin, out ~/tmp/skasm/uip on vibex8: 6 sketch-used-* + 8 batch-6 takes).
+  If the bg task is gone after compaction: check `ssh vibex8 ~/bin/slot --status` / ~/tmp/skasm/uip/run.log before rerunning.
+- Next: SKETCH-INFERENCE-HORIZONTAL-RANGE (reach already +-7.5 px: replay rclick-line-circle-menu with logs to see the
+  source/zoom), SKETCH-SLOT-ON-SPLINE, SKETCH-OFFSET-DISTANCE-FROM-CLICK. SKETCH-INFERENCE-TANGENT-AND-SPLINE-HORIZONTAL:
+  nothing left (b landed, a not a gap).
 - LANDED 572c7b23 (P0 used-curve click). QUEUED a9e00c4f (skasm-main, branch skasm-mc-spline, 2 commits; 5508f938 failed):
   ASM-MC-SPLINE-FACE-ORIGIN-ENTITY (B-spline face: its edges' midpoints + ends, a corner once along its curved edge, no
   centroid) + the arc chooser (nearer of centre and midpoint: live Fillet 1 midpoint, hinge 270 deg arc centre). T1s green.
