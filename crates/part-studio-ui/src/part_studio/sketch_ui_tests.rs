@@ -8048,11 +8048,12 @@ fn a_used_edges_line_is_clicked_and_boxed_in_its_sketch(cx: &mut TestAppContext)
 #[gpui::test]
 fn the_menu_over_a_used_line_takes_the_line_not_the_edge_under_it(cx: &mut TestAppContext) {
     let (window, view, edge, pick, a, b) = sketch_on_top_face(cx, "used-line-menu", Tool::Use);
-    let mid = on_screen(cx, &view, (a + b) * 0.5);
+    // Off the midpoint: a Use there makes a point (live use-mid-1128).
+    let along = on_screen(cx, &view, a * 0.2 + b * 0.8);
     let m = Modifiers::default();
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
         let vp = v.viewport.clone();
-        for ev in [ViewportEvent::PointerMove { position: mid, modifiers: m }, ViewportEvent::Hover(Some(pick)), ViewportEvent::ToolDown { position: mid, modifiers: m, click_count: 1 }, ViewportEvent::ToolUp { position: mid, modifiers: m }] {
+        for ev in [ViewportEvent::PointerMove { position: along, modifiers: m }, ViewportEvent::Hover(Some(pick)), ViewportEvent::ToolDown { position: along, modifiers: m, click_count: 1 }, ViewportEvent::ToolUp { position: along, modifiers: m }] {
             if let ViewportEvent::PointerMove { position, .. } = ev {
                 vp.update(cx, |vp, _| vp.place_pointer(position));
             }
