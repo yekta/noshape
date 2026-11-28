@@ -2216,6 +2216,64 @@ fn split_of_a_sheet_by_a_tube_keeps_one_side() {
     assert!(near(got[0], disc, 1e-6) && near(got[1], 0.01 - disc, 1e-6), "{got:?}");
 }
 
+/// Profiles held tangent to the sheets they bound give the Coons patch blended across them (c2-surf-workshop-britatap's
+/// Bridge patch - Top): a 20 mm wide S-bridge from a flat sheet at z 0 to one at z 10 mm, whose V profiles are the edges
+/// of the S's own extrusion, is that extrusion, level with both sheets along their edges.
+#[test]
+fn boundary_held_tangent_to_two_sheets_is_their_s_bridge() {
+    let mut s = Studio::new();
+    let mm = |p: &[(f64, f64)]| p.iter().map(|q| DVec2::new(q.0, q.1) * 1e-3).collect::<Vec<_>>();
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.01, 0.0)).0;
+    let b = sk.add_line(DVec2::new(0.03, 0.01), DVec2::new(0.04, 0.01)).0;
+    let c = sk.add_bspline(&mm(&[(10.0, 0.0), (20.0, 0.0), (20.0, 10.0), (30.0, 10.0)]), 3).unwrap().0;
+    let sk = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    for e in [a, b, c] {
+        s.add("extrude", move |p| {
+            p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+            p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: sk, entity: e }]));
+            p.set("depth", expr("20 mm"));
+            p.set("symmetric", ParamValue::Bool(true));
+        });
+    }
+    let r = s.ok();
+    let sheets: Vec<usize> = (0..r.context.bodies.len()).filter(|&i| r.context.bodies[i].kind == BodyKind::Surface).collect();
+    assert_eq!(sheets.len(), 3);
+    let edge_at = |i: usize, p: DVec3| {
+        let body = &r.context.bodies[sheets[i]];
+        let v = noshape_kernel::make_vertex(p).unwrap();
+        let j = body.shape.edges().iter().position(|e| noshape_kernel::distance(&v, e).is_ok_and(|d| d.distance < 1e-9)).expect("edge");
+        Reference::Edge((*body.edges[j]).clone())
+    };
+    let face = |i: usize| Reference::Face((*r.context.bodies[sheets[i]].faces[0]).clone());
+    let u = [(edge_at(0, DVec3::new(0.01, 0.0, 0.0)), face(0)), (edge_at(1, DVec3::new(0.03, 0.0, 0.01)), face(1))];
+    let v = [edge_at(2, DVec3::new(0.02, 0.01, 0.005)), edge_at(2, DVec3::new(0.02, -0.01, 0.005))];
+    let bridge = surface_area(&r, sheets[2]);
+    s.add("boundarySurface", move |p| {
+        let row = |pre: &str, e: Reference, held: Option<Reference>| {
+            let mut x = ParamValues::default();
+            x.set(&format!("{pre}ProfileEntities"), ParamValue::Query(vec![e]));
+            x.set(&format!("{pre}Condition"), ParamValue::Enum(if held.is_some() { "MATCH_TANGENT" } else { "DEFAULT" }.into()));
+            x.set(&format!("{pre}Reference"), ParamValue::Query(held.into_iter().collect()));
+            x.set(&format!("{pre}Magnitude"), ParamValue::Expr(ExprValue::new("1")));
+            x
+        };
+        p.set("uProfilesArray", ParamValue::Array(u.into_iter().map(|(e, f)| row("u", e, Some(f))).collect()));
+        p.set("vProfilesArray", ParamValue::Array(v.into_iter().map(|e| row("v", e, None)).collect()));
+    });
+    let r = s.ok();
+    let patch = r.context.bodies.iter().rfind(|b| b.kind == BodyKind::Surface).unwrap();
+    let f = &patch.shape.faces()[0];
+    let area = f.area().unwrap();
+    assert!((area - bridge).abs() < 1e-5 * bridge, "patch {} mm2, the S's extrusion {} mm2", area * 1e6, bridge * 1e6);
+    for y in [-0.008, 0.0, 0.008] {
+        for p in [DVec3::new(0.01, y, 0.0), DVec3::new(0.03, y, 0.01)] {
+            let n = f.normal_at_point(p).unwrap();
+            assert!(n.cross(DVec3::Z).length() < 1e-4, "normal {n:?} at {p:?}");
+        }
+    }
+}
+
 /// Live L28: a U row "Normal to profile" on a part edge (no sketch plane)
 /// fails with loft.fs's planar-profile text; the same rows with None work.
 #[test]

@@ -777,20 +777,22 @@ fn trim_profiles(own: &[Vec<Shape>], other: &[Vec<Shape>]) -> FResult<Vec<Vec<(S
 }
 
 pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
-    let collect = |ev: &EvalCtx, array: &str, ents: &str, cond: &str| -> FResult<(Vec<Vec<Shape>>, bool)> {
+    let collect = |ev: &EvalCtx, array: &str, ents: &str, cond: &str, mag: &str| -> FResult<(Vec<Vec<Shape>>, bool, Vec<f64>)> {
         let mut out = Vec::new();
         let mut conditions = false;
+        let mut magnitudes = Vec::new();
         for item in ev.params.array(array) {
             let edges = curve_edges(ev, item.query(ents))?;
             if !edges.is_empty() {
                 out.push(edges);
+                magnitudes.push(ev.eval_num_in(item, mag, crate::params::NumKind::Real).unwrap_or(1.0));
             }
             conditions |= !matches!(item.enum_(cond), "" | "DEFAULT");
         }
-        Ok((out, conditions))
+        Ok((out, conditions, magnitudes))
     };
-    let (u, cu) = collect(ev, "uProfilesArray", "uProfileEntities", "uCondition")?;
-    let (v, cv) = collect(ev, "vProfilesArray", "vProfileEntities", "vCondition")?;
+    let (u, cu, mu) = collect(ev, "uProfilesArray", "uProfileEntities", "uCondition", "uMagnitude")?;
+    let (v, cv, mv) = collect(ev, "vProfilesArray", "vProfileEntities", "vCondition", "vMagnitude")?;
     // bsurf.fs: at least two profiles in all.
     if u.len() + v.len() < 2 {
         return crate::regen::eval::err_at(&["uProfilesArray", "vProfilesArray"], "Select edges to specify at least two profiles.");
@@ -886,10 +888,13 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
             sides = Some([pu.clone(), pu1, pv.clone(), pv1]);
         }
         // Live: the bilinearly blended Coons patch of the four sides (c2-surf-workshop-boundary's Boundary surface 1).
-        match sides.as_ref().filter(|_| !cu && !cv).map(k::coons_surface) {
-            Some(Ok(r)) => r.shape,
+        let at = |e: &Shape| held.iter().find(|h| h.edge.is_same(e)).cloned().unwrap_or(k::FillEdge { edge: e.clone(), support: None, continuity: k::Continuity::Position });
+        // Sides held to faces: the Coons patch blended by cubic Hermite across them (britatap's Bridge patch - Top).
+        let magnitudes = [mu.first(), mu.get(1).or(mu.first()), mv.first(), mv.get(1).or(mv.first())].map(|m| m.copied().unwrap_or(1.0));
+        let held_coons = sides.as_ref().filter(|s| !held.is_empty() && s.iter().all(|x| !x.is_empty())).and_then(|s| k::coons_surface_held(&s.clone().map(|side| side.iter().map(at).collect()), magnitudes).ok());
+        match (sides.as_ref().filter(|_| !cu && !cv).map(k::coons_surface), held_coons) {
+            (Some(Ok(r)), _) | (_, Some(r)) => r.shape,
             _ => {
-                let at = |e: &Shape| held.iter().find(|h| h.edge.is_same(e)).cloned().unwrap_or(k::FillEdge { edge: e.clone(), support: None, continuity: k::Continuity::Position });
                 let boundary: Vec<k::FillEdge> = all.iter().map(at).collect();
                 let free: Vec<k::FillEdge> = all.into_iter().map(|e| k::FillEdge { edge: e, support: None, continuity: k::Continuity::Position }).collect();
                 // (Profiles that don't close a boundary (two parallel U and one V) fill to an invalid sheet: refused.)

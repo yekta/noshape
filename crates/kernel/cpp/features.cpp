@@ -14048,6 +14048,29 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
       if (!g.IsNull() && BRep_Tool::Curve(ce, f1, l1) == g && std::abs(f1 - f0) < 1e-12 && std::abs(l1 - l0) < 1e-12)
         at = i;
     }
+    // (Or rebuilt on another curve: the copy with the same ends and middle. c2-surf-intro-fill's Fill 1 next to a held
+    // Boundary surface.)
+    if (at < 0)
+    {
+      const BRepAdaptor_Curve r(e);
+      const gp_Pnt            ra = r.Value(r.FirstParameter()), rb = r.Value(r.LastParameter());
+      const gp_Pnt            rm = r.Value((r.FirstParameter() + r.LastParameter()) / 2);
+      for (const auto& [ce, i] : copies)
+      {
+        const BRepAdaptor_Curve q(ce);
+        const gp_Pnt            qa = q.Value(q.FirstParameter()), qb = q.Value(q.LastParameter());
+        const double            tol = 1e-6;
+        if (!(ra.Distance(qa) < tol && rb.Distance(qb) < tol) && !(ra.Distance(qb) < tol && rb.Distance(qa) < tol))
+          continue;
+        double                        f1, l1;
+        const occ::handle<Geom_Curve> gc = BRep_Tool::Curve(ce, f1, l1);
+        if (gc.IsNull())
+          continue;
+        GeomAPI_ProjectPointOnCurve on(rm, gc, f1, l1);
+        if (on.NbPoints() > 0 && on.LowerDistance() < tol)
+          at = i;
+      }
+    }
     if (at < 0)
       return std::nullopt;
     const BRepAdaptor_Curve c(e);
@@ -14722,6 +14745,344 @@ OpOut op_coons(const OcShapeList& edges, rust::Slice<const uint32_t> counts)
   BRepBuilderAPI_MakeFace mf(surf, Precision::Confusion());
   if (!mf.IsDone())
     fail_op("Coons patch: no face");
+  std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
+  return make_result(args, mf.Face(), nullptr);
+}
+
+namespace
+{
+// One side of a held Coons patch: a chain of edges on t in [0, 1] by arc length, and per edge the face it is held to
+// (null: not held).
+struct HeldSide
+{
+  std::vector<BRepAdaptor_Curve> cs;
+  std::vector<bool>              rev;
+  std::vector<double>            len;
+  std::vector<double>            t0;  // where each edge starts in t; one more entry, 1
+  std::vector<TopoDS_Face>       sup;
+  std::vector<double>            sign;  // +1 where T x N runs away from the support's material
+  bool                           flip = false;
+  bool                           held = false;
+
+  size_t locate(double t, double& w) const
+  {
+    t        = flip ? 1 - t : t;
+    size_t i = 0;
+    while (i + 1 < cs.size() && t > t0[i + 1])
+      ++i;
+    const double x = (t - t0[i]) / (t0[i + 1] - t0[i]), a = cs[i].FirstParameter(), b = cs[i].LastParameter();
+    w              = rev[i] ? b - x * (b - a) : a + x * (b - a);
+    GCPnts_AbscissaPoint ap(cs[i], (rev[i] ? -x : x) * len[i], rev[i] ? b : a);
+    if (ap.IsDone())
+      w = ap.Parameter();
+    return i;
+  }
+  gp_Pnt at(double t) const
+  {
+    double       w;
+    const size_t i = locate(t, w);
+    return cs[i].Value(w);
+  }
+  gp_Vec d1(double t) const
+  {
+    double       w;
+    const size_t i = locate(t, w);
+    gp_Pnt       p;
+    gp_Vec       v;
+    cs[i].D1(w, p, v);
+    const double span = len[i] / std::max(1e-12, v.Magnitude()) / (t0[i + 1] - t0[i]);
+    return v * ((rev[i] != flip) ? -span : span);
+  }
+  // T x N at edge i's parameter w, or a null vector where the support's normal isn't defined there.
+  gp_Vec across_at(size_t i, double w, gp_Pnt& p) const
+  {
+    gp_Vec tg;
+    cs[i].D1(w, p, tg);
+    if (rev[i])
+      tg.Reverse();
+    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(sup[i]);
+    double                          u0, u1, v0, v1;
+    BRepTools::UVBounds(sup[i], u0, u1, v0, v1);
+    GeomAPI_ProjectPointOnSurf proj(p, s, u0, u1, v0, v1);
+    if (proj.NbPoints() == 0)
+      proj.Init(p, s);
+    if (proj.NbPoints() == 0)
+      return gp_Vec();
+    double a, b;
+    proj.LowerDistanceParameters(a, b);
+    gp_Pnt q;
+    gp_Vec su, sv;
+    s->D1(a, b, q, su, sv);
+    const gp_Vec d = tg.Crossed(su.Crossed(sv));
+    return d.Magnitude() < 1e-12 ? gp_Vec() : d.Normalized();
+  }
+  // The same, where the support is pinched to a point (c2-surf-workshop-pipe's Boundary surface - Bottom): its limit from
+  // a little way inside the edge.
+  gp_Vec raw_across(size_t i, double w, gp_Pnt& p) const
+  {
+    const double mid = 0.5 * (cs[i].FirstParameter() + cs[i].LastParameter());
+    for (const double f : {0.0, 1e-6, 1e-5, 1e-4, 1e-3})
+    {
+      const gp_Vec d = across_at(i, w + (mid - w) * f, p);
+      if (d.Magnitude() > 0.5)
+        return d;
+    }
+    return gp_Vec();
+  }
+  // Which way T x N leaves each support's material, tried a little way off each edge's middle.
+  bool find_signs()
+  {
+    sign.assign(cs.size(), 0.0);
+    for (size_t i = 0; i < cs.size(); ++i)
+    {
+      const double w   = 0.5 * (cs[i].FirstParameter() + cs[i].LastParameter());
+      const double eps = std::max(1e-6, 1e-3 * len[i]);
+      gp_Pnt       p;
+      const gp_Vec d = raw_across(i, w, p);
+      if (d.Magnitude() < 0.5)
+        return false;
+      const occ::handle<Geom_Surface> s = BRep_Tool::Surface(sup[i]);
+      for (const double side : {1.0, -1.0})
+      {
+        GeomAPI_ProjectPointOnSurf proj(p.Translated(d * (side * eps)), s);
+        if (proj.NbPoints() == 0)
+          continue;
+        double a, b;
+        proj.LowerDistanceParameters(a, b);
+        if (BRepClass_FaceClassifier(sup[i], gp_Pnt2d(a, b), 1e-9).State() == TopAbs_IN)
+        {
+          sign[i] = -side;
+          break;
+        }
+      }
+      if (sign[i] == 0.0)
+        return false;
+    }
+    return true;
+  }
+  // The unit direction continuing the support beyond the side at t, square to it in the support's tangent plane.
+  gp_Vec across(double t) const
+  {
+    double       w;
+    const size_t i = locate(t, w);
+    gp_Pnt       p;
+    return raw_across(i, w, p) * sign[i];
+  }
+};
+
+// The edges as one chain from an end, or false where they don't chain.
+bool held_side(const std::vector<TopoDS_Edge>& es, const std::vector<TopoDS_Face>& fs, HeldSide& out)
+{
+  const double tol  = 1e-6;
+  auto         ends = [&](size_t i) {
+    BRepAdaptor_Curve c(es[i]);
+    return std::make_pair(c.Value(c.FirstParameter()), c.Value(c.LastParameter()));
+  };
+  auto shared = [&](const gp_Pnt& p, size_t not_i) {
+    for (size_t j = 0; j < es.size(); ++j)
+      if (j != not_i && (ends(j).first.Distance(p) < tol || ends(j).second.Distance(p) < tol))
+        return true;
+    return false;
+  };
+  size_t first     = 0;
+  bool   first_rev = false;
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const auto [a, b] = ends(i);
+    if (!shared(a, i))
+    {
+      first     = i;
+      first_rev = false;
+      break;
+    }
+    if (!shared(b, i))
+    {
+      first     = i;
+      first_rev = true;
+      break;
+    }
+  }
+  std::vector<bool> used(es.size(), false);
+  size_t            i = first;
+  bool              r = first_rev;
+  for (size_t k = 0; k < es.size(); ++k)
+  {
+    used[i] = true;
+    out.cs.emplace_back(es[i]);
+    out.rev.push_back(r);
+    out.sup.push_back(fs[i]);
+    out.len.push_back(GCPnts_AbscissaPoint::Length(out.cs.back()));
+    const gp_Pnt tail = r ? ends(i).first : ends(i).second;
+    if (k + 1 == es.size())
+      break;
+    bool found = false;
+    for (size_t j = 0; j < es.size() && !found; ++j)
+    {
+      if (used[j])
+        continue;
+      const auto [a, b] = ends(j);
+      if (a.Distance(tail) < tol || b.Distance(tail) < tol)
+      {
+        i     = j;
+        r     = b.Distance(tail) < tol;
+        found = true;
+      }
+    }
+    if (!found)
+      return false;
+  }
+  double total = 0;
+  for (double l : out.len)
+    total += l;
+  if (total < 1e-9)
+    return false;
+  out.t0.push_back(0);
+  for (double l : out.len)
+    out.t0.push_back(out.t0.back() + l / total);
+  out.t0.back() = 1;
+  out.held      = std::all_of(out.sup.begin(), out.sup.end(), [](const TopoDS_Face& f) { return !f.IsNull(); });
+  return !out.held || out.find_signs();
+}
+} // namespace
+
+OpOut op_coons_held(const OcShapeList& edges, rust::Slice<const uint32_t> counts, const OcShapeList& supports,
+                    rust::Slice<const double> magnitudes)
+{
+  // Boundary surface of two U and two V profiles with sides held to faces: Coons' patch blended by cubic Hermite
+  // across the held sides, their cross-boundary derivative continuing the support square to the side, its length the
+  // row's magnitude times the distance across the patch; linear across a direction where neither side is held. The
+  // sides run by arc length.
+  if (counts.size() != 4 || magnitudes.size() != 4 || supports.items.size() != edges.items.size())
+    fail_invalid("a held Coons patch needs four sides, their supports and magnitudes");
+  HeldSide side[4];
+  size_t   at = 0;
+  for (size_t k = 0; k < 4; ++k)
+  {
+    std::vector<TopoDS_Edge> es;
+    std::vector<TopoDS_Face> fs;
+    for (uint32_t i = 0; i < counts[k]; ++i, ++at)
+    {
+      if (at >= edges.items.size())
+        fail_invalid("Coons side counts exceed the edges");
+      es.push_back(as_edge(edges.items[at], "Coons side edge"));
+      fs.push_back(supports.items[at].IsNull() ? TopoDS_Face() : TopoDS::Face(supports.items[at]));
+    }
+    if (es.empty() || !held_side(es, fs, side[k]))
+      fail_op("held Coons patch: a side isn't one chain of edges with its supports");
+  }
+  HeldSide &c0 = side[0], &c1 = side[1], &g0 = side[2], &g1 = side[3];
+  const double tol   = 1e-6;
+  auto         meets = [&](const gp_Pnt& a, const gp_Pnt& b) { return a.Distance(b) < tol; };
+  if (!meets(c0.at(0), g0.at(0)) && !meets(c0.at(0), g0.at(1)))
+    std::swap(g0, g1);
+  if (meets(c0.at(0), g0.at(1)))
+    g0.flip = true;
+  if (meets(c0.at(1), g1.at(1)))
+    g1.flip = true;
+  if (meets(g0.at(1), c1.at(1)))
+    c1.flip = true;
+  if (!meets(c0.at(0), g0.at(0)) || !meets(c0.at(1), g1.at(0)) || !meets(c1.at(0), g0.at(1)) || !meets(c1.at(1), g1.at(1)))
+    fail_op("held Coons patch: the sides don't meet at four corners");
+  const bool hv = c0.held || c1.held, hu = g0.held || g1.held;
+  // Cross derivatives: dS/dv along v = 0, 1 (E) and dS/du along u = 0, 1 (F); an unheld side's the chord across.
+  auto E = [&](int j, double u) {
+    const gp_Vec    chord(c0.at(u), c1.at(u));
+    const HeldSide& s = j == 0 ? c0 : c1;
+    return s.held ? s.across(u) * ((j == 0 ? 1 : -1) * magnitudes[(size_t)j] * chord.Magnitude()) : chord;
+  };
+  auto F = [&](int i, double v) {
+    const gp_Vec    chord(g0.at(v), g1.at(v));
+    const HeldSide& s = i == 0 ? g0 : g1;
+    return s.held ? s.across(v) * ((i == 0 ? 1 : -1) * magnitudes[2 + (size_t)i] * chord.Magnitude()) : chord;
+  };
+  // The u data meet the U sides' own derivatives at the corners (else the patch would leave those sides there), and the
+  // v data the V sides' where both directions are Hermite: the differences faded linearly along the side.
+  const gp_Vec e00 = E(0, 0), e01 = E(0, 1), e10 = E(1, 0), e11 = E(1, 1);
+  const gp_Vec f00 = F(0, 0), f01 = F(0, 1), f10 = F(1, 0), f11 = F(1, 1);
+  auto         Ec = [&](int j, double u) {
+    const gp_Vec e = E(j, u);
+    if (!hu)
+      return e;
+    return e + (g0.d1(j) - (j == 0 ? e00 : e10)) * (1 - u) + (g1.d1(j) - (j == 0 ? e01 : e11)) * u;
+  };
+  auto Fc = [&](int i, double v) {
+    const gp_Vec f = F(i, v);
+    return f + (c0.d1(i) - (i == 0 ? f00 : f10)) * (1 - v) + (c1.d1(i) - (i == 0 ? f01 : f11)) * v;
+  };
+  const int           n = 41;
+  std::vector<double> t(n);
+  for (int i = 0; i < n; ++i)
+    t[(size_t)i] = (double)i / (n - 1);
+  // The data along each direction at the grid's parameters: values at 0, 1, then cross derivatives at 0, 1.
+  std::vector<std::array<gp_XYZ, 4>> du(n), dv(n);
+  for (int k = 0; k < n; ++k)
+  {
+    const double x = t[(size_t)k];
+    du[(size_t)k]  = {g0.at(x).XYZ(), g1.at(x).XYZ(), hu ? Fc(0, x).XYZ() : gp_XYZ(), hu ? Fc(1, x).XYZ() : gp_XYZ()};
+    dv[(size_t)k]  = {c0.at(x).XYZ(), c1.at(x).XYZ(), hv ? Ec(0, x).XYZ() : gp_XYZ(), hv ? Ec(1, x).XYZ() : gp_XYZ()};
+  }
+  const double h  = 1e-4;
+  auto         d1 = [&](auto&& f, double x) {
+    const double s = x < 0.5 ? 1 : -1;
+    return (f(x + s * h) * 4 - f(x) * 3 - f(x + 2 * s * h)) * (s / (2 * h));
+  };
+  // M[a][b]: the a-th u datum (value at 0, at 1, d/du at 0, at 1) of the b-th v datum; the twists the mean of what the
+  // two directions ask for (they differ only where the corners disagree).
+  auto vdata = [&](int b, double u) {
+    return b == 0 ? gp_Vec(c0.at(u).XYZ()) : b == 1 ? gp_Vec(c1.at(u).XYZ()) : hv ? Ec(b - 2, u) : gp_Vec();
+  };
+  auto udata = [&](int a, double v) {
+    return a == 0 ? gp_Vec(g0.at(v).XYZ()) : a == 1 ? gp_Vec(g1.at(v).XYZ()) : hu ? Fc(a - 2, v) : gp_Vec();
+  };
+  gp_XYZ M[4][4];
+  for (int b = 0; b < 4; ++b)
+    for (int a = 0; a < 4; ++a)
+    {
+      const double x  = a % 2;
+      auto         fv = [&](double u) { return vdata(b, u); };
+      auto         fu = [&](double v) { return udata(a, v); };
+      gp_Vec       m  = a < 2 ? fv(x) : b < 2 ? (b == 0 ? c0 : c1).d1(x) : (d1(fv, x) + d1(fu, b % 2)) * 0.5;
+      M[a][b]         = m.XYZ();
+    }
+  auto basis = [](bool hermite, double x, double out[4]) {
+    const double x2 = x * x, x3 = x2 * x;
+    if (hermite)
+    {
+      out[0] = 1 - 3 * x2 + 2 * x3;
+      out[1] = 3 * x2 - 2 * x3;
+      out[2] = x - 2 * x2 + x3;
+      out[3] = x3 - x2;
+    }
+    else
+    {
+      out[0] = 1 - x;
+      out[1] = x;
+      out[2] = out[3] = 0;
+    }
+  };
+  NCollection_Array2<gp_Pnt> grid(1, n, 1, n);
+  for (int i = 0; i < n; ++i)
+    for (int j = 0; j < n; ++j)
+    {
+      double bu[4], bv[4];
+      basis(hu, t[(size_t)i], bu);
+      basis(hv, t[(size_t)j], bv);
+      gp_XYZ r;
+      for (int a = 0; a < 4; ++a)
+        r += du[(size_t)j][(size_t)a] * bu[a] + dv[(size_t)i][(size_t)a] * bv[a];
+      for (int a = 0; a < 4; ++a)
+        for (int b = 0; b < 4; ++b)
+          if (bu[a] != 0 && bv[b] != 0)
+            r -= M[a][b] * (bu[a] * bv[b]);
+      grid(i + 1, j + 1) = gp_Pnt(r);
+    }
+  GeomAPI_PointsToBSplineSurface fit;
+  fit.Interpolate(grid, Approx_IsoParametric);
+  if (!fit.IsDone())
+    fail_op("held Coons patch: no surface through its grid");
+  BRepBuilderAPI_MakeFace mf(fit.Surface(), Precision::Confusion());
+  if (!mf.IsDone())
+    fail_op("held Coons patch: no face");
   std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
   return make_result(args, mf.Face(), nullptr);
 }

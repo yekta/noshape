@@ -1016,6 +1016,9 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
               const OcShapeList& guides);
 // The bilinearly blended Coons patch of four sides (edge chains of counts[i] edges: u0, u1, v0, v1).
 OpOut op_coons(const OcShapeList& edges, rust::Slice<const uint32_t> counts);
+// The same with sides held tangent to supports (null: not held), cubic Hermite across them; magnitudes u0, u1, v0, v1.
+OpOut op_coons_held(const OcShapeList& edges, rust::Slice<const uint32_t> counts, const OcShapeList& supports,
+                    rust::Slice<const double> magnitudes);
 OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
              P3 d1, P3 d2, bool fuse);
 

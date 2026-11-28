@@ -1006,6 +1006,17 @@ pub fn coons_surface(sides: &[Vec<Shape>; 4]) -> Result<OpResult> {
     op(ffi::op_coons(&vec_to_list(&edges), &counts))
 }
 
+/// [`coons_surface`] with sides held tangent to their supports (each side's edges all with a support; a side held in
+/// curvature is held tangent): cubic Hermite across the held sides, the cross-boundary derivative continuing each
+/// support square to the side, `magnitudes` (u0, u1, v0, v1) times the distance across the patch long; linear across a
+/// direction where neither side is held. The sides run by arc length.
+pub fn coons_surface_held(sides: &[Vec<FillEdge>; 4], magnitudes: [f64; 4]) -> Result<OpResult> {
+    let edges: Vec<Shape> = sides.iter().flatten().map(|b| b.edge.clone()).collect();
+    let supports: Vec<Shape> = sides.iter().flatten().map(|b| b.support.clone().filter(|_| b.continuity != Continuity::Position).unwrap_or_default()).collect();
+    let counts: Vec<u32> = sides.iter().map(|s| s.len() as u32).collect();
+    op(ffi::op_coons_held(&vec_to_list(&edges), &counts, &vec_to_list(&supports), &magnitudes))
+}
+
 /// Build solids from the regions fully enclosed by intersecting faces,
 /// shells and solids (BOPAlgo_MakerVolume; Onshape "Enclose").
 pub fn enclose(shapes: &[Shape]) -> Result<OpResult> {

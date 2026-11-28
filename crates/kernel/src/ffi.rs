@@ -771,6 +771,7 @@ pub(crate) mod ffi {
             guides: &OcShapeList,
         ) -> Result<OpOut>;
         fn op_coons(edges: &OcShapeList, counts: &[u32]) -> Result<OpOut>;
+        fn op_coons_held(edges: &OcShapeList, counts: &[u32], supports: &OcShapeList, magnitudes: &[f64]) -> Result<OpOut>;
         fn op_rib(
             base: &OcShape,
             wire: &OcShape,
