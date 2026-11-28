@@ -16,6 +16,7 @@ fields get focus events as on a desktop.
 import argparse
 import datetime
 import json
+import math
 import re
 import os
 import subprocess
@@ -893,11 +894,66 @@ def click_placed_points(a, b, pixel):
         pa, pb = (x or {}).get("points"), (y or {}).get("points")
         if not (isinstance(pa, list) and isinstance(pb, list) and len(pa) == len(pb)):
             continue
+        ours = [list(q) if isinstance(q, list) else q for q in pb]
         for p, q in zip(pa, pb):
             if isinstance(p, list) and isinstance(q, list):
                 for i, (u, w) in enumerate(zip(p, q)):
                     if free(u) and free(w) and abs(u - w) <= 2 * pixel:
                         q[i] = u
+        # A free spline's end derivatives follow its points (Onshape's fit is the natural centripetal cubic): read as
+        # live's when both are that fit of their own points (sketch-used-click-line s13: 18.1242 from our points,
+        # 17.8292 from live's 0.4 mm away).
+        if x.get("kind") == "spline" and pa == pb and x.get("derivatives") != y.get("derivatives"):
+            if near(fit_derivatives(pa), x.get("derivatives")) and near(fit_derivatives(ours), y.get("derivatives")):
+                y["derivatives"] = x.get("derivatives")
+
+
+def near(fit, ds, tol=2e-3):
+    """Recorded end derivatives [[x, y], [x, y]] within `tol` of `fit`'s (the recordings round to 1e-4)."""
+    if fit is None or not (isinstance(ds, list) and len(ds) == 2 and all(isinstance(d, list) and len(d) == 2 for d in ds)):
+        return False
+    try:
+        return all(abs(float(u) - v) <= tol for d, f in zip(ds, fit) for u, v in zip(d, f))
+    except (TypeError, ValueError):
+        return False
+
+
+def fit_derivatives(pts):
+    """The end derivatives (per unit of the 0-1 parameter) of the natural cubic through 2-D `pts` at centripetal
+    parameters, as Onshape's free sketch spline; None for fewer than 3 points or coincident ones."""
+    try:
+        P = [(float(p[0]), float(p[1])) for p in pts]
+    except (TypeError, ValueError, IndexError):
+        return None
+    n = len(P)
+    if n < 3:
+        return None
+    w = [math.hypot(P[k + 1][0] - P[k][0], P[k + 1][1] - P[k][1]) ** 0.5 for k in range(n - 1)]
+    if min(w) <= 0:
+        return None
+    total = sum(w)
+    h = [v / total for v in w]
+    # Second derivatives M (M0 = Mn-1 = 0) by the tridiagonal system, per coordinate.
+    out = []
+    for c in range(2):
+        y = [p[c] for p in P]
+        a, b, r = [0.0] * n, [1.0] * n, [0.0] * n
+        cc = [0.0] * n
+        for k in range(1, n - 1):
+            a[k], b[k], cc[k] = h[k - 1], 2 * (h[k - 1] + h[k]), h[k]
+            r[k] = 6 * ((y[k + 1] - y[k]) / h[k] - (y[k] - y[k - 1]) / h[k - 1])
+        for k in range(1, n):
+            m = a[k] / b[k - 1]
+            b[k] -= m * cc[k - 1]
+            r[k] -= m * r[k - 1]
+        M = [0.0] * n
+        M[n - 1] = r[n - 1] / b[n - 1]
+        for k in range(n - 2, -1, -1):
+            M[k] = (r[k] - cc[k] * M[k + 1]) / b[k]
+        d0 = (y[1] - y[0]) / h[0] - h[0] * (2 * M[0] + M[1]) / 6
+        d1 = (y[n - 1] - y[n - 2]) / h[n - 2] + h[n - 2] * (M[n - 2] + 2 * M[n - 1]) / 6
+        out.append((d0, d1))
+    return [[out[0][0], out[1][0]], [out[0][1], out[1][1]]]
 
 
 def cloud_menu(a, b):
