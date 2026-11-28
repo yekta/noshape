@@ -1671,9 +1671,10 @@ impl PartStudioView {
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);
                 // The offset's value label opens its box, unless a picked curve is in reach under it (live sketch-offset:
-                // a click 7 px off the picked side, on the label, drops the side).
+                // a click 7 px off the picked side, on the label, drops the side) or the arrow is (live rq-1128: it flips).
                 if let Some(ed) = self.sketch.as_ref().filter(|ed| ed.tool == Tool::Offset && ed.offset_label_hovered)
                     && !hovered.is_some_and(|h| ed.offset_pending.as_ref().is_some_and(|p| p.contains(&h)))
+                    && !self.sketch_data(cx).is_some_and(|data| ed.offset_arrow_at(&data.sketch, hit))
                 {
                     self.open_offset_input(window, cx);
                     cx.notify();
@@ -4580,7 +4581,7 @@ impl PartStudioView {
             let full = noshape_units::format_quantity(Quantity::new(d, Dim::LENGTH), &units);
             let t = super::plane_text(full.split(' ').next().unwrap_or_default());
             let (anchor, hw, hh) = (ed.frame.to_world(at), 0.5 * t.width * asc + 2.0 * wpp, 11.0 * wpp);
-            if ed.offset_label_hovered {
+            if ed.offset_label_hot(&data.sketch) {
                 out.push(fill(vec![rect(anchor, hw, hh), rect(anchor, hw - wpp, hh - wpp).into_iter().rev().collect()], rgb(0xd99c3e)));
                 out.push(fill(vec![rect(anchor, hw - wpp, hh - wpp)], rgb(0xccb396)));
             }
@@ -5799,7 +5800,7 @@ impl PartStudioView {
                     .px(px(1.))
                     .border_1()
                     .border_color(gpui::transparent_black())
-                    .when(!in_plane, |d| d.hover(|s| s.bg(rgb(0xccb396)).border_color(rgb(0xd99c3e))))
+                    .when(!in_plane && ed.offset_label_hot(&data.sketch), |d| d.bg(rgb(0xccb396)).border_color(rgb(0xd99c3e)))
                     .text_size(px(16.))
                     // In an oblique view drawn in the plane (`sketch_dimension_fills`); this box stays to hover and click.
                     .text_color(if in_plane { gpui::transparent_black() } else { rgb(0x000000).into() })

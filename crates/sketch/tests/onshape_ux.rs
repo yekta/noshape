@@ -31,6 +31,12 @@ fn chamfer_corner_cuts_both_lines_and_keeps_virtual_sharp() {
     assert!(!sk.entity(b).unwrap().construction);
     let on_sharp = sk.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { a, b: x } if (a == b || x == b) && sk.kind(if a == b { x } else { a }) == Some(EntityKind::Point))).count();
     assert_eq!(on_sharp, 2, "the legs' starts on the sharp");
+    // and on each other (live rq-chamfer-too-large-constraints: distanceA/B's starts COINCIDENT too), still solving
+    let pt = |e: EntityId| sk.kind(e) == Some(EntityKind::Point) && e != b;
+    let starts = sk.constraints().filter(|c| matches!(c.kind, ConstraintKind::Coincident { a, b: x } if pt(a) && pt(x))).count();
+    assert_eq!(starts, 1, "the legs' starts on each other");
+    let rep = sk.solve();
+    assert!(rep.is_solved() && rep.entity_states.values().all(|st| *st != ConstraintState::OverConstrained), "the extra COINCIDENT is no conflict: {rep:?}");
     let legs: Vec<(DVec2, DVec2, f64)> = sk.constraints().filter_map(|c| match c.kind {
         ConstraintKind::Length { curve, value } if sk.entity(curve)?.construction => {
             let cv = sk.curve(curve)?;

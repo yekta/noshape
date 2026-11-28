@@ -3105,9 +3105,9 @@ impl SketchEditor {
             }
             Tool::Offset => {
                 // The direction arrow: drag to set the distance, click to flip.
-                if let Some((base, tip)) = self.offset_arrow(&data.sketch)
-                    && (p - tip).length().min((p - (base + tip) * 0.5).length()) <= self.world_per_px * 9.0
-                {
+                // (Anywhere along it, its tail on the copy too: live rq-1128 flips on a click 1 mm short of the copy; a
+                // picked curve in reach under it takes the click first, live sketch-offset: 7 px off it drops it.)
+                if self.offset_arrow_at(&data.sketch, p) && !hovered.is_some_and(|h| self.offset_pending.as_ref().is_some_and(|q| q.contains(&h))) {
                     let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(&data.sketch) { -1.0 } else { 1.0 };
                     self.drag = Some(DragState::OffsetArrow { start: p, moved: false, from: sign * self.offset_distance });
                     return EditOutcome::redraw();
@@ -3680,6 +3680,16 @@ impl SketchEditor {
         let (dir, px) = (n * sign, self.world_per_px);
         let start = mid + dir * self.offset_distance;
         Some((start, start + dir * px * (OFFSET_ARROW_STEM_PX + OFFSET_ARROW_HEAD_PX)))
+    }
+
+    /// Whether `p` is on the offset's hollow arrow, which wins over the distance label under it.
+    pub fn offset_arrow_at(&self, sk: &Sketch, p: DVec2) -> bool {
+        self.offset_arrow(sk).is_some_and(|(start, apex)| dist_to_segment(p, start, apex) <= self.world_per_px * 10.0)
+    }
+
+    /// The distance label shows hovered (its tan box, the dimension's arrowheads hidden) unless the arrow takes the pointer.
+    pub fn offset_label_hot(&self, sk: &Sketch) -> bool {
+        self.offset_label_hovered && !self.cursor.is_some_and(|c| self.offset_arrow_at(sk, c))
     }
 
     /// The pending offset's distance label; clicking it opens the distance box (Onshape's offset tool opens its
@@ -7437,7 +7447,7 @@ impl SketchEditor {
                 // Onshape's hollow arrow (as the Part Studio manipulators): a light grey 3 px outline under a 1.5 px
                 // white line; hovered blue (live offset-look-1121).
                 let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
-                let hovered = self.cursor.is_some_and(|c| dist_to_segment(c, start, apex) <= self.world_per_px * 10.0);
+                let hovered = self.cursor.is_some_and(|c| self.offset_arrow_at(&data.sketch, c));
                 let (outline, core) = if hovered { MANIPULATOR_HOVER } else { (MANIPULATOR_OUTLINE, [0xff, 0xff, 0xff, 0xff]) };
                 push_hollow_arrow_across(&mut wide, self.snap_to_pixel(start), d * self.world_per_px, OFFSET_ARROW_STEM_PX, self.screen_across(d), outline, core);
             }
@@ -7451,7 +7461,7 @@ impl SketchEditor {
                     None => mid - dir * px * 4.0,
                 };
                 wide.push((vec![back, far], [0, 0, 0, 255], 1.0));
-                for (tip, d) in [(mid, -dir), (far, dir)].into_iter().filter(|_| !self.offset_label_hovered) {
+                for (tip, d) in [(mid, -dir), (far, dir)].into_iter().filter(|_| !self.offset_label_hot(&data.sketch)) {
                     let base = tip - d * px * OFFSET_DIM_ARROW_PX;
                     for i in 0..=6 {
                         let t = i as f64 / 6.0 * 2.0 - 1.0;
@@ -13697,6 +13707,35 @@ mod tests {
         let across = ed.screen_across(dir);
         assert!(((to_screen * across).length() - 1.0).abs() < 1e-9, "one screen pixel across");
         assert!((to_screen * across).dot(to_screen * dir).abs() < 1e-9, "square to the arrow on screen");
+    }
+
+    /// Live rq-1128 (offset-open-chain, iso at ~2.4 px/mm): with the first line of an open chain picked, a click 1 mm
+    /// short of the 5 mm copy (y -4) and one 3 mm past it (y -8) are on the hollow arrow: each flips the side (the
+    /// copy goes from -5 to +5); nothing is made, the tool stays, the line stays selected, the label opens no box.
+    #[test]
+    fn a_click_on_the_offset_arrows_tail_flips_the_side() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        ed.world_per_px = 1e-3 / 2.4;
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let first = d.sketch.add_line(mm(0.0, 0.0), mm(20.0, 0.0));
+        d.sketch.add_line(mm(20.0, 0.0), mm(20.0, 15.0));
+        d.sketch.add_line(mm(20.0, 15.0), mm(40.0, 15.0));
+        click(&mut ed, &mut d, mm(10.0, 0.0));
+        assert_eq!(ed.selection, vec![first]);
+        for past in [-1.0, 3.0] {
+            let (base, tip) = ed.offset_arrow(&d.sketch).unwrap();
+            let dir = (tip - base).normalize();
+            let at = base + dir * past * 1e-3;
+            assert!(ed.offset_arrow_at(&d.sketch, at), "{past} mm past the copy is on the arrow");
+            ed.offset_label_hovered = true;
+            ed.pointer_move(&mut d, at, false, false);
+            assert!(!ed.offset_label_hot(&d.sketch), "the arrow takes the pointer from the label");
+            click(&mut ed, &mut d, at);
+            let (base2, tip2) = ed.offset_arrow(&d.sketch).unwrap();
+            assert!((tip2 - base2).normalize().dot(dir) < -0.99, "the click at {past} mm flips the side");
+            assert_eq!(count(&d, EntityKind::Line), 3, "nothing is made");
+            assert_eq!((ed.tool, ed.offset_pending.clone(), ed.selection.clone()), (Tool::Offset, Some(vec![first]), vec![first]));
+        }
     }
 
     #[test]
