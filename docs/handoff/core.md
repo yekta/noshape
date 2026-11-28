@@ -1,36 +1,36 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 22:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-28 04:45 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 23:00 (compaction at 219k) (lead 22:3x: extrude-hole P1 first; impeller P2; then probe/blend #4/#5/SPLINE-FILLET)
-EXTRUDE-PRESELECTED-SKETCH-FILLS-HOLE (P1, qa c3919286ce): UI side = psui (feature_preselection / pick_feature_into_
-dialog take every region; psui adds SketchRegionDisplay.inner + features::sketch::inner_regions(&SketchResult), port
-of parity.rs's qSketchRegion(..., true) rule; NOT LANDED at 22:40). Mine: eval.rs Reference::Sketch leaves out
-inner_regions too (ops `sketch:` refs, ops' extrude helpers). WIP uncommitted: eval.rs, T1 engine::a_whole_sketch_
-extrudes_around_its_holes, e2e an_extrude_of_a_whole_sketch_keeps_its_holes; psui's sketch.rs hunk copied verbatim
-(core-scratch/psui-inner.patch) only to test: drop it if psui lands first (identical hunk rebases clean anyway).
-Test run .exw.sh (also runs e2e::zz_probe = spline probe, NOT for landing: remove from e2e.rs before commit).
-IMPELLER: P0 -> P2 (lead 22:3x: bar = whole doc, +12 % median < 20 %). Green 05496d20 vs 0.4.73, 3 runs: doc 41.2 vs
-36.8 s; #29 Stevenrohr 6.1-6.6 vs 1.65 (xft: section_blend 1.3 s err, then 2nd rolling_ball_blend 4.1 s err); #37
-Delete face 4.0-4.3 vs 1.7-2.0; #46 Extrude Bohrungssitz 2.8-3.6 vs 0.45-0.70; #38 bool's 8.5 vs 9.3 (fixed). TICKETS
-row updated (uncommitted). All 8 parts valid on main's final state. xft.patch is APPLIED in the tree: git apply -R
-/root/core-scratch/xft.patch + touch -c the 3 files before any commit.
-SPLINE-FILLET-ASM-R2-END: analysis 22:3x: live's spline = ours (edge 39.461, spline face 710.295). R2 sweep alone
-removes 33.2015 mm3 exactly (tube formula), so any end shape gives <= 28329.455; live 28329.612 is above that ->
-Parasolid mass-property error on its procedural blend face, likely. Ours 28328.537 = sweep + tangent extension cut by
-y=0/30 planes (+0.46/end). Asked live (22:3x) for massproperties [min,max] bands + face areas; close if inside.
-VIBEX7 SLOT: bool's gate holds it ~1 h at a time; keep qa's 02:00-04:05 window free (lead 21:xx; vibex6 gone).
-BLEND #4 (23:0x): box-corner test FIXED: GeomProjLib::Curve2d of the y=0 plane x tool 1 cylinder section started on
-the seam at u=2pi and stayed there (middle 3.5 mm off); the stray check now reprojects with curve_by_feet (GeomProjLib
-fallback). All 7 blend_section tests pass. Kernel diff = HEAD + that block only (debug copy core-scratch/
-blend_direct.xdbg3.cpp). RUNNING 22:58: core-scratch/bab-run.sh (B build + model tests + g++-13 kernel, then A = HEAD's
-blend files swapped in LOCALLY, corpus userdocs A/B, restore + touch). Don't edit those 2 files while it runs; if it died,
-restore from core-scratch/bab.F1 / bab.F2. Then: commit blend #4, land after psui's inner_regions (extrude commit).
-Queued after blend #4: SPLINE-FILLET-ASM-R2-END (P2, live 3e464c63): R2 fillet on a fit spline's top edge ends
-1.08 mm3 short; e2e the_depth_batch_starts_are_lives accepts 1.5 mm3 under it: back to 1e-3 when fixed.
-Then depth batch 8 (live 78dc566b, behaviours "Depth batch 8"): mass-properties-spline-part / -three-parts /
--add-part / -asm-two-instances ("Instances to measure", no-material toast) / mistake-mass-properties-surface.
+## IN FLIGHT 11-28 04:45
+LANDED: 434c2a49 (as 1d0bf5a6: extrude-hole evaluator side, spline-fillet-asm exact volume, blend #4 box-corner balls +
+reach + reprojection), macOS G2 sphere-fill T1 (aa19340a: cross-edge curvature 1.2 % vs band 5 %; lead picks it onto
+the release).
+QUEUED 57ac5e13 (worktree core-g2mac, from main; carries f27f2793): (1) e18766a8 impeller: an as-is OCCT round whose
+new vertices are looser than its radius isn't kept (feature 43 Fillet Flansch zum Stroemungskanal, tol 1.14 mm ->
+Extrude Bohrungssitz Ansaugflansch's Boolean no longer declines, 2.9 -> 0.25 s; bool's report). Corpus A/B 04:3x: only
+c2-impeller-loft differs (Part 1 115536 -> 115591 mm3, live 119670: upstream #29), statuses unchanged. (2) slanted-end
+round test asserts edges on faces (de975d18). (3) britatap Delete face 2 (58f84927): direct.rs adjacent_fillets takes
+an edge only along a fillet's rails (least-curved way); T1 features_c::delete_face_keeps_a_pipe_bend_tangent_across_it.
+Corpus A/B 04:4x: only britatap differs; parity 8/22 -> 12/22. Kernel 622/0, model 670/0, g++-13 ok.
+NEXT: britatap's first diff is now #12 Extrude 1 (a surface extrude: area 5309.019 vs live 5309.235 mm2, 4e-5), then
+#13 Split 3 (1 part, live 2), #14 Side blend curve ERROR "Selected vertex does not belong to selected face.". Fillet 1
+errors in our corpus run (A: Ok on the wrong body), downstream of #14-#20. rm worktree core-g2mac once 57ac5e13 lands
+(core-uip3 was reset onto it).
+Probe setup vibex8 ~/tmp/core/{bt (britatap copy + live.jsonl), lib (sig/nscli/hkf/fdump)}.
+PARKED tonight (all blocked upstream / native blend faces): (a) c2-hunting-knife #51 Fillet 8 (16/36/22 vs 15/37/25):
+the dome ring is 2 edges (both seams end on it, archive 11-18), OCCT makes one blend face per spine edge -> 2 faces of
+57.44 (live one 114.83); joining the edges first (probe vibex8 ~/tmp/core/hk/fp.cpp) fails (pcurves cross a seam).
+Needs a two-blend-face merge (surface concatenation) or native blend faces. Live also splits the loft side in 6
+(11-16 known class). (b) impeller #47 is downstream of #29 zum Halter (parked): parity diff list from #27 on.
+(c) body-draft-naming #8 Fillet 2 = the pinch corner (2.9 mm3). lora-enclosure matches to the end (item f done).
+If 434c2a49 fails: fix forward. qa 01:1x asked about 28329.612 in its UI takes: answered (live UI shows massproperties' nominal; compare UI takes within live's variance band). Not yet checked: a_round_over_a_slanted_end_across_a_turn fails without `reach`.
+IMPELLER P2 (kernel profiles vibex7 ~/tmp/core/kn/i-new.err / i-old.err): Extrude Bohrungssitz Ansaugflansch 2.9 s
+vs 0.5: noshape's Boolean declines in 12 ms (0.4.73: boolean.rust 284 ms), OCCT 2.8 s; with NOSHAPE_BOOL_FALLBACK=0
+"a face's vertex off its plane" (boolean.rs ~5625; that run also fails Delete face 2, so maybe not the real reason):
+told bool 00:5x (P2, for later; they'll say if an upstream feature of mine is sloppy). Delete face 2 4.1 vs 1.9 s:
+OCCT op_defeature on the bigger (live-like) part, 579 vs 85 edge-face intersections: not a regression in code.
 ## REPORT PENDING (lead at 395k at 20:40: not messaged): pulleys fix QUEUED 96280303. Earlier (16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
 (errors only when pieces < 2 AND an INTERNAL face/edge remains = a slit). Both said to lead 17:3x in thread.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
@@ -46,18 +46,8 @@ Then depth batch 8 (live 78dc566b, behaviours "Depth batch 8"): mass-properties-
     Fillet 1 row LIVE_LINES_AS_OTHER. bridging Boundary surface 1 Warning -> Ok, 20866 -> 17289 mm2 (live 17559, row
     open). Corpus A/B: only bridging; kernel 621 ok, model 664 ok, g++-13 ok. T1 surfacing::a_g2_fill_of_a_hole_in_a_
     sphere_follows_the_sphere (G2 0.3 um off at r 10 mm, G1 3x). LEAD NOT YET TOLD (lead at 215k at 13:04): report.
-  4 IN FLIGHT 15:42 c2-curve-pattern-composite Fillet 2 (uncommitted in core-uip3 blend_section.rs; kernel at HEAD; debug
-    kernel patch core-scratch/cpc-kernel-debug.patch, not for landing). Cause found: the arc edge's loft ran its stations
-    0..1 of the edge but its junction balls (tangency_ball) lie short of the vertices (0.227 / 0.773), so the loft
-    doubled back (hook 0.17-0.31 mm). Fix 1: ball_tools' loft stations run from/to where each junction ball's plane
-    crosses the edge (`reach`, secant). Then the direct build went through but cylinders crossed at the box corners
-    (+351 mm3, no spheres). Fix 2: corners where 3 straight convex chain edges meet between 3 planes: the corner ball,
-    each round ending on the plane through it square to its edge (`corner_at` in s0/s1 + rolls_on), corner tool =
-    hexahedron (vertex, ball, 3 edge points, 3 feet) less the ball, fused into the first edge's tool; other 3+ corners
-    decline. Sphere seam/poles turned away. Parity: 3/11 -> 9/11 (Fillet 2..Fillet 3 = live; next diff Curve pattern 1
-    Part 8/9, pre-existing). Module tests added: three_rounds_at_a_box_corner_meet_in_a_sphere (FAILS: direct "a blend
-    face that wouldn't split" on a plain box, debugging with .cpt.sh), a_round_over_a_slanted_end_across_a_turn_builds_
-    directly (passes; check it fails without fix 1). Then: corpus A/B, land.
+  4 QUEUED 434c2a49 (11-28 01:0x, commit 5e870683) c2-curve-pattern-composite Fillet 2: parity 3/11 -> 9/11 (next diff
+    Curve pattern 1 Part 8/9, pre-existing). Details in IN FLIGHT above.
   5 PARKED 13:4x c2-impeller-loft (parity 13:2x on 30439ec5e: 27/48; Fillet 3 34/93/60 vs live 34/95/62, faces and volume
     as live; then zum Halter ERROR "Failed to fillet selections." and the cascade to 47). Fillet 3 edges by type+length
     (.imp3.sh, vibex7 ~/tmp/core/imp3): (a) vertex splits along the y=+-27 run-ons and label kinds (live LINE/SPLINE vs
@@ -146,9 +136,9 @@ Then depth batch 8 (live 78dc566b, behaviours "Depth batch 8"): mass-properties-
    a-d. 2d82a0 C2 landed 45db5d099; 184ad0 F3/F5, C6 build now. Ranking now from the 11-26 run (Now: SCISSOR RUN). Probes:
       core-scratch/sc st.py (failing features per studio), fe.py (params + edges); NOSHAPE_DUMP_OPS=<dir>
       NOSHAPE_DUMP_ONLY=chamfer dumps blend inputs. Saved doc: vibex7 ~/tmp/core/sc/fresh/.
-   e. c2-body-draft-naming #7 Fillet 1 (builds, 15→19 lines / 6→2 other edges vs live) then #8 Fillet 2 fails (draft body)
+   e. c2-body-draft-naming #8 Fillet 2: builds (281ced578), 2.9 mm3 off = the pinch corner (native blend faces)
    After an upstream difference (fix upstream first; re-check after):
-   f. c2-lora-enclosure-ribs #19 USB C Port Chamfer Base (#16 USB Base Extrude Remove differs)
+   f. DONE: c2-lora-enclosure-ribs matches to the end (gate cache 11-28)
    g. c2-genesis-trunk-hanger #62 "3.7", #63 "1.5", #67 "3", #72 Fillet 1 (#20 snap-holes Boolean: ellipse edges)
    h. scissor cascades: 0139f2 F1; 665cf3 C1, F5; 264eb3 C1; 37a1a7 F3, F5; 404ddb F1, C1, F5, F14; fed22d F4, F5,
       F24, F25, F30, C2; 4ce5c7 F1; 57725f F3-5, C1; 5aae43 C1-2, F1-7; 97ad5f F1-2; b58244 (17, lost refs after Extrude 4)
