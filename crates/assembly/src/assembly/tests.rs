@@ -2604,6 +2604,32 @@ fn torus_face_inferences_lie_on_the_axis() {
     assert!(pts.iter().all(|p| p.frame.z().cross(DVec3::Z).length() < 1e-9 && p.frame.origin.truncate().length() < 1e-9), "{:#?}", pts.iter().map(|p| (p.frame.origin, p.frame.z())).collect::<Vec<_>>());
 }
 
+/// Live probe-mcq (11-27): on a fit spline's extruded side (a B-spline face) the connector snaps to its edges' ends and
+/// midpoints, Z along the edge (the end vertex is the edge with the vertex, POINT), never the face's centroid.
+#[test]
+fn spline_face_inferences_are_its_edges_points() {
+    use super::eval::inference_candidates;
+    let mut sk = noshape_sketch::Sketch::new();
+    let spline = sk.add_fit_spline(&[DVec2::new(0.04, 0.0), DVec2::new(0.052, 0.015), DVec2::new(0.04, 0.03)]).unwrap();
+    let (a, b) = sk.endpoints(spline).unwrap();
+    let (c, d) = (sk.add_point(DVec2::new(0.0, 0.03)), sk.add_point(DVec2::ZERO));
+    for (p, q) in [(b, c), (c, d), (d, a)] {
+        sk.add_line_between(p, q).unwrap();
+    }
+    let f = doc_with(vec![extruded_studio(sk, "20 mm", true)]);
+    let mut ev = AssemblyEvaluator::new();
+    let (part, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let side = face_of_kind(&r, |s| matches!(s, noshape_kernel::Surface::BSpline { .. } | noshape_kernel::Surface::Bezier { .. } | noshape_kernel::Surface::Extrusion { .. }));
+    let pts = inference_candidates(&r.context, Some(&part), &side, &UnitPrefs::default());
+    let show = || pts.iter().map(|p| (p.reference.clone(), p.frame.origin * 1e3, p.frame.z())).collect::<Vec<_>>();
+    assert!(pts.iter().all(|p| !matches!(&p.reference, Reference::Implicit { inference: Inference::Centroid, .. })), "{:#?}", show());
+    let end = pts.iter().find(|p| p.frame.origin.distance(DVec3::new(0.04, 0.03, 0.0)) < 1e-7).unwrap_or_else(|| panic!("the spline's end: {:#?}", show()));
+    assert!(matches!(end.align, Some(Reference::Edge(_))) && matches!(&end.reference, Reference::Implicit { inference: Inference::Vertex, .. }));
+    // The natural spline's end tangent: (-18, 15) per unit of its parameter.
+    assert!(end.frame.z().cross(DVec3::new(-18.0, 15.0, 0.0).normalize()).length() < 1e-3, "{:#?}", end.frame.z());
+    assert!(pts.iter().any(|p| (p.frame.origin - DVec3::new(0.052, 0.015, 0.0)).length() < 2e-4), "the bottom edge's midpoint: {:#?}", show());
+}
+
 #[test]
 fn mate_reset_and_apply_limit_position() {
     let f = doc_with(vec![block_studio()]);

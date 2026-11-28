@@ -2126,6 +2126,41 @@ pub fn inference_candidates(ctx: &Arc<Context>, body: Option<&BodyId>, on: &Refe
                         refs.push((implicit(on, Inference::Centroid), None));
                     }
                 }
+                // A B-spline face (a fit spline's side, a fillet along it): its edges' midpoints and ends, Z along the
+                // edge, no centroid (live probe-mcq 11-27: a click in the middle of a spline side, iso view, takes the
+                // spline's end, Z its tangent; on the fillet along it, its top edge's midpoint).
+                Some(noshape_kernel::Surface::Bezier { .. } | noshape_kernel::Surface::BSpline { .. } | noshape_kernel::Surface::Extrusion { .. }) => {
+                    let before = refs.len();
+                    if let Reference::Face(n) = on
+                        && let Some(b) = bodies().find(|b| !b.find_faces(n).is_empty())
+                        && let Ok(edge_faces) = b.shape.edge_faces()
+                    {
+                        let fi = b.find_faces(n)[0] as u32;
+                        let vertex_edges = b.shape.vertex_edges().unwrap_or_default();
+                        for (ei, faces) in edge_faces.iter().enumerate() {
+                            let Some(en) = b.edges.get(ei).filter(|_| faces.contains(&fi)) else { continue };
+                            let Some(info) = b.shape.sub_shape(noshape_kernel::ShapeType::Edge, ei).ok().and_then(|e| e.edge_info().ok()) else { continue };
+                            let edge_ref = Reference::Edge((**en).clone());
+                            if matches!(info.curve, noshape_kernel::Curve::Circle { .. }) {
+                                refs.push((implicit(&edge_ref, Inference::CenterRim), None));
+                            }
+                            refs.push((implicit(&edge_ref, Inference::Midpoint), None));
+                            if info.closed {
+                                continue;
+                            }
+                            for (vi, edges) in vertex_edges.iter().enumerate() {
+                                if edges.contains(&(ei as u32))
+                                    && let Some(vn) = b.vertices.get(vi)
+                                {
+                                    refs.push((implicit(&Reference::Vertex((**vn).clone()), Inference::Vertex), Some(edge_ref.clone())));
+                                }
+                            }
+                        }
+                    }
+                    if refs.len() == before {
+                        refs.push((implicit(on, Inference::Centroid), None));
+                    }
+                }
                 _ => refs.push((implicit(on, Inference::Centroid), None)),
             }
         }
