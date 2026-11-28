@@ -5970,3 +5970,58 @@ bool2's branches and parked tail reasons: docs/handoff/archive/bool.md (end, "Fr
   (kn-<sha>.out, vibex7), nuts' gate + knurls, unify's gate + knurls. Gate covers all corpora + parity56 + 200-doc
   suite. Land each on 0 new differences (unify: or each closer to live), report, tell skasm on nuts.
 
+
+## Moved from the handoff 11-28 00:40 UTC (P0 speed, gamma lens, decline recheck 11-27)
+## P0 SPEED vs 0.4.73 (state 11-27 22:20 UTC)
+- LANDED ccf1a1ed4d marcher opt-in (NOSHAPE_BOOL_MARCH=1; also qa's impeller Fillet row 12.4 s: MARCH=0 5.9 s),
+  f06939ddf6 one unify pass + slit fill checks only changed faces, fd7f64569e rejoin (21:16; told lead + qa). vibex8 vs
+  0.4.73: valve 0.81 (0.78), standoffs 1.23-1.42 (1.46-1.59), gamma 2.70 (2.45), wire-clip 2.62 (2.42). Left:
+  gamma/wire-clip ~+0.2 s = the slit fill's own fuse (live's topology): inherent. Pulleys' +63 ms is core's 39141bac63.
+- Cleanup left: vibex8 ~/tmp/bool/cmp/cli-{0473,g}; vibex7 ~/tmp/bool/kn3; local /root/bool-scratch/nf/cli-0473.
+
+## GAMMA (next)
+- 22:20 LANDING 6efdffdcaf (= 394c39327e on the P0 fixes): gate clean (replay +0 -0, suite 138->138 with gamma and
+  wire-clip Boolean 2 886 -> 884 faces as live, shells 6=6, crates pass), knurls 5/5 0 diff-lines, GCC 13 ok.
+- DECLINES (lead 21:40, while gates run): 42 open P2 BOOL-DECLINE tickets rechecked on 0.4.73 (unit bool-nfrecheck,
+  /root/bool-scratch/nf: own copies of qa's nfrecheck.py / clifuzz_nf.py, NSCLI=cli-0473 -> nfrecheck-0473.out):
+  16 GONE, 21 OTHER-OP (replay takes another path), 4 STILL: cones meeting at an apex (1846/23 shell), an internal
+  face (1247/10 draft), no point inside a face piece (1234/79), no clean ray (1256/53). Fallback on (fon.sh): same
+  state, OCCT gives Ok (1846, 1247): users unaffected, only coverage. Declined cases aren't recorded (decline() throws
+  before the recorder): probe NOSHAPE_PROBE_DECLINE_DUMP in to_body (uncommitted, bool-fb) -> CLI vibex8
+  ~/tmp/bool/cmp/cli-nf (probe removed again). 1247 = draft_sloped_plane's BRepAlgoAPI_Defeaturing leaves 2
+  INTERNAL faces, its common with the half-space box declines; OCCT's keeps them and the draft is Ok: leave to OCCT.
+  1846 FIXED 8eae4ef17c (brep cyl_cyl: coaxial cones' common apex outside either face's box = no section; T1
+  bool_patterns::coaxial_cones_whose_common_apex_lies_off_both_faces fails without; brep 68, bool_patterns 178 ok;
+  seed 1846 ours Ok, OCCT's volume, 0.4 s vs 1.5). GATING 8eae4ef17c on vibex7 (unit bool-gate-8eae4ef17c, from
+  22:58; ~00:35); knurls after its build (kn-run.sh vibex7 kn4: k-main = bool-gate-base's, k-br = bool-tube-gate's
+  all-96c035059fc28abb; unit bool-kn-8eae4ef17c -> /root/bool-scratch/kn-8eae4ef17c.out).
+  1256 "no clean ray": no longer reached on current main (its path changes at step 36, a fillet now Ok).
+  1234 "no point inside a face piece": dumped with a decline probe (catch(...) in rust_boolean() writing args;
+  removed again): /root/bool-scratch/nf/dump1234/decl7-{0..68}.brep, a fuse of 69 args (op 0) at step 79's delete
+  (arrange.rs inside_of finds no ray hit for a region). NEXT: make it a corpus case (objects/tools split unknown:
+  try 1 + 68), find the region.
+- LEAD 23:5x NEXT (after compaction): (1) gate 8eae4ef17c + knurls: background wait printed chain + kn out; clean ->
+  land from bool-fb (stack: 8eae4ef17c apex fix + handoff commits on queued 3e1a04dd), report. (2) work the 4 STILL
+  (1846 fixed; 1247 left to OCCT, reason above; 1256 not reached; 1234 dumped). (3) re-run the 21 OTHER-OP on the
+  current green: fetch /root/green/SHA's CLI (build noshape-cli at that sha on vibex8 -> ~/tmp/bool/cmp/cli-green,
+  scp to /root/bool-scratch/nf/), NSCLI=it, python3 bin/nfrecheck.py TICKETS.md green (rows filter OTHER-OP only:
+  grep OTHER-OP nfrecheck-0473.out for seeds). Cleanup: nf/cli-0473, nf/cli-nf, vibex8 cmp/cli-{0473,g,nf}.
+- 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
+  uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
+  dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
+  dropped edge's cylinder moved by whole periods onto the dropped edge's. Boolean 2: 884 faces (live 884), area +0.083
+  mm2 (was +0.103), 7 unmatched (5 = plates band below). T1 boolean_groups::crescents_where_two_holes_meet_five_
+  microns_off_centre_are_gone (fails with KEEP_STRIPS and without the period move); clips_a_few_micrometres_apart and
+  precise_parts_fused_with_a_far_tolerant_pin -2 faces/-2 edges (the crescents). GCC 13 ok, bool_patterns 176/176, lib
+  ok, all kernel otherwise 619 + those 2. NEXT: gate it after ec60's (one gate at a time), knurls, land, report.
+- Worktree bool-uv (branch bool-gamma on origin/main bbb452fe6): probes probe_case_args/probe_case_topo (+PROBE_FUZZY) in
+  brep_replay.rs (never commit), lens change in drop_strip_faces (boolean.cpp: `lens` = face of 2 vertices, 2 edges
+  within 1e-5; lensv map shares joined vertices) + PROBE fprintf lines. Recording kept at vibex8
+  ~/agents/bool-keep/gam-rec/317bec683037fff1.*; script /root/bool-scratch/gamma-lens.sh, score gamma-score.py.
+- Findings: 2 extra faces = 5 um crescents (lens) where args 2/3's r=1 holes meet off-centre at x 114.18; dropping
+  one works (885 faces), dropping both -> BRepCheck invalid (suspect FixAddPCurve pcurve period on the 2nd cylinder:
+  find the check's error next). 5 of 7 unmatched = plates arg 5 (upper) / arg 10 (lower) overlap 50 um in z, front
+  faces + notch cylinders 2.5 um apart in y: live gives the band to arg 5 (lower arg index). Rib 243.6 mm2 pair
+  (0.0226 mm2): ours exactly input minus arg 3: not the Boolean. OCCT fuzzy 3e-6..1.1e-5: Boolean ok, unify segfaults.
+- Impeller early decline QUEUED 45eafc5f (ab9ee9b3f + handoff, reported 11:25).
+
