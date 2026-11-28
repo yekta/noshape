@@ -552,7 +552,9 @@ fn rows() -> Vec<Row> {
         Row { id: "menu / configured suppression", live: "a feature whose suppression is configured: Unconfigure suppression where Configure suppression was (live rollto-menus 11-20)", gap: false, check: |l, cx| {
             l.view.update(cx, |v, cx| {
                 let fid = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 1").map(|f| f.id)).expect("Extrude 1");
+                // As live's cov-dm-config: a List input first, then a Checkbox (which configures the suppression).
                 v.edit_config("configure", cx, |ps| {
+                    noshape_ops::config::add_input(ps, "List");
                     let input = noshape_ops::config::add_input(ps, "Checkbox");
                     noshape_ops::config::configure_parameter(ps, fid, noshape_model::configuration::SUPPRESSED_PARAM, &input);
                 });
@@ -568,7 +570,9 @@ fn rows() -> Vec<Row> {
         Row { id: "menu / rolled back under Sketch 1", live: "Sketch 1 › Roll to here: Sketch 1 keeps its full menu (no Section view…), Hide | Hide other sketches | Hide all sketches and Roll to end in place of Roll to here; every row below the bar: Rename | Add selection to folder… | Section view… (a sketch: Hide other sketches | Hide all sketches) | Suppress | Dynamic suppression | (Un)configure suppression | Roll to here | Roll to end | Delete (live rollback-menus 11-21; Add comment: cloud)", gap: false, check: |l, cx| {
             l.view.update(cx, |v, cx| {
                 let fid = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Extrude 2").map(|f| f.id)).expect("Extrude 2");
+                // As live's cov-dm-config: a List input first, then a Checkbox (which configures the suppression).
                 v.edit_config("configure", cx, |ps| {
+                    noshape_ops::config::add_input(ps, "List");
                     let input = noshape_ops::config::add_input(ps, "Checkbox");
                     noshape_ops::config::configure_parameter(ps, fid, noshape_model::configuration::SUPPRESSED_PARAM, &input);
                 });
