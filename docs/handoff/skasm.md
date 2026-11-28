@@ -1,17 +1,28 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 10:0x UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 10:28 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (lead 11-28 10:2x, in order; tests on the Mac)
-1. Offset's 2nd click in space (open chain, (10,-4) / (10,-8)): live makes nothing, tool stays, line stays selected: ours
-   must not open the distance box there (TICKETS SKETCH-OFFSET-DISTANCE-FROM-CLICK).
-2. The too-large chamfer's constraints (live rq-chamfer-too-large-constraints: 5 mm made, 9 CHAMFER COINCIDENTs, the
-   corner COINCIDENT gone; REQUESTS skasm 06:5x answer 2).
-3. Reconcile the MC corner frame (TICKETS 50: rq-1128 top corner along the vertical edge vs probe-mcq's spline end).
-4. Replay: bn02so8gg hit the 2 h background limit waiting in vibex8's slot (stopped locally; the remote wait may live on:
-   check ps on vibex8 for my uipr.sh before re-queuing). Re-queue when vibex8 frees up, then the asm replay.
-- QUEUED f5233e5e (the matrix + trim + pattern, carries everything below).
+## NOW (11-28 10:31 UTC): offset arrow flip + chamfer 13th COINCIDENT + MC top corner test QUEUED via land.sh (Mac: sketch, scene lib, ps-ui offset, assembly spline_face, clippy green); next: replay on vibex8 when free
+All three items coded, not committed:
+1. Offset: live's (10,-4) and (10,-8) clicks FLIP the side (shots: copy -5 -> +5), they hit the hollow arrow (tail on the
+   copy, running to -22). Ours: `offset_arrow_at` (whole arrow, 10 px from the segment) for click + hover look;
+   `offset_label_hot` (label hover yields to the arrow); ps-ui sketch.rs label click skips when the arrow is under it,
+   both label hover boxes use offset_label_hot. Scene T1 a_click_on_the_offset_arrows_tail_flips_the_side PASSED (Mac).
+   ps-ui offset_a_click_beside_the_picked_side_drops_it FAILED (live sketch-offset: a click 7 px off the picked line
+   drops it; the arrow took it). Fixed after: the scene arrow branch skips when `hovered` is a pending curve. RERUN
+   /root/skasm-scratch/bin/toff4.sh on the Mac (scene+ps-ui offset, clippy), then tnext.sh.
+2. Chamfer: sketch tools.rs `chamfer` adds Coincident(startA, startB) (live's 13th COINCIDENT: distanceA/B starts on each
+   other; point-point coincidents are union-find, no redundancy row). T1 onshape_ux chamfer_corner_cuts_both_lines_... extended.
+3. MC corner: already reconciled by 5637f3887c (corner = straight side's end, VertexEnd Z = -tangent = into the edge).
+   tests.rs spline_face_inferences_are_its_edges_points now also checks the top corner (40,30,20) Z -z, X +x (live
+   rq-1128). Not yet run: tnext.sh (sketch all, scene lib, assembly spline_face, clippy sketch+assembly).
+TICKETS: offset + chamfer rows noted; dropped stale union duplicates of ASM-MC-FRAME / ASM-MC-SPLINE rows (re-grep
+before land). Then commit, touch -c, land.sh.
+Replay: vibex8's slot busy (qa uip 4 h, bool gate, ops); no wait of mine left there. Re-queue bn02so8gg's set
+(sketch-rclick-line-circle-menu, sketch-horizontal-key, sketch-vertical-key, sketch-3pt-arc-reversed-sides,
+sketch-slot-on-arc + /root/skasm-scratch/used.txt), add sketch-offset-open-chain, then the asm replay.
+- QUEUED f5233e5e (the matrix + trim + pattern); handoff commit c6807d5839 rides with the next land.
 
 ## NOW (11-28 10:0x UTC): the sketch hover × state matrix
 - docs/parity/sketch-hover-matrix.md: 48 =, 0 ?, 0 ✗, 40 L of 88 (14 new GPU cells in hover_matrix_tests, all green on

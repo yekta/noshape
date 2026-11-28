@@ -725,7 +725,9 @@ impl Sketch {
         }
         // Live (behaviours "qa5 sketch tools" (4)): `distanceAId` / `distanceBId`, construction lines from the virtual
         // sharp to the chamfer's ends, each with its LENGTH.
-        // Each leg starts on its own point, coincident with the sharp (live: 13 COINCIDENT on a rectangle's corner).
+        // Each leg starts on its own point, coincident with the sharp and with the other leg's start (live
+        // rq-chamfer-too-large-constraints: 9 CHAMFER COINCIDENTs, 13 on a rectangle's corner).
+        let mut starts = Vec::new();
         for (end, d) in [(pa, d1), (pb, d2)] {
             let start = self.add_point(v);
             let leg = self.add_line_between(start, end)?;
@@ -733,7 +735,9 @@ impl Sketch {
             res.created.extend([start, leg]);
             self.add_c(&mut res, ConstraintKind::Coincident { a: start, b: corner });
             self.add_c(&mut res, ConstraintKind::Length { curve: leg, value: d });
+            starts.push(start);
         }
+        self.add_c(&mut res, ConstraintKind::Coincident { a: starts[0], b: starts[1] });
         Ok(res)
     }
 

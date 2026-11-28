@@ -2628,6 +2628,11 @@ fn spline_face_inferences_are_its_edges_points() {
     assert!(matches!(&end.reference, Reference::Implicit { inference: Inference::Vertex | Inference::VertexEnd, on } if matches!(**on, Reference::Edge(_))), "{:#?}", show());
     assert_eq!(pts.iter().filter(|p| p.frame.origin.distance(end.frame.origin) < 1e-7).count(), 1, "the corner once: {:#?}", show());
     assert!(end.frame.z().dot(DVec3::Z) > 1.0 - 1e-6, "{:#?}", end.frame.z());
+    // Live rq-1128 (spline-fillet-asm Part 1, a click near the top corner): the same vertical edge's other end, Z into
+    // the edge (down), X +x.
+    let top = pts.iter().find(|p| p.frame.origin.distance(DVec3::new(0.04, 0.03, 0.02)) < 1e-7).unwrap_or_else(|| panic!("the top corner: {:#?}", show()));
+    assert!(matches!(&top.reference, Reference::Implicit { inference: Inference::Vertex | Inference::VertexEnd, on } if matches!(**on, Reference::Edge(_))), "{:#?}", show());
+    assert!(top.frame.z().dot(-DVec3::Z) > 1.0 - 1e-6 && top.frame.x().dot(DVec3::X) > 1.0 - 1e-6, "z {:?} x {:?}", top.frame.z(), top.frame.x());
     // Edge midpoints run the way the side's loop does (live spline-fillet-asm: bottom +y, top -y).
     for (z, y) in [(0.0, 1.0), (0.02, -1.0)] {
         let mid = pts.iter().find(|p| (p.frame.origin - DVec3::new(0.052, 0.015, z)).length() < 2e-4).unwrap_or_else(|| panic!("the midpoint at z {z}: {:#?}", show()));
