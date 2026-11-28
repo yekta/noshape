@@ -221,6 +221,35 @@ fn direction_held(sk: &Sketch, l: EntityId) -> bool {
     false
 }
 
+/// The lines tied to line `l` by Parallel / Perpendicular constraints (a rectangle's sides), `l` included.
+fn square_group(sk: &Sketch, l: EntityId) -> Vec<EntityId> {
+    let mut group = vec![l];
+    let mut i = 0;
+    while let Some(&x) = group.get(i) {
+        i += 1;
+        for c in sk.constraints() {
+            let (ConstraintKind::Parallel { a, b } | ConstraintKind::Perpendicular { a, b }) = c.kind else { continue };
+            let o = if a == x { b } else if b == x { a } else { continue };
+            if !group.contains(&o) {
+                group.push(o);
+            }
+        }
+    }
+    group
+}
+
+/// Whether held line `l` (direction `t`) was drawn after every other held line along it, counting its rectangle
+/// together: a line started on its midpoint is Perpendicular to it only then, else Vertical (live
+/// sketch-line-on-line-mid i-v: a rectangle drawn after the line; sketch-line-from-midpoint: on the rectangle's edge).
+fn newest_of_its_direction(sk: &Sketch, ctx: &InferenceContext, l: EntityId, t: DVec2) -> bool {
+    let group = square_group(sk, l);
+    let newest = group.iter().copied().max().unwrap_or(l);
+    !sk.entities().any(|e| {
+        let Some(Curve2::Line { a, b }) = sk.curve(e.id) else { return false };
+        e.id > newest && !group.contains(&e.id) && !excluded(sk, ctx, e.id) && (b - a).normalize_or_zero().perp_dot(t).abs() <= 1e-9 && direction_held(sk, e.id)
+    })
+}
+
 fn excluded(sk: &Sketch, ctx: &InferenceContext, id: EntityId) -> bool {
     // (A spline's handle arm: no inference to or along it.)
     if ctx.exclude.contains(&id) || sk.entity(id).is_some_and(|e| e.handle_of.is_some()) {
@@ -465,7 +494,7 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     let on = 1e-9 * (1.0 + a.length());
                     let mid = (la + lb) * 0.5 - a;
                     if mid.length() <= on {
-                        return true;
+                        return newest_of_its_direction(sk, ctx, w, t);
                     }
                     // From its end (a chain): Vertical (live sketch-line-chain).
                     if (la - a).length() <= on || (lb - a).length() <= on {
@@ -661,6 +690,31 @@ mod tests {
         assert_eq!(infer(&sk, v(1.01, 1.0), &unwoken)[0].kind, InferenceKind::Vertical);
         let mid = InferenceContext { anchor: Some(v(2.0, -1.0)), ..across };
         assert_eq!(infer(&sk, v(2.01, 1.0), &mid)[0].constraints, vec![AutoConstraint::VerticalLine]);
+    }
+
+    /// A held line with a rectangle drawn after it: a line started on its midpoint is Vertical, one started on it off
+    /// the midpoint still Perpendicular; on the newer rectangle's edge midpoint, Perpendicular, a later vertical line
+    /// notwithstanding (live sketch-line-on-line-mid i-v, -iv without the rectangle; -off-midpoint-1mm, -3mm).
+    #[test]
+    fn square_to_an_older_held_line_from_its_midpoint_is_vertical() {
+        let mut sk = Sketch::new();
+        let held = sk.add_line(v(-2.0, 1.0), v(2.0, 1.0));
+        sk.add_constraint(ConstraintKind::Horizontal { a: held, b: None }).unwrap();
+        let top = sk.add_line(v(-2.0, -1.0), v(2.0, -1.0));
+        let side = sk.add_line(v(2.0, -3.0), v(2.0, -1.0));
+        let bottom = sk.add_line(v(-2.0, -3.0), v(2.0, -3.0));
+        sk.add_constraint(ConstraintKind::Horizontal { a: bottom, b: None }).unwrap();
+        sk.add_constraint(ConstraintKind::Parallel { a: top, b: bottom }).unwrap();
+        sk.add_constraint(ConstraintKind::Perpendicular { a: side, b: bottom }).unwrap();
+        let up = |sk: &Sketch, base: EntityId, x: f64, y: f64| {
+            let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(x, y)), snap_radius: 0.05, woken: vec![base], ..Default::default() };
+            infer(sk, v(x + 0.01, y + 1.5), &ctx).into_iter().next().unwrap()
+        };
+        assert_eq!(up(&sk, held, 0.0, 1.0).constraints, vec![AutoConstraint::VerticalLine]);
+        assert_eq!(up(&sk, held, -0.3, 1.0).constraints, vec![AutoConstraint::PerpendicularTo(held)]);
+        let later = sk.add_line(v(0.0, 1.0), v(0.0, 2.5));
+        sk.add_constraint(ConstraintKind::Vertical { a: later, b: None }).unwrap();
+        assert_eq!(up(&sk, top, 0.0, -1.0).constraints, vec![AutoConstraint::PerpendicularTo(top)]);
     }
 
     /// Live's "Reach brackets" (11-21): started within 22.5 px of a held line, or within 30 px of its midpoint, a line
