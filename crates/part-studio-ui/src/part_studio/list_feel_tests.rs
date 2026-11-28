@@ -1813,3 +1813,22 @@ fn a_variables_row_menu_as_live(cx: &mut TestAppContext) {
     l.right_click(cx, &format!("feature:{name}"));
     assert_eq!(l.menu(cx), ["Edit…", "Add selection to folder…", "Suppress", "Dynamic suppression", "Show dependencies…", "Roll to here", "Delete"]);
 }
+
+/// Live section-view-include-tab-part / -exclude-part: with Section view open, a Parts list row selects nothing while
+/// Section planes is active, and goes into Items to exclude (and the selection, till ✓) once that field is active.
+#[gpui::test]
+fn a_part_row_goes_into_the_section_dialogs_items_field(cx: &mut TestAppContext) {
+    let l = studio(cx, "fl-section-items", 1.);
+    cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| v.section_through(Reference::Plane(DatumPlane::Front), w, cx))).unwrap();
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = l.view.read(cx);
+        (v.selection.len(), v.ui.section_dialog.as_ref().map(|d| d.items.len()))
+    });
+    l.click(cx, "part:Part 2", NONE);
+    assert_eq!(state(cx), (0, Some(0)), "Section planes active: nothing selected, no item");
+    l.view.update(cx, |v, _| v.ui.section_dialog.as_mut().expect("the dialog").items_active = true);
+    l.click(cx, "part:Part 2", NONE);
+    assert_eq!(state(cx), (1, Some(1)), "Items to exclude active: Part 2 is an item, selected while it is");
+    cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| v.end_section_dialog(true, w, cx))).unwrap();
+    assert_eq!(state(cx), (0, None), "✓: the item leaves the selection");
+}

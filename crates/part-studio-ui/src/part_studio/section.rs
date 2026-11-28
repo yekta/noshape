@@ -234,6 +234,8 @@ impl PartStudioView {
     /// ✓ keeps the section, ✕ restores the state before the dialog.
     pub(super) fn end_section_dialog(&mut self, accept: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(d) = self.ui.section_dialog.take() else { return };
+        // Its items leave the selection with it (live section-view-exclude-part s6: none selected after ✓).
+        self.selection.retain(|r| !matches!(r, Reference::Body(b) if d.items.contains(b)));
         self.ui.section_offset_edit = None;
         self.reset_section_manip();
         if self.message.as_ref().is_some_and(|(_, m)| m == SELECT_SECTION_PLANE) {
@@ -257,11 +259,17 @@ impl PartStudioView {
                 return true;
             };
             if let Some(d) = &mut self.ui.section_dialog {
+                // The field's parts are selected while it holds them (live section-view-exclude-part s4: selection 1).
+                let r = Reference::Body(b.clone());
                 match d.items.iter().position(|x| *x == b) {
                     Some(i) => {
                         d.items.remove(i);
+                        self.selection.retain(|x| *x != r);
                     }
-                    None => d.items.push(b),
+                    None => {
+                        d.items.push(b);
+                        self.selection.push(r);
+                    }
                 }
                 self.ui.section_parts = Some((d.include, d.items.clone()));
             }

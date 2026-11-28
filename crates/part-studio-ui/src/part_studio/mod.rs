@@ -5370,6 +5370,14 @@ impl PartStudioView {
                 if this.edit.is_none() {
                     window.focus(&this.ui.list_focus, cx);
                 }
+                // Section view open: the row goes into Items when that field is active, and is ignored with Section
+                // planes active (live section-view-exclude-part / -include-tab-part: nothing selected).
+                if let Some(items_active) = this.ui.section_dialog.as_ref().map(|d| d.items_active) {
+                    if items_active {
+                        this.section_pick(&Reference::Body(id1.clone()), window, cx);
+                    }
+                    return;
+                }
                 // Shift with no part clicked before selects nothing (with a feature last clicked, or none: live).
                 let shift = ev.modifiers().shift && this.edit.is_none();
                 if shift && this.ui.part_anchor.is_none() {

@@ -139,6 +139,7 @@ pub fn render<V: 'static>(props: Props, key: &'static str, view: &Entity<V>, on:
     };
     let field = |id: &'static str, caption: String, on_field: bool, rows: Vec<AnyElement>, items: bool| {
         let empty = rows.is_empty();
+        let mark_name = format!("field:{caption}");
         v_flex()
             .id(id)
             .flex_1()
@@ -155,6 +156,7 @@ pub fn render<V: 'static>(props: Props, key: &'static str, view: &Entity<V>, on:
             .child(div().px(px(6.)).when(empty, |d| d.text_size(px(12.))).when(!empty, |d| d.pt(px(2.)).text_size(px(10.))).text_color(pal.text_muted).child(caption))
             .children(rows)
             .on_click(act(Action::ItemsActive(items)))
+            .map(|d| crate::ui_script::mark(d, || mark_name))
     };
     let plane_rows = props.planes.iter().enumerate().map(|(i, (n, l))| chip(SharedString::from(format!("sec-plane-{i}")), if l.is_empty() { format!("Section plane {n}") } else { format!("Section plane {n} ({l})") }, i == props.active, Action::RemovePlane(i))).collect();
     let item_rows = props.items.iter().enumerate().map(|(i, n)| chip(SharedString::from(format!("sec-item-{i}")), n.clone(), false, Action::RemoveItem(i))).collect();
