@@ -288,12 +288,14 @@ impl AssemblyView {
             let r = |x: f64| (x * 1e6).round() / 1e6;
             (0..4).flat_map(|row| (0..4).map(move |col| (row, col))).map(|(row, col)| r(m.col(col)[row] * if col == 3 && row < 3 { 1e3 } else { 1.0 })).collect::<Vec<f64>>()
         };
-        // Live reads them over REST: a mate dialog's preview isn't stored yet.
-        let previewing = self.mate.is_some();
+        // Live reads them over REST: a new Slider's or Revolute's preview shows there once both connectors are picked
+        // (asm-import-step-slider-pin-on-r4-fillet-ok, revolute-pin-in-r2-corner-ok s17), a Fastened's only at ✓
+        // (fastened-top-to-spline-face-ok s15-16); an edited mate's isn't stored yet.
+        let hidden = self.mate.as_ref().filter(|m| m.editing.is_some() || m.dialog.read(cx).mate_type() == MateType::Fastened).map(|m| &m.opened_at);
         // Live's recorder reads them over REST: what the open Insert dialog inserted shows there only after ✓
         // (asm-standard-content-edit-instance).
         let pending = |id: InstanceId| self.insert_open && self.ui.insert_inserted.contains(&id);
-        let instances: Vec<Value> = asm.instances.iter().filter(|i| !pending(i.id)).map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(if previewing { &i.placement } else { placed.get(&i.id).unwrap_or(&i.placement) }) })).collect();
+        let instances: Vec<Value> = asm.instances.iter().filter(|i| !pending(i.id)).map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(hidden.unwrap_or(&placed).get(&i.id).unwrap_or(&i.placement)) })).collect();
         // As live's REST gives them: the mateType enum ("PIN_SLOT") and the feature status ("OK"; a suppressed mate's
         // too, asm-mate-menu-suppress).
         // (The mate being edited is committed as it was: OK while its dialog is red, live mistake-asm-mate-one-connector s8.)

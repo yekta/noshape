@@ -98,6 +98,8 @@ struct MateSession {
     solve_all: bool,
     /// Heads-up checkmark position (viewport-local) once both connectors are picked.
     hud: Option<DVec2>,
+    /// The placements solved when the dialog opened: what live's REST still reads while the dialog hides its preview.
+    opened_at: HashMap<InstanceId, Placement>,
     _sub: Subscription,
 }
 
@@ -2666,7 +2668,8 @@ impl AssemblyView {
         if editing.is_some() {
             self.selected_mate = None;
         }
-        self.mate = Some(MateSession { dialog, editing, solve_all: false, hud: None, _sub: sub });
+        let opened_at = self.result.solved.placements.iter().cloned().collect();
+        self.mate = Some(MateSession { dialog, editing, solve_all: false, hud: None, opened_at, _sub: sub });
         self.ui.mate_field_focus = true;
         self.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
         self.schedule_eval(window, cx);

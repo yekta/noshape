@@ -5443,3 +5443,40 @@ fn an_edited_revolute_goes_home_into_its_limits(cx: &mut TestAppContext) {
     assert!((undo(cx) - 40.0).abs() < 1e-6, "Undo: 40° back");
     assert!(edit(Some(("-120", "110")), cx).abs() < 1e-6, "limits −120/110: home 0");
 }
+
+/// Live REST in asm-import-step-slider-pin-on-r4-fillet-ok and revolute-pin-in-r2-corner-ok s17: a new Slider's moving
+/// part reads at its preview once both connectors are picked; a new Fastened's stays where it is stored until ✓
+/// (fastened-top-to-spline-face-ok s15-16).
+#[gpui::test]
+fn a_new_sliders_preview_reads_in_the_state_a_fastened_does_not(cx: &mut TestAppContext) {
+    for (t, name, reads_preview) in [(MateType::Slider, "mate-state-slider", true), (MateType::Fastened, "mate-state-fastened", false)] {
+        let (window, view) = pattern_assembly(cx, name);
+        let read = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui_state(cx)["assembly"]["instances"].clone());
+        let stored = read(cx);
+        let solved = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).result.solved.placements.clone());
+        let before = solved(cx);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            v.start_mate(t, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+        }))
+        .unwrap();
+        let moved = |cx: &mut TestAppContext| {
+            let now = solved(cx);
+            now.iter().any(|(id, p)| before.iter().find(|(b, _)| b == id).is_none_or(|(_, q)| (glam::DVec3::from(p.translation) - glam::DVec3::from(q.translation)).length() > 1e-5 || glam::DQuat::from_array(p.rotation).dot(glam::DQuat::from_array(q.rotation)).abs() < 1.0 - 1e-9))
+        };
+        for _ in 0..600 {
+            if moved(cx) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            cx.executor().advance_clock(std::time::Duration::from_millis(50));
+            cx.run_until_parked();
+        }
+        draw(cx, window);
+        let placements = cx.update(|cx| format!("{:?}", view.read(cx).result.solved.placements));
+        assert!(moved(cx), "{t:?}: the preview moves a part: {placements}");
+        assert_eq!(read(cx) != stored, reads_preview, "{t:?}: the state reads the preview");
+    }
+}
