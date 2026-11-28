@@ -35,26 +35,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## STATE 11-28 11:4x (start here)
-- QUEUED 3ff853aa 10:3x (654fc768 failed 09:44 on a rebase conflict; rebased clean on ab9dc25196, re-landed): Section view
-  Items fix, ps79 tickets, runner per-format export memory. Lead reports; never poll.
-- NOT LANDED (local, after 3ff853aa): 7569c85870 + b7de2964eb (Ctrl+click beside an open context menu: os_menu dismisses
-  and lets the press through, so the viewport reopens the menu there, as live's take s81-s84; the sketch menu and a
-  Ctrl+press take the used curve under the cursor (`used_curve_under_cursor`; the Ctrl+press sets ed.cursor from its own
-  position since the hover holds while a menu is open); tests feel::a_click_beside_an_open_context_menu_only_closes_it,
-  the_menu_over_a_used_line_takes_the_line_not_the_edge_under_it), dfc2419fb6 (used spline: no Insert spline points;
-  line + spline at its end: "Intersection angle" only; scene pair_readouts test), 912eb874e3 (ui_script reports the
-  Variable table panel's tables: hook variable_table_state -> VariableStudioView::ui_table, then the own untitled table).
-  Mac ps85/86/87/89 green (clippy + tests). ps88 replay: vs-ps-variable-table-after-edit tables match (step 1's live
-  "Where used" document.panel is a stale live state: tell qa/live); sketch-used-rclick-menu-spline and the readout match.
-- RUNNING ps90 (vibe2 replay, /root/psui-scratch/resp/ps90.log; JSONs vibe2:tmp/psui/ps90/a): check
-  sketch-used-ctrl-multiselect s81-s85 (live: menu reopened, selection 1, s84 Extrude 2 "Sketch curves to extrude" with
-  line + spline). Live's s81 menu lacks Construction/Extrude/Revolve (line + the arc?) ours may still differ there (our
-  menu reads the held hover). Then tick in TICKETS (qa rows "qa 11-28 10:5x"): SKETCH-USED-CTRL-CLICK-WITH-MENU-OPEN (if
-  s84 matches), VS-PS-VARIABLE-TABLE-EMPTY, MEASURE-LINE-SPLINE-INTERSECTION, SKETCH-USED-SPLINE-NO-INSERT-POINTS; land.
+## STATE 11-28 12:3x (start here)
+- 3ff853aa LANDED (main 3a9f10842e..4bd4ec52d9). QUEUED now (12:3x, rebased on main): Ctrl+click beside an open menu
+  reopens it there (os_menu dismisses and lets the press through; the sketch menu and a Ctrl+press take the used curve
+  under the cursor via `used_curve_under_cursor`); used spline menu without Insert spline points; line + spline
+  "Intersection angle"; ui-parity Variable table tables (hook variable_table_state); Extrude… from a sketch with only
+  curves selected = Surface with those curves (`selected_sketch_curves`, start_feature; live ctrl-multiselect s85);
+  ui-parity reports the renamed Variable's "Update all references" box (`update_references_shown`). Five qa rows ticked.
+  Mac ps91 (614 sketch ui tests) + ps92 green. Lead reports; never poll.
+- ps90 replay: ctrl-multiselect s83-84 match; s82 rows differ only because ours used an arc at s62 where live used a
+  point (sketch geometry); s85 fixed after ps90 (not replayed yet: next replay batch). vs-ps-variable-table-after-edit
+  step 1: live's "Where used" panel is stale live state: told qa/live (12:3x).
 - Open from qa's list: P3 ASM-INSERT-PANEL-PART-LIST (asm-insert-spline-part-ok s3-5; with ASM-INSERT-DIALOG-LIST).
-- TEST MEMORY DONE (ps83 on vibe2, 11-28 10:5x): the whole part-studio-ui binary peaks at 2.02 GB (was 3.75; earlyoom
-  kills were at 5.2-5.4). Heaviest single tests ~1.0-1.2 GB (two windows each): not worth more.
 - Then: Apply export rules (waits REQUESTS 05:3x), Realign retake (REQUESTS 09:3x), PICK-FACE-OVER-NEAR-EDGE (P3).
 - Section view (fd74228711): dialog fields are ui-script `field:` targets; a Parts list row goes into Items when
   active (selected till ✓), ignored with Section planes active; T1 a_part_row_goes_into_the_section_dialogs_items_field.
