@@ -2661,7 +2661,7 @@ impl Viewport {
         self.buttons.set(e.button, true);
         cx.stop_propagation();
         // A left press beside an open menu only closes it (live: nothing selected, no box).
-        if e.button == MouseButton::Left && crate::os_menu::press_closed_menu(e.position, cx) {
+        if (e.button == MouseButton::Left || is_ctrl_click(e)) && crate::os_menu::press_closed_menu(e.position, cx) {
             self.drag = Drag::None;
             return;
         }
@@ -3328,6 +3328,16 @@ fn converted_ctrl_click() -> bool {
 #[cfg(not(target_os = "macos"))]
 fn converted_ctrl_click() -> bool {
     false
+}
+
+/// A press that is Onshape's context-menu gesture made with Ctrl (a left press with Ctrl; macOS hands it over as a right
+/// press).
+pub(crate) fn is_ctrl_click(e: &MouseDownEvent) -> bool {
+    match e.button {
+        MouseButton::Left => e.modifiers.control,
+        MouseButton::Right => converted_ctrl_click(),
+        _ => false,
+    }
 }
 
 /// The newest mouse press's number and the time since the press before it by the platform's own event times, where

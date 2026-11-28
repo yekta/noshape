@@ -986,7 +986,8 @@ fn a_cover_reached_from_the_list_lights_nothing_after_it_closes(cx: &mut TestApp
 }
 
 /// Live2 submenu-diag-1119 (qa face-rclick-select-fillet-faces): a click beside an open context menu only closes it:
-/// the plane under it isn't selected (live: selection 0); the next click there selects the plane.
+/// the plane under it isn't selected (live: selection 0); the next click there selects the plane. A Ctrl+click there
+/// first leaves the menu open.
 #[gpui::test]
 fn a_click_beside_an_open_context_menu_only_closes_it(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -1016,7 +1017,17 @@ fn a_click_beside_an_open_context_menu_only_closes_it(cx: &mut TestAppContext) {
     vcx.simulate_mouse_down(at, gpui_kit::MouseButton::Right, Modifiers::default());
     vcx.simulate_mouse_up(at, gpui_kit::MouseButton::Right, Modifiers::default());
     pointer.settle(cx, &view);
-    let opened = cx.update(|cx| view.read(cx).context_menu.is_some());
+    let opened = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|m| m.0));
+    // Live sketch-used-ctrl-multiselect s81-s83: a Ctrl+click beside it keeps the same menu open and selects nothing.
+    let at_plane = pointer.window_point(cx, plane_spot);
+    let ctrl = Modifiers { control: true, ..Default::default() };
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_down(at_plane, gpui_kit::MouseButton::Left, ctrl);
+    vcx.simulate_mouse_up(at_plane, gpui_kit::MouseButton::Left, ctrl);
+    pointer.settle(cx, &view);
+    let kept = cx.update(|cx| (view.read(cx).context_menu.as_ref().map(|m| m.0), view.read(cx).selection.clone()));
+    assert!(opened.is_some() && kept == (opened, Vec::new()), "a Ctrl+click beside the face's menu ({opened:?}) left (menu, selection) {kept:?}");
+    let opened = opened.is_some();
     pointer.click(cx, &view, plane_spot);
     let after = cx.update(|cx| (view.read(cx).context_menu.is_some(), view.read(cx).selection.clone()));
     pointer.click(cx, &view, plane_spot);
