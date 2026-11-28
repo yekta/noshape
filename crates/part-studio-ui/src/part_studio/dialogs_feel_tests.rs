@@ -1015,7 +1015,8 @@ fn rows() -> Vec<Row> {
             let place = (panel.origin - origin) == crate::part_studio::behaviors::feature_dialog_pos();
             let size = (f32::from(panel.size.width).round(), f32::from(panel.size.height).round());
             let state = cx.update(|cx| view.read(cx).appearance_dialog_state(cx)).ok_or("no state")?;
-            let (title, chips) = (state["title"].as_str().map(str::to_string), state["fields"][0]["items"].clone());
+            let feature = &state["feature"];
+            let (title, chips) = (feature["title"].as_str().map(str::to_string), feature["fields"][0]["items"].clone());
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_edit_color([255, 0, 0], w, cx))).unwrap();
             draw(cx, window);
             // The first face's vertices red, another face's left to the part colour (alpha 0).

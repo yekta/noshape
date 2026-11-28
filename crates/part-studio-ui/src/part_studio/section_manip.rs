@@ -329,6 +329,19 @@ impl PartStudioView {
                 }
                 // Live: the box then takes typing, its value selected.
                 let Some(r) = self.ui.section_rot.filter(|r| r.dragging) else {
+                    // A click on the arrow (no move past the dead zone) flips the plane (live section-view-click-arrow:
+                    // "Section plane 1 (Top)" becomes "(Bottom)").
+                    if self.manip_drag.is_some() && self.ui.arrow_press.take().is_some() {
+                        self.manip_drag = None;
+                        if let Some(i) = self.ui.section_dialog.as_ref().map(|d| d.active)
+                            && let Some(pl) = self.ui.section.get_mut(i)
+                        {
+                            pl.flipped = !pl.flipped;
+                        }
+                        self.apply_section(window, cx);
+                        self.sync_manipulator(cx);
+                        return Some(true);
+                    }
                     if self.manip_drag.is_some() {
                         self.open_section_box(window, cx);
                     }

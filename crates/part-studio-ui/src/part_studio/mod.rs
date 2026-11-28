@@ -3696,9 +3696,15 @@ impl PartStudioView {
                 Reference::Face(n) => this.context.as_ref()?.bodies.iter().find_map(|b| {
                     let fi = *b.find_faces(n).first()?;
                     let face = b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?;
-                    let pl = face.face_plane().ok()??;
-                    let (normal, x) = (pl.unit_normal(), pl.unit_x());
-                    Some((noshape_model::display::PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal }, face.centroid().ok()))
+                    // A cylinder's face looks down its axis (live appearance-maker-plate-r8-face offers View normal to).
+                    let (origin, normal, x) = match face.face_plane().ok()? {
+                        Some(pl) => (pl.origin, pl.unit_normal(), pl.unit_x()),
+                        None => match face.face_surface().ok()? {
+                            noshape_kernel::Surface::Cylinder { origin, axis, x_dir, .. } => (origin, axis.normalize(), x_dir.normalize()),
+                            _ => return None,
+                        },
+                    };
+                    Some((noshape_model::display::PlaneFrame { origin, x, y: normal.cross(x), normal }, face.centroid().ok()))
                 }),
                 _ => None,
             }
@@ -3726,6 +3732,16 @@ impl PartStudioView {
             let fwd = noshape_scene::camera_ops::normal_forward(cur, f.normal);
             self.viewport.update(cx, |vp, cx| vp.animate_to_direction_centred(fwd, f.y, centre, cx));
         }
+    }
+
+    /// Whether a face reference lies on a cylinder (live's face menu offers View normal to and Section view… there).
+    pub(super) fn cylinder_face(&self, r: &Reference) -> bool {
+        let Reference::Face(n) = r else { return false };
+        self.context.as_ref().is_some_and(|c| {
+            c.bodies.iter().any(|b| {
+                b.find_faces(n).first().and_then(|fi| b.shape.sub_shape(noshape_kernel::ShapeType::Face, *fi).ok()).and_then(|f| f.face_surface().ok()).is_some_and(|s| matches!(s, noshape_kernel::Surface::Cylinder { .. }))
+            })
+        })
     }
 
     /// "View normal to section plane" (live ui-com/03: the face menu while
@@ -8180,6 +8196,13 @@ impl Render for PartStudioView {
                 }
                 if this.ui.create_selection.is_some() {
                     this.close_create_selection(cx);
+                    return;
+                }
+                // The Library select's list first, then the panel (live material-library-dropdown).
+                if let Some(m) = &mut this.ui.material_panel
+                    && m.close_library_list()
+                {
+                    cx.notify();
                     return;
                 }
                 if this.ui.material_panel.take().is_some() {

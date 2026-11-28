@@ -519,8 +519,8 @@ fn open_modal((base, title): (String, SharedString), assembly: bool, parts_only:
                     body.child(
                         div()
                             .mt(px(mt))
-                            .child(crate::os_ui::field_label(label))
-                            .child(div().mt(px(FIELD_MT)).h(px(34.)).px(px(1.)).flex().items_center().border_1().border_color(gpui_kit::rgb(border)).rounded(px(4.)).bg(pal.panel).child(Input::new(&input).appearance(false).text_size(px(14.))))
+                            .child(crate::os_ui::field_label(label.clone()))
+                            .child(crate::ui_script::mark(div().mt(px(FIELD_MT)).h(px(34.)).px(px(1.)).flex().items_center().border_1().border_color(gpui_kit::rgb(border)).rounded(px(4.)).bg(pal.panel).child(Input::new(&input).appearance(false).text_size(px(14.))), move || format!("field:{label}")))
                             .when_some(error, |d, e| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child(e))),
                     )
                 }

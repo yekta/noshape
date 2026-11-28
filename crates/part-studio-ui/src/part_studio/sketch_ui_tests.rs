@@ -3358,7 +3358,8 @@ fn the_appearance_editors_fields_tab_and_enter_as_live(cx: &mut TestAppContext) 
     keys(cx, window, &["1", "2", "tab"]);
     assert_eq!(focused(cx), Some(3), "Tab: G");
     keys(cx, window, &["tab", "tab"]);
-    assert_eq!(focused(cx), Some(0), "after B, A");
+    // Live appearance-part-rgb-escape: after B, Tessellation quality's select (no colour field).
+    assert_eq!(focused(cx), None, "after B, the select");
     keys(cx, window, &["shift-tab", "shift-tab", "shift-tab"]);
     assert_eq!(focused(cx), Some(2), "Shift+Tab back to R");
     keys(cx, window, &["backspace", "backspace", "tab"]);

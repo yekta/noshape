@@ -75,6 +75,10 @@ pub struct AppearanceEdit {
     /// put them back), and the values last put in.
     before: Option<(Vec<FaceAppearance>, std::collections::BTreeMap<BodyId, noshape_model::partstudio::PartProperties>)>,
     applied: ([u8; 3], f32, TessQuality),
+    /// The parts' colours as drawn when it opened: live's document keeps them until the colour is committed.
+    shown: std::collections::BTreeMap<BodyId, [f32; 4]>,
+    /// Tessellation quality's select, Tab's stop after B.
+    select_focus: FocusHandle,
     /// It adds a face appearance (✓ is on from the start).
     adds: bool,
     pub(super) hex: Entity<InputState>,
@@ -89,6 +93,11 @@ impl AppearanceEdit {
     /// until Enter or a click away commits the colour).
     pub(super) fn committed_props(&self) -> Option<&std::collections::BTreeMap<BodyId, noshape_model::partstudio::PartProperties>> {
         self.before.as_ref().map(|(_, props)| props)
+    }
+
+    /// A part's colour as drawn when the editor opened (its preview isn't in live's document yet).
+    pub(super) fn committed_color(&self, body: &BodyId) -> Option<[f32; 4]> {
+        self.shown.get(body).copied()
     }
 
     /// ✓ is on: something changed, or it adds a face appearance.
@@ -275,10 +284,11 @@ impl PartStudioView {
         };
         let rgb = [lin_to_srgb(color[0]), lin_to_srgb(color[1]), lin_to_srgb(color[2])];
         let transparency = 1.0 - color[3].clamp(0.0, 1.0);
-        let hex = cx.new(|cx| InputState::new(window, cx).default_value(hex_field(rgb)));
-        // A click in R, G or B puts the caret there (live appearance-face-row-remove: no select-all).
+        // A click in #, R, G, B or A puts the caret there (live appearance-face-row-remove, appearance-part-opacity-half:
+        // no select-all).
+        let hex = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(hex_field(rgb)));
         let channels = [0, 1, 2].map(|i| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(rgb[i].to_string())));
-        let alpha = cx.new(|cx| InputState::new(window, cx).default_value(noshape_units::to_fixed(f64::from(1.0 - transparency), 2)));
+        let alpha = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(noshape_units::to_fixed(f64::from(1.0 - transparency), 2)));
         // Live (behaviours "Appearance editor R / G / B / A / hex"): keystroke-filtered colour fields, rewritten as
         // typed (the filter below), not expression fields.
         let refilter = |st: &Entity<InputState>, filter: fn(&str) -> String, window: &mut Window, cx: &mut App| -> String {
@@ -294,9 +304,11 @@ impl PartStudioView {
                 return;
             }
             let text = refilter(st, hex_input, window, cx);
-            if let Some(rgb) = parse_hex(&text).filter(|_| text.len() == 6) {
-                this.set_edit_color_from(rgb, Some(ColorField::Hex), window, cx);
-            }
+            let Some(rgb) = parse_hex(&text).filter(|_| text.len() == 6) else {
+                // An incomplete colour: Enter does nothing, the editor stays (live mistake-appearance-hex-invalid).
+                return;
+            };
+            this.set_edit_color_from(rgb, Some(ColorField::Hex), window, cx);
             this.appearance_enter(ev, cx);
         })];
         for (i, ch) in channels.iter().enumerate() {
@@ -372,7 +384,8 @@ impl PartStudioView {
             });
         }
         let adds = matches!(target, EditTarget::Faces(_, None));
-        self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), before: None, applied: (rgb, transparency, tess), adds, hex, channels, alpha, _subs: subs });
+        let shown = self.display.bodies.iter().map(|b| (b.id.clone(), b.color)).collect();
+        self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), before: None, applied: (rgb, transparency, tess), shown, select_focus: cx.focus_handle(), adds, hex, channels, alpha, _subs: subs });
         // Its parts outlined at once, untinted (live tools-1119 a1-appearance).
         self.refresh_scene(false, cx);
         cx.notify();
@@ -389,11 +402,18 @@ impl PartStudioView {
         }
     }
 
-    /// Tab / Shift+Tab: the next or previous field, A → # → R → G → B (live), its text selected.
+    /// Tab / Shift+Tab: the next or previous field, A → # → R → G → B (live), its text selected; Tab from B goes on to
+    /// Tessellation quality's select, which holds no text (live appearance-part-rgb-escape).
     fn appearance_tab(&mut self, step: isize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(e) = &self.ui.appearance_edit else { return };
         let fields = [e.alpha.clone(), e.hex.clone(), e.channels[0].clone(), e.channels[1].clone(), e.channels[2].clone()];
-        let at = fields.iter().position(|f| f.read(cx).focus_handle(cx).is_focused(window)).unwrap_or(0);
+        let on_select = e.select_focus.is_focused(window);
+        let at = fields.iter().position(|f| f.read(cx).focus_handle(cx).is_focused(window)).unwrap_or(if on_select { fields.len() } else { 0 });
+        if step > 0 && at + 1 == fields.len() && matches!(e.target, EditTarget::Parts(_)) {
+            window.focus(&e.select_focus, cx);
+            cx.notify();
+            return;
+        }
         let next = &fields[(at as isize + step).rem_euclid(fields.len() as isize) as usize];
         next.update(cx, |s, cx| {
             s.focus(window, cx);
@@ -817,6 +837,7 @@ impl PartStudioView {
                 }
             }));
         let tess = e.tessellation;
+        let select_focus = e.select_focus.clone();
         let view = cx.entity();
         let tess_select = crate::os_ui::select_field("ap-tess", TessQuality::ALL.iter().map(|q| q.label().to_string()).collect(), TessQuality::ALL.iter().position(|q| *q == tess).unwrap_or(0), move |i, _, cx| {
             view.update(cx, |this, cx| {
@@ -826,6 +847,7 @@ impl PartStudioView {
                 this.apply_appearance(false, cx);
             })
         })
+        .track_focus(&select_focus)
         .h(px(26.))
         .w(px(97.))
         .pl(px(6.))
@@ -1211,7 +1233,11 @@ impl PartStudioView {
                             };
                             let (r, e, c) = (b2.clone(), b2.clone(), b2.clone());
                             m.item(item("Rename…", Box::new(move |this, w, cx| this.open_folder_prompt_for(super::FolderTarget::Part(r.clone()), w, cx))))
-                                .item(item("Edit appearance…", Box::new(move |this, w, cx| this.edit_appearance(EditTarget::Parts(vec![e.clone()]), w, cx))))
+                                .item(item("Edit appearance…", Box::new(move |this, w, cx| {
+                                    // Live (appearance-panel-edit-part-row): the part is selected while its editor is open.
+                                    this.selection = vec![Reference::Body(e.clone())];
+                                    this.edit_appearance(EditTarget::Parts(vec![e.clone()]), w, cx);
+                                })))
                                 .when(configurable, |m| m.item(item("Configure appearance", Box::new(move |this, _, cx| this.configure_appearance(c.clone(), cx)))))
                         })
                         // The popup beside the row, left of the panel.

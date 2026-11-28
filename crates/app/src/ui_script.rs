@@ -272,6 +272,13 @@ fn control_name(t: &Value) -> Option<String> {
         Some(b) => return Some(format!("button:{b}")),
         None => {}
     }
+    // A configuration table's cell "<row>:<column>", in the table of `input` if given (README config_cell).
+    if let Some(c) = t.get("config_cell").and_then(Value::as_str) {
+        return Some(match t.get("input").and_then(Value::as_str) {
+            Some(i) => format!("config_cell:{i}|{c}"),
+            None => format!("config_cell:{c}"),
+        });
+    }
     // One of a dialog's unlabelled fields by its order (`"index"`, from 0: a mate's X / Y / Z offset boxes, live
     // asm-fastened-offset).
     if let (Some(f), Some(i), None) = (t.get("field").and_then(Value::as_str), t.get("index").and_then(Value::as_u64), t.get("chip")) {
@@ -295,7 +302,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "var_header", "table_title", "table_header", "crumb", "col_header", "col_grip", "row_icon", "recent_card", "editor", "cp_header", "notice", "profile_badge", "table_cell", "measure_value", "toggle"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "config_param", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "var_header", "table_title", "table_header", "crumb", "col_header", "col_grip", "row_icon", "recent_card", "editor", "cp_header", "notice", "profile_badge", "table_cell", "measure_value", "toggle"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))

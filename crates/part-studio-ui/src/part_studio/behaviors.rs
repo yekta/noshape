@@ -503,6 +503,9 @@ pub struct UiState {
     /// The center of mass being worked out off the UI thread for that part (Show center of mass on a big part).
     pub com_task: Option<(BodyId, Task<()>)>,
     pub mass_ref_active: bool,
+    /// The selection Mass properties opened with: a part clicked since gives "Parts to measure" the keyboard (live
+    /// mass-properties-add-part).
+    pub mass_opened_with: Vec<Reference>,
     pub mass_reference: Option<Reference>,
     /// Mass and section properties › Show calculation variance, and the
     /// bounds of the parts last measured (by the model they came from: two
@@ -1024,6 +1027,7 @@ impl UiState {
             com: None,
             com_task: None,
             mass_ref_active: false,
+            mass_opened_with: Vec::new(),
             mass_reference: None,
             mass_variance: false,
             mass_state: None,
@@ -1187,6 +1191,8 @@ impl UiState {
 
 /// The info toast while a Remove / Intersect tool misses the parts (live 234).
 pub(super) const NO_INTERSECTION: &str = "Selected tools and targets do not intersect.";
+/// The toast of a part rename emptied (live mistake-rename-blank).
+const NAME_REQUIRED: &str = "Name is required.";
 
 /// Marks a Transform ghost's body id (scene only).
 const GHOST_INDEX_BIT: u32 = 1 << 31;
@@ -1716,6 +1722,11 @@ impl PartStudioView {
                     .collect(),
             );
         }
+        // Section view's Section planes: an edge clicked gives the face beside it (live mistake-section-view-pick-edge:
+        // the block's top edge picks its top face, no message).
+        if self.ui.section_dialog.as_ref().is_some_and(|d| !d.items_active) {
+            return Some(vec![PickKind::Face, PickKind::Plane, PickKind::Connector]);
+        }
         let t = self.ui.analysis_tool.as_ref().filter(|_| self.edit.is_none())?;
         use super::analysis_tools::ToolKind as T;
         Some(match t.kind {
@@ -2060,10 +2071,19 @@ impl PartStudioView {
     pub(super) fn start_part_rename(&mut self, body: BodyId, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
-        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, _, ev: &InputEvent, _, cx| {
-            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
-                this.commit_part_rename(cx);
+        // An emptied name shows live's "Name is required." toast at once (live mistake-rename-blank).
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
+            InputEvent::PressEnter { .. } | InputEvent::Blur => this.commit_part_rename(cx),
+            InputEvent::Change => {
+                let empty = st.read(cx).value().trim().is_empty();
+                if empty {
+                    this.message = Some((noshape_model::display::FeatureStatus::Error, NAME_REQUIRED.into()));
+                } else if this.message.as_ref().is_some_and(|(_, m)| m == NAME_REQUIRED) {
+                    this.message = None;
+                }
+                cx.notify();
             }
+            _ => {}
         });
         st.update(cx, |s, cx| {
             s.focus(window, cx);
@@ -2077,6 +2097,9 @@ impl PartStudioView {
     pub(super) fn commit_part_rename(&mut self, cx: &mut Context<Self>) {
         let Some((body, st, _)) = self.ui.part_renaming.take() else { return };
         let text = st.read(cx).value().trim().to_string();
+        if self.message.as_ref().is_some_and(|(_, m)| m == NAME_REQUIRED) {
+            self.message = None;
+        }
         let old = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_default();
         if !text.is_empty() && text != old {
             self.doc.update(cx, |doc, cx| {

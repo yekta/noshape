@@ -310,7 +310,8 @@ impl MetaForm {
         let v = spec.values.clone();
         let text = |s: &str, window: &mut Window, cx: &mut Context<Self>| {
             let s = s.to_string();
-            cx.new(|cx| InputState::new(window, cx).default_value(s))
+            // A click puts the caret where it lands, as a browser input (live properties-name-save-renames).
+            cx.new(|cx| InputState::new(window, cx).select_on_focus(false).default_value(s))
         };
         let opt = |s: &Option<String>| s.clone().unwrap_or_default();
         let name = text(&v.name, window, cx);
@@ -327,7 +328,7 @@ impl MetaForm {
         let drawing = v.drawing.as_ref().map(|d| [text(&d[0], window, cx), text(&d[1], window, cx), text(&d[2], window, cx), text(&d[3], window, cx), text(&d[4], window, cx)]);
         let mass = {
             let m = v.mass_override.clone().unwrap_or_default();
-            cx.new(|cx| InputState::new(window, cx).placeholder("Computed value").default_value(m))
+            cx.new(|cx| InputState::new(window, cx).select_on_focus(false).placeholder("Computed value").default_value(m))
         };
         let mut subs = Vec::new();
         for st in [&name, &part_number, &revision, &vendor, &project, &product_line, &titles[0], &titles[1], &titles[2], &mass].into_iter().chain(drawing.iter().flatten()) {

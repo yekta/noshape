@@ -25,6 +25,8 @@ impl PartStudioView {
         } else if let Some((label, st)) = self.ui.var_input.as_ref().and_then(|d| d.focused_field(window, cx)) {
             // The Variable input dialog's field (live: its label, "Name" on opening).
             crate::feature_dialog::field_focus(label, st)
+        } else if let Some((label, st)) = self.ui.material_panel.as_ref().and_then(|m| m.focused_custom_field(window, cx)) {
+            crate::feature_dialog::field_focus(label, st)
         } else if let Some(st) = dim_box {
             // Live: an input outside the dialogs.
             let mut f = crate::feature_dialog::field_focus("", st);
@@ -269,6 +271,8 @@ impl PartStudioView {
         // Mass properties' Face tab: its faces field has the keyboard (live ui-parity mass-properties-face-tab).
         if focus["kind"] == "none" && self.show_mass && self.ui.mass_faces && !self.ui.mass_ref_active {
             focus = json!({ "kind": "field", "label": "Faces to measure", "dialog": "Mass and section properties" });
+        } else if focus["kind"] == "none" && self.show_mass && !self.ui.mass_ref_active && self.selection != self.ui.mass_opened_with {
+            focus = json!({ "kind": "field", "label": "Parts to measure", "dialog": "Mass and section properties" });
         }
         if in_dialog.is_some() {
             // (The Appearance editor's as its older reading titles it: `feature`.)
@@ -287,6 +291,8 @@ impl PartStudioView {
             "tooltip": null,
             "undo": self.ui_undo_state(cx),
             "part_data": self.ui_part_data(cx),
+            "variables": self.ui_config_variables(cx),
+            "configurations": self.ui_configurations(cx),
             "panels": self.ui_panels(),
             "sketch": self.ui_sketch_state(cx),
             "camera": self.ui_camera_state(cx),
@@ -297,6 +303,94 @@ impl PartStudioView {
                 None => json!({ "readout": self.ui.measure_readout, "panel": null }),
             },
         })
+    }
+
+    /// `variables` (README "config_data", live depth batch 10): the Variable table panel's tables (none here yet) and the
+    /// Configuration panel's inputs while it is open, a List's configured columns ("Extrude 1 › Depth") and each row's
+    /// values (a cell being typed in as typed).
+    fn ui_config_variables(&self, cx: &App) -> Value {
+        use noshape_model::configuration::ConfigInputKind as K;
+        let open = self.right_panel == Some(super::config_panel::RightPanel::Configurations);
+        let configuration = self.studio(cx).filter(|_| open).map(|studio| {
+            let cfg = &studio.configuration;
+            let typed = |key: &str| self.panel_inputs.get(key).map(|(st, _)| st.read(cx).value().to_string());
+            cfg.inputs
+                .iter()
+                .map(|i| {
+                    let shown = cfg.value_of(&self.config_values, &i.id);
+                    let mut v = match &i.kind {
+                        K::List { options, default } => {
+                            let name = |id: &str| options.iter().find(|o| o.id == id).map(|o| o.name.clone());
+                            let mut columns: Vec<(usize, &noshape_model::configuration::ConfiguredParam)> = cfg.configured.iter().enumerate().filter(|(_, c)| c.input == i.id).collect();
+                            columns.sort_by_key(|(_, c)| {
+                                let pi = studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.params.iter().position(|p| p.id == c.param));
+                                (studio.index_of(c.feature).unwrap_or(usize::MAX), pi.unwrap_or(usize::MAX))
+                            });
+                            let header = |c: &noshape_model::configuration::ConfiguredParam| {
+                                let feature = studio.feature(c.feature);
+                                let param = feature.and_then(|f| f.feature_type()).and_then(|t| t.param(&c.param)).map(|p| p.column_label().to_string());
+                                let param = param.unwrap_or_else(|| if c.param == noshape_model::configuration::SUPPRESSED_PARAM { "Suppressed".into() } else { c.param.clone() });
+                                format!("{} › {param}", feature.map(|f| f.name.clone()).unwrap_or_else(|| "Deleted feature".into()))
+                            };
+                            let cell = |ci: usize, c: &noshape_model::configuration::ConfiguredParam, row: &str| {
+                                let key = format!("cp-{ci}-{row}");
+                                if self.ui.cfg_editing.as_deref() == Some(key.as_str())
+                                    && let Some(t) = typed(&key)
+                                {
+                                    return json!(t);
+                                }
+                                match c.values.get(row) {
+                                    Some(noshape_model::ParamValue::Bool(b)) => json!(b),
+                                    Some(noshape_model::ParamValue::Expr(e)) => json!(e.text),
+                                    Some(noshape_model::ParamValue::Text(t) | noshape_model::ParamValue::Enum(t)) => json!(t),
+                                    _ => Value::Null,
+                                }
+                            };
+                            let mut rows: Vec<String> = options.iter().map(|o| o.name.clone()).collect();
+                            let mut values: Vec<Value> = options.iter().map(|o| json!(columns.iter().map(|(ci, c)| cell(*ci, c, &o.id)).collect::<Vec<_>>())).collect();
+                            // The italic add row being typed in reads as a row (live config-list-three-rows-pick).
+                            if let Some(t) = typed(&format!("opt-new-{}-{}", i.id, options.len())).filter(|t| !t.trim().is_empty()) {
+                                rows.push(t);
+                                values.push(json!([]));
+                            }
+                            let columns: Vec<String> = columns.iter().map(|(_, c)| header(c)).collect();
+                            json!({ "kind": "list", "default": name(default), "shown": shown.as_deref().and_then(name), "rows": rows, "columns": columns, "values": values })
+                        }
+                        K::Checkbox { default } => json!({ "kind": "checkbox", "default": default, "shown": shown.map(|v| v == "true"), "rows": [] }),
+                        K::Variable { default, .. } => json!({ "kind": "variable", "default": default.text, "shown": shown, "rows": [] }),
+                        K::Text { default } => json!({ "kind": "text", "default": default, "shown": shown, "rows": [] }),
+                    };
+                    v["name"] = json!(i.name);
+                    v
+                })
+                .collect::<Vec<_>>()
+        });
+        json!({ "tables": [], "configuration": configuration, "insert_into_all": null, "configuration_panel": open, "help": null })
+    }
+
+    /// `configurations` (README "config_data"): the Configurations box above the feature list, its shown inputs and
+    /// their values; null while the Part Studio has no configuration input.
+    fn ui_configurations(&self, cx: &App) -> Value {
+        use noshape_model::configuration::ConfigInputKind as K;
+        let Some(cfg) = self.studio(cx).map(|s| &s.configuration).filter(|c| !c.inputs.is_empty()) else { return Value::Null };
+        let (shown, _) = cfg.visibility(&self.config_values);
+        let rows: Vec<Value> = cfg
+            .inputs
+            .iter()
+            .enumerate()
+            .filter(|(k, _)| shown.get(*k).is_none_or(|v| v.visible))
+            .map(|(_, i)| {
+                let value = cfg.value_of(&self.config_values, &i.id);
+                let (kind, value) = match &i.kind {
+                    K::List { options, .. } => ("list", json!(value.and_then(|id| options.iter().find(|o| o.id == id).map(|o| o.name.clone())))),
+                    K::Checkbox { .. } => ("checkbox", json!(value.map(|v| v == "true"))),
+                    K::Variable { .. } => ("variable", json!(value)),
+                    K::Text { .. } => ("text", json!(value)),
+                };
+                json!({ "label": i.name, "kind": kind, "value": value })
+            })
+            .collect();
+        json!(rows)
     }
 
     /// `part_data` (README "part_data", live 11-27): each part, surface and composite in the parts list's order, with
@@ -311,7 +405,7 @@ impl PartStudioView {
             .map(|b| {
                 let p = props.and_then(|ps| ps.get(&b.id));
                 let set = p.and_then(|p| p.appearance).map(|a| a.color);
-                let c = set.unwrap_or(b.color);
+                let c = set.or_else(|| self.ui.appearance_edit.as_ref().and_then(|e| e.committed_color(&b.id))).unwrap_or(b.color);
                 let hex: String = c[..3].iter().map(|v| format!("{:02X}", super::appearance::lin_to_srgb(*v))).collect();
                 let opacity = (c[3].clamp(0.0, 1.0) * 255.0 + 1e-3).floor() as u8;
                 json!({
@@ -458,6 +552,11 @@ impl PartStudioView {
         {
             let v = st.read(cx).value().to_string();
             return Some(json!({ "kind": "panel", "title": "Folder name", "text": [v], "fields": [{ "label": "Folder name", "kind": "input", "value": v }] }));
+        }
+        // A face appearance row's "Rename" popup (live appearance-panel-rename-face-row).
+        if let Some((st, super::FolderTarget::Appearance(_), _)) = &self.folder_prompt {
+            let v = st.read(cx).value().to_string();
+            return Some(json!({ "kind": "panel", "title": "Rename", "text": [v], "fields": [{ "label": "Rename", "kind": "input", "value": v }] }));
         }
         if let Some(state) = self.material_ui_state(cx) {
             return Some(state);

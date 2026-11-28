@@ -1712,6 +1712,15 @@ impl PartStudioView {
                     }
                     studio.feature(c.feature).and_then(|f| f.feature_type()).and_then(|t| t.param(&c.param)).map(|p| p.column_label().to_string()).unwrap_or_else(|| if c.param == noshape_model::configuration::SUPPRESSED_PARAM { "Suppressed".into() } else { "?".into() })
                 };
+                // The runner's column names (README config_cell): a parameter's label, a suppression's feature.
+                let col_names: Vec<String> = columns
+                    .iter()
+                    .map(|(_, c)| match c.param == noshape_model::configuration::SUPPRESSED_PARAM {
+                        true => studio.feature(c.feature).map(|f| f.name.clone()).unwrap_or_default(),
+                        false => label_of(c),
+                    })
+                    .collect();
+                let input_name = input.name.clone();
                 if columns.is_empty() {
                     section = section.child(h_flex().border_l_1().border_color(grid).child(head(name_w).relative().child(first).child(crate::ui::col_grip(&table, "name", NAME_W))));
                 } else {
@@ -1767,6 +1776,7 @@ impl PartStudioView {
                             cell(name_w)
                                 // The runner's row: its Name cell, where live's runner clicks (qa UIS-CONFIG-ROW-MENU).
                                 .map(|d| crate::ui_script::mark(d, || format!("config_row:{rname}")))
+                                .map(|d| config_cell_mark(d, &input_name, rname, first))
                                 .relative()
                                 .cursor_pointer()
                                 .pl(px(6.))
@@ -1835,7 +1845,8 @@ impl PartStudioView {
                         });
                     for (q, (ci, c)) in columns.iter().enumerate() {
                         // The active configuration's values are bold (live2 config.json cellColours).
-                        row = row.child(cell(col_ws[q]).when(active, |d| d.font_weight(FontWeight::BOLD)).child(self.configured_value_cell(*ci, c, rk, active, window, cx)));
+                        let value = self.configured_value_cell(*ci, c, rk, active, window, cx);
+                        row = row.child(cell(col_ws[q]).map(|d| config_cell_mark(d, &input_name, rname, &col_names[q])).when(active, |d| d.font_weight(FontWeight::BOLD)).child(value));
                     }
                     section = section.child(row);
                 }
@@ -1871,6 +1882,7 @@ impl PartStudioView {
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
                             cell(name_w)
+                                .map(|d| config_cell_mark(d, &input_name, "", "Name"))
                                 .relative()
                                 // Tab reaches the input as its IndentInline action (no key listener sees it).
                                 .capture_action(cx.listener(move |this, _: &gpui_kit::component::input::IndentInline, _, _| {
@@ -2772,9 +2784,11 @@ impl PartStudioView {
                 ConfigInputKind::Checkbox { .. } => {
                     let on = current == "true";
                     let iid = input.id.clone();
-                    crate::ui::os_checkbox(SharedString::from(format!("cfgbox-cb-{}", input.id)), "", on)
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_config_value(&iid, (!on).to_string(), window, cx)))
-                        .into_any_element()
+                    let name = input.name.clone();
+                    let b = crate::ui::os_checkbox(SharedString::from(format!("cfgbox-cb-{}", input.id)), "", on)
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_config_value(&iid, (!on).to_string(), window, cx)));
+                    // The runner's config_param: the box itself (README config_param).
+                    crate::ui_script::mark(div().child(b), || format!("config_param:{name}")).into_any_element()
                 }
                 // Variables and texts are typed in the box, a variable's value right-aligned; one out of range or not a
                 // value turns pink with a red underline, no message (live errors-1118).
@@ -2814,7 +2828,14 @@ impl PartStudioView {
                             .truncate()
                             .child(crate::ui::user_text(input.name.clone())),
                     )
-                    .child(div().debug_selector(|| format!("cfgbox-field-{}", input.id)).flex_1().min_w(px(field_min)).child(control))
+                    .child(
+                        div()
+                            .debug_selector(|| format!("cfgbox-field-{}", input.id))
+                            .when(!matches!(input.kind, ConfigInputKind::Checkbox { .. }), |d| crate::ui_script::mark(d, || format!("config_param:{}", input.name)))
+                            .flex_1()
+                            .min_w(px(field_min))
+                            .child(control),
+                    )
                     // Live part-studio/535: the excluded icon follows the value.
                     .when(input.excluded, |d| {
                         d.child(
@@ -3503,6 +3524,13 @@ impl PartStudioView {
 
 /// The Variable table's name check (FeatureScript identifier; empty is
 /// allowed, it commits nothing).
+/// A List / Checkbox table's cell for the runner (README config_cell): `config_cell:<row>:<column>`, the first table's,
+/// and `config_cell:<input>|<row>:<column>`.
+fn config_cell_mark(d: Div, input: &str, row: &str, column: &str) -> Div {
+    let d = crate::ui_script::mark_first(d, || format!("config_cell:{row}:{column}"));
+    crate::ui_script::mark(d, || format!("config_cell:{input}|{row}:{column}"))
+}
+
 fn valid_variable_name(v: &str) -> bool {
     let v = v.trim();
     v.is_empty() || noshape_model::variable_table::is_identifier(v.trim_start_matches('#'))

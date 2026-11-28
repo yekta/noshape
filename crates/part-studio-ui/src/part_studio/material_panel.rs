@@ -55,6 +55,16 @@ pub struct MaterialPanel {
 }
 
 impl MaterialPanel {
+    /// Closes the Library select's open list; whether it was open.
+    pub(super) fn close_library_list(&mut self) -> bool {
+        std::mem::take(&mut self.lib_open)
+    }
+
+    /// The Custom tab's focused field and its label (live material-custom-name-density: a labelled field).
+    pub(super) fn focused_custom_field<'a>(&self, window: &Window, cx: &'a App) -> Option<(&'static str, &'a InputState)> {
+        FIELDS.iter().zip(&self.custom_fields).map(|(l, e)| (*l, e.read(cx))).find(|(_, st)| st.focus_handle(cx).is_focused(window))
+    }
+
     /// The picked library material's name.
     pub(super) fn picked_name(&self) -> Option<String> {
         self.picked.as_ref().map(|e| e.name.clone())
@@ -116,10 +126,10 @@ impl PartStudioView {
         }
         ONSHAPE_MATERIALS
             .iter()
-            .map(|(n, c, d, extra)| Entry {
+            .map(|(n, c, d, kg_m3, extra)| Entry {
                 name: n.to_string(),
                 category: c.to_string(),
-                density: d.parse::<f64>().unwrap_or(0.0) * LB_IN3,
+                density: *kg_m3,
                 density_text: format!("{d} lb/in³"),
                 extra: extra.map(str::to_string),
             })
@@ -359,8 +369,7 @@ impl PartStudioView {
                     .py(px(3.))
                     .gap(px(1.))
                     .child(
-                        div()
-                            .id("matlib-select")
+                        crate::ui_script::mark(div().id("matlib-select"), || "dropdown:Library".into())
                             .flex_1()
                             .h(px(32.))
                             .px(px(5.))
@@ -426,10 +435,12 @@ impl PartStudioView {
                                     this.pick_material_row(e, window, cx);
                                 }
                             }
-                            // The list only; the keyboard back to the studio, so the next Esc cancels the dialog (live).
+                            // The list only, its search cleared; the keyboard stays in the search field, whose next Esc
+                            // cancels the dialog (live material-search-steel).
                             "escape" => {
                                 m.list_open = false;
-                                window.focus(&this.focus, cx);
+                                let search = m.search.clone();
+                                search.update(cx, |s, cx| s.set_value("", window, cx));
                             }
                             _ => return,
                         }

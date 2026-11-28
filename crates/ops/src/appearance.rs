@@ -8,9 +8,6 @@ use noshape_model::reference::{BodyId, FeatureId, Reference, Role, TopoName};
 /// A Material Library tab's Update… (also the history text).
 pub const UPDATE_MATERIAL_LIBRARY: &str = "Update material library";
 
-/// kg/m³ per lb/in³ (the Material panel shows lb/in³).
-pub const LB_IN3: f64 = 27_679.904_710_191;
-
 /// sRGB 0..255 to linear 0..1.
 pub fn srgb_to_lin(c: u8) -> f32 {
     let c = c as f32 / 255.0;
@@ -176,7 +173,7 @@ pub struct LibraryEntry {
 pub fn library_materials(doc: &noshape_model::Document) -> Vec<LibraryEntry> {
     let mut out: Vec<LibraryEntry> = crate::material_data::ONSHAPE_MATERIALS
         .iter()
-        .map(|(n, c, d, _)| LibraryEntry { library: "Onshape Material Library".into(), name: n.to_string(), category: c.to_string(), density: d.parse::<f64>().unwrap_or(0.0) * LB_IN3 })
+        .map(|(n, c, _, kg_m3, _)| LibraryEntry { library: "Onshape Material Library".into(), name: n.to_string(), category: c.to_string(), density: *kg_m3 })
         .collect();
     for (_, lib_name, lib) in noshape_model::material_library::libraries(doc) {
         out.extend(lib.materials.iter().map(|m| LibraryEntry { library: lib_name.clone(), name: m.name.clone(), category: m.category.clone(), density: m.density }));

@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
 # Added later (README "undo", "sketch", "assembly"): compared once live's recording has them.
-LATER_KEYS = ["undo", "sketch", "assembly", "drawing", "document", "documents", "preferences", "variables", "featurestudio", "camera", "measure", "part_data"]
+LATER_KEYS = ["undo", "sketch", "assembly", "drawing", "document", "documents", "preferences", "variables", "featurestudio", "camera", "measure", "part_data", "configurations"]
 # Read from the main page, which a drawing's iframe leaves alone (README "### Drawings"): not compared there.
 NOT_IN_DRAWINGS = {"selection", "undo", "assembly"}
 
@@ -49,6 +49,59 @@ def remembered_settings(seed):
             return {"t": "Expr", "v": {"text": str(v)}}
         return {"t": "Enum", "v": v}
     return {ty: {g: {p: value(g, v) for p, v in params.items()} for g, params in groups.items()} for ty, groups in seed.items()}
+
+
+# ops/src/export.rs's lists, by index (OPTIONS, UNITS, RESOLUTIONS, STEP_PREPROCESSING and the formats' versions).
+EXPORT_OPTIONS = ["Download", "Download and store file in a new tab", "Store file in a new tab"]
+EXPORT_UNITS = ["Centimeter", "Foot", "Inch", "Meter", "Millimeter", "Yard"]
+EXPORT_RESOLUTIONS = ["Coarse", "Medium", "Fine", "Custom"]
+EXPORT_PREPROCESSING = ["None", "Automatic", "Remove small entities only (advanced)", "Remove small entities only (basic)",
+                        "Remove small entities only (advanced) and convert all surfaces to b-surfaces"]
+EXPORT_VERSIONS = {"STEP": ["AP242", "AP214", "AP203"], "RHINO": ["8", "7", "6", "5", "4", "3", "2"],
+                   "PARASOLID": ["38.1", "37.1", "37.0", "36.0", "35.1", "34.1", "34.0", "33.1", "33.0", "32.1", "32.0", "31.1",
+                                 "31.0", "30.1", "30.0", "29.1", "29.0", "28.1", "28.0", "27.1", "27.0", "26.1", "26.0", "25.1", "25.0"]}
+
+
+def remembered_export(seed):
+    """A scenario's "remembered": {"export": {label: value}} (README) as the app's export_solid.json
+    (ops SolidExportPrefs), for a part or assembly format; None for a drawing's (PDF, DXF, DWG)."""
+    fmt = seed.get("Format")
+    if fmt is None or fmt in ("PDF", "DXF", "DWG", "DRAWING_JSON"):
+        return None
+    out = {"format": fmt, "step": {}}
+    index = lambda lst, v: lst.index(v) if v in lst else None
+    if "Export models oriented Y axis up" in seed:
+        out["y_up"] = bool(seed["Export models oriented Y axis up"])
+    if "Include hidden instances in export" in seed:
+        out["hidden"] = bool(seed["Include hidden instances in export"])
+    if index(EXPORT_OPTIONS, seed.get("Options")) is not None:
+        out["options"] = EXPORT_OPTIONS.index(seed["Options"])
+    res = index(EXPORT_RESOLUTIONS, seed.get("Resolution"))
+    units = index(EXPORT_UNITS, seed.get("Units"))
+    if fmt == "STL":
+        if res is not None:
+            out["stl_resolution"] = res
+        if units is not None:
+            out["stl_units"] = units
+        if "STL Format" in seed:
+            out["stl_text"] = seed["STL Format"] == "Text"
+    elif res is not None:
+        out["mesh_resolution"] = res
+    version = {"latest": bool(seed.get("Use latest version", True)), "version": index(EXPORT_VERSIONS.get(fmt, []), seed.get("Version")) or 0}
+    if fmt == "STEP":
+        step = out["step"]
+        step["version"] = version
+        if index(EXPORT_PREPROCESSING, seed.get("Preprocessing")) is not None:
+            step["preprocessing"] = EXPORT_PREPROCESSING.index(seed["Preprocessing"])
+        for label, key in (("Use custom units for export", "custom_units"), ("Include derived tolerances in export", "derived_tolerances"),
+                           ("Use custom annotation text height for MBD export", "mbd_text_height")):
+            if label in seed:
+                step[key] = bool(seed[label])
+        if units is not None:
+            step["units"] = units
+    elif fmt in ("PARASOLID", "RHINO"):
+        out[fmt.lower()] = version
+    return out
 
 
 def recorded_window_height(live):
@@ -170,7 +223,10 @@ def run_one(app, scenario, out, display, timeout, height=None, live=None):
         env["NOSHAPE_UI_CLICKS_ROUND"] = "1"
         env["NOSHAPE_UI_LIVE_AT"] = json.dumps(at)
     config = tempfile.mkdtemp(prefix="noshape-uip-config-")
-    seed = json.loads(Path(scenario).read_text()).get("remembered")
+    seed = dict(json.loads(Path(scenario).read_text()).get("remembered") or {})
+    export = remembered_export(seed.pop("export", None) or {})
+    if export:
+        Path(config, "export_solid.json").write_text(json.dumps(export))
     if seed:
         Path(config, "feature_settings.json").write_text(json.dumps(remembered_settings(seed)))
         env["NOSHAPE_UI_REMEMBERED"] = "1"
@@ -583,7 +639,10 @@ def normalize_live(state):
             d["title"] = re.sub(r" Copy \d+$", "", d["title"])
         for f in d.get("fields") or []:
             if isinstance(f, dict) and str(f.get("label", "")).startswith("File name") and isinstance(f.get("value"), str):
-                f["value"] = re.sub(r"^start \S+( Copy \d+)? - ", "Part Studio 1 - ", f["value"])
+                # Alone, the copy's Part Studio tab ("Export 2 Parts": "start spline-fillet-asm Copy 1"); an assembly
+                # tab's copy keeps its name without " Copy N".
+                f["value"] = re.sub(r"^start \S+( Copy \d+)?( - |$)", r"Part Studio 1\2", f["value"])
+                f["value"] = re.sub(r" Copy \d+( - |$)", r"\1", f["value"])
     # The Properties modal as live's recorder reads it since 2026-11-08 (Description, the category row labelled by its
     # value, Undo / Redo named), in its earlier form, ours' (part-menu-properties): no Description, "Category", the
     # icon buttons unnamed.

@@ -1073,6 +1073,20 @@ fn workspace_units_are_not_an_undo_step() {
     assert_eq!(call(&mut ctx, "document_info", json!({}))["units"]["length"], "in", "the units stay");
 }
 
+/// A part renamed in its Properties isn't an undo step (live properties-name-save-renames: Undo stays off after Save);
+/// the Extrude before it is.
+#[test]
+fn a_part_renamed_in_its_properties_is_not_an_undo_step() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "props-rename-undo.noshape", "plane:top");
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm" } }));
+    call(&mut ctx, "part_set_properties", json!({ "part": "Part 1", "name": "Bracket" }));
+    let r = call(&mut ctx, "history_undo", json!({}));
+    assert_ne!(r["description"], "Properties : Bracket", "{r}");
+    assert_eq!(call(&mut ctx, "query_parts", json!({}))["parts"].as_array().unwrap().len(), 0, "the Extrude was undone");
+}
+
 /// Help › Help and Help › FeatureScript documentation: the user guide, the standard library's modules and sources.
 #[test]
 fn help_and_the_featurescript_library_read_offline() {

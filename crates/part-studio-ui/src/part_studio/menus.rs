@@ -97,6 +97,8 @@ impl PartStudioView {
         // (not on a surface's face or a curve).
         let solid_body = body.as_ref().and_then(|b| self.display.body(b)).is_some_and(|d| d.kind == noshape_model::display::BodyKind::Solid);
         let wire_body = body.as_ref().and_then(|b| self.display.body(b)).is_some_and(|d| d.kind == noshape_model::display::BodyKind::Wire);
+        let surface_body = body.as_ref().and_then(|b| self.display.body(b)).is_some_and(|d| super::part_section(d) == "surfaces");
+        let other_surfaces = surface_body && body.as_ref().is_some_and(|b| self.display.bodies.iter().any(|d| &d.id != b && super::part_section(d) == "surfaces"));
         // A curve made from a sketch's edges (Composite curve of Sketch 4's lines) names that sketch too (live 1714).
         let source_sketch = source_sketch.or_else(|| {
             let s = studio?;
@@ -128,6 +130,7 @@ impl PartStudioView {
             && self.selection.iter().any(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_)));
         let kind = if mixed && matches!(kind, Some(PickKind::Edge | PickKind::Vertex)) { Some(PickKind::Face) } else { kind };
         let planar_target = planar;
+        let cylinder = !mixed && target_ref.as_ref().is_some_and(|r| self.cylinder_face(r));
         let (planar, linear_edge) = (planar && !mixed, linear_edge && !mixed);
         // A face's own rows (New sketch… … Revolve…, Export as DXF/DWG…) only while nothing else is selected (live
         // ctx-menus-1117 part-selected-graphics: Part 1's row selected, its face right-clicked, has neither).
@@ -645,16 +648,20 @@ impl PartStudioView {
                         // / 8.10", a face of one of three parts; "3.12 / 3.13",
                         // an edge): Hide other parts and Hide all parts follow,
                         // as in the parts list.
-                        if matches!(k, PickKind::Face | PickKind::Edge) && several_parts && solid_body {
+                        // A surface's face: Hide other surfaces / Hide all surfaces, of the surfaces (live
+                        // mistake-surface-assign-material, Surface 2 of Part 1 + 2 surfaces).
+                        if matches!(k, PickKind::Face | PickKind::Edge) && ((several_parts && solid_body) || other_surfaces) {
                             let keep = b.clone();
+                            let (label, only) = if solid_body { ("parts", None) } else { ("surfaces", Some("surfaces")) };
+                            let of = move |d: &noshape_model::display::BodyDisplay| only.is_none_or(|o| super::part_section(d) == o);
                             m = m
-                                .item(item(&crate::i18n::template("Hide other __label__", &[("label", "parts")]), Box::new(move |this, _, cx| {
-                                    let others: Vec<Reference> = this.display.bodies.iter().filter(|d| d.id != keep).map(|d| Reference::Body(d.id.clone())).collect();
+                                .item(item(&crate::i18n::template("Hide other __label__", &[("label", label)]), Box::new(move |this, _, cx| {
+                                    let others: Vec<Reference> = this.display.bodies.iter().filter(|d| d.id != keep && of(d)).map(|d| Reference::Body(d.id.clone())).collect();
                                     this.set_visibility(&others, true, cx);
                                     this.hover = None;
                                 })))
-                                .item(item(&crate::i18n::template("Hide all __label__", &[("label", "parts")]), Box::new(|this, _, cx| {
-                                    let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
+                                .item(item(&crate::i18n::template("Hide all __label__", &[("label", label)]), Box::new(move |this, _, cx| {
+                                    let all: Vec<Reference> = this.display.bodies.iter().filter(|d| of(d)).map(|d| Reference::Body(d.id.clone())).collect();
                                     this.set_visibility(&all, true, cx);
                                     this.hover = None;
                                 })));
@@ -668,8 +675,9 @@ impl PartStudioView {
                         // A curved face too; a planar one has Section view… instead (live appearance-spline-face, its
                         // spline face: Curve/surface analysis… after Hide all parts, no Section view…), as has a
                         // selection of faces and edges (live ctx-menus-1117 face-and-edge).
-                        let sectioned = k == PickKind::Face && (planar_target || mixed);
-                        if k == PickKind::Edge || (k == PickKind::Face && !sectioned) {
+                        // A cylinder's face has both (live appearance-maker-plate-r8-face, a fillet's face).
+                        let sectioned = k == PickKind::Face && (planar_target || mixed || cylinder);
+                        if k == PickKind::Edge || (k == PickKind::Face && (!sectioned || cylinder)) {
                             let re = r.clone();
                             m = m.item(item("Curve/surface analysis…", Box::new(move |this, w, cx| {
                                 this.selection = vec![re.clone()];
@@ -700,7 +708,7 @@ impl PartStudioView {
                         } else if sectioned {
                             let rs = r.clone();
                             m = m.item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| {
-                                if this.frame_of_ref(&rs).is_some() {
+                                if this.frame_of_ref(&rs).is_some() || this.cylinder_face(&rs) {
                                     this.section_through(rs.clone(), w, cx);
                                 } else {
                                     this.section_part(&b4, w, cx);
@@ -753,7 +761,7 @@ impl PartStudioView {
                     if k != PickKind::Vertex {
                         m = m.item(zoom_sel(&r));
                     }
-                    if planar {
+                    if planar || (cylinder && k == PickKind::Face) {
                         m = m.item(normal_to(&r));
                         if section && in_section_plane && k == PickKind::Face {
                             m = m.item(item("View normal to section plane", Box::new(|this, _, cx| this.view_normal_to_section(cx))));
@@ -1046,7 +1054,6 @@ impl PartStudioView {
             return;
         }
         let kept = configured.clone();
-        let shown = spec.values.name.clone();
         crate::properties_dialog::open_part_properties_configured(
             spec,
             crate::properties_dialog::PartExtras { mass, reset_to: Some(reset_to), configured },
@@ -1063,7 +1070,7 @@ impl PartStudioView {
                 doc.update(cx, |d, cx| {
                     let desc = noshape_ops::studio::properties_description(&v.name);
                     let save = |ps: &mut noshape_model::partstudio::PartStudio| noshape_ops::studio::set_part_properties(ps, &body, &values, &kept);
-                    if d.studio(tab).is_none_or(|ps| noshape_ops::studio::properties_save_is_undo_step(ps, &body, &values, &shown, &kept)) {
+                    if d.studio(tab).is_none_or(|ps| noshape_ops::studio::properties_save_is_undo_step(ps, &body, &values)) {
                         d.edit_studio(tab, &desc, cx, save);
                     } else {
                         d.edit_studio_not_undoable(tab, &desc, cx, save);
@@ -1119,13 +1126,12 @@ impl PartStudioView {
         let (display, gpu, parts) = (self.display.clone(), self.gpu.clone(), bodies.clone());
         let thumbs = cx.background_spawn(async move { crate::tab_thumbnail::part_thumbnails(&display, &parts, &gpu).await });
         let (doc, view, tab, config) = (self.doc.clone(), cx.entity(), self.tab, self.config_values.clone());
-        let shown = names.clone();
         crate::properties_dialog::open_parts_properties(
             spec,
             crate::properties_dialog::PartsProperties { names, values, reset_to, thumbs },
             move |written, _, cx| {
                 const FIELDS: [&str; 10] = ["Name", "Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3"];
-                let edits: Vec<(BodyId, noshape_ops::studio::PartPropertyValues, String)> = written
+                let edits: Vec<(BodyId, noshape_ops::studio::PartPropertyValues)> = written
                     .into_iter()
                     .filter_map(|(i, v)| {
                         let values = noshape_ops::studio::PartPropertyValues {
@@ -1136,7 +1142,7 @@ impl PartStudioView {
                             meta: v.meta.clone(),
                             mass_override: v.mass_override.as_deref().and_then(crate::properties_dialog::parse_mass),
                         };
-                        Some((bodies.get(i)?.clone(), values, shown.get(i)?.clone()))
+                        Some((bodies.get(i)?.clone(), values))
                     })
                     .collect();
                 let desc = noshape_ops::studio::properties_description(&format!("{} parts", edits.len()));
@@ -1144,9 +1150,9 @@ impl PartStudioView {
                     FIELDS.into_iter().filter(|f| noshape_model::configured_properties::configured_value(ps, body, f, &config).is_some()).collect()
                 };
                 doc.update(cx, |d, cx| {
-                    let undo_step = d.studio(tab).is_none_or(|ps| edits.iter().any(|(body, values, name)| noshape_ops::studio::properties_save_is_undo_step(ps, body, values, name, &configured(ps, body))));
+                    let undo_step = d.studio(tab).is_none_or(|ps| edits.iter().any(|(body, values)| noshape_ops::studio::properties_save_is_undo_step(ps, body, values)));
                     let save = |ps: &mut noshape_model::partstudio::PartStudio| {
-                        for (body, values, _) in &edits {
+                        for (body, values) in &edits {
                             let kept = configured(ps, body);
                             noshape_ops::studio::set_part_properties(ps, body, values, &kept);
                         }
@@ -2897,6 +2903,7 @@ impl PartStudioView {
             }
         }
         self.show_mass = show;
+        self.ui.mass_opened_with = self.selection.clone();
         self.ui.mass_shown = None;
         // Show calculation variance isn't kept (live: reopened, it's unticked).
         self.ui.mass_variance = false;

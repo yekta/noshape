@@ -233,7 +233,7 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             Some(serde_json::Value::Null) => v.mass_override = None,
             Some(x) => v.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
         }
-        undo_step |= studio::properties_save_is_undo_step(ps, body, &v, &shown, &configured) || com.is_some() || inertia.is_some();
+        undo_step |= studio::properties_save_is_undo_step(ps, body, &v) || com.is_some() || inertia.is_some();
         edits.push((body.clone(), v, configured));
     }
     // In a version (history_view): its own properties take the edit; Name, Part number, Revision, State, Material, Not
