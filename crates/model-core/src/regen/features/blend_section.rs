@@ -6034,6 +6034,8 @@ mod tests {
         let made = k::blend_direct(&body, &tools, &rims).unwrap().shape;
         assert!(made.is_valid());
         assert!(made.volume().unwrap() < body.volume().unwrap());
+        // (Doubling back, its edges strayed 4.4e-3 off the faces they lie on: 4.7e-5 of the part's size; 8.3e-4 now.)
+        assert!(made.max_edge_tolerance() < scale * 2e-5, "{}", made.max_edge_tolerance());
     }
 
     /// Two walls' outlines picked whole (asm-scissor-lift's Fillet 13): the second outline's edges listed from a corner
