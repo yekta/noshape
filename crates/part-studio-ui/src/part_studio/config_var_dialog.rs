@@ -39,13 +39,18 @@ pub use noshape_ops::config::kind_dim;
 
 /// Default / Minimum / Maximum of a new variable of `kind` (live 702).
 fn prefill(kind: VariableKind, units: &UnitPrefs) -> [String; 3] {
-    let unit = match kind {
-        VariableKind::Length => Some(units.length.symbol()),
-        VariableKind::Angle => Some(units.angle.symbol()),
-        _ => None,
-    };
-    let v = |n: &str| unit.map(|u| format!("{n} {u}")).unwrap_or_else(|| n.to_string());
+    let unit = kind_unit(kind, units);
+    let v = |n: &str| unit.as_deref().map(|u| format!("{n} {u}")).unwrap_or_else(|| n.to_string());
     if kind == VariableKind::Text { [String::new(), String::new(), String::new()] } else { [v("1"), v("0"), v("100000")] }
+}
+
+/// The workspace unit a variable type's values are written in (`None` for unitless types).
+fn kind_unit(kind: VariableKind, units: &UnitPrefs) -> Option<String> {
+    match kind {
+        VariableKind::Length => Some(units.length.symbol().to_string()),
+        VariableKind::Angle => Some(units.angle.symbol().to_string()),
+        _ => None,
+    }
 }
 
 /// Fields that don't evaluate (Default, Minimum, Maximum).
@@ -62,7 +67,9 @@ pub fn range_error(dim: Option<Dim>, values: [&str; 3], units: &UnitPrefs) -> Op
     let unit_of = |t: &str| t.split_whitespace().nth(1).map(str::to_string);
     let [d, lo, hi] = values;
     let (Some(dv), Some(lv), Some(hv)) = (val(d), val(lo), val(hi)) else { return None };
-    if unit_of(d) != unit_of(lo) || unit_of(lo) != unit_of(hi) {
+    // A plain number is in the workspace unit (live config-variable-input-change: "25" with "0 mm" keeps ✓ on).
+    let stated: Vec<String> = [d, lo, hi].into_iter().filter_map(unit_of).collect();
+    if stated.windows(2).any(|w| w[0] != w[1]) {
         Some(("The default value, minimum, and maximum must all be in the same units.", [true, true, true]))
     } else if lv > dv {
         Some(("The default value must be greater or equal to the minimum.", [true, true, false]))
@@ -123,10 +130,22 @@ impl PartStudioView {
         let subs = [&name, &default, &min, &max]
             .into_iter()
             .map(|st| {
-                cx.subscribe(st, |_, _, ev: &InputEvent, cx| {
-                    if matches!(ev, InputEvent::Change) {
-                        cx.notify();
+                cx.subscribe_in(st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                    InputEvent::Change => cx.notify(),
+                    // Leaving a value field writes a plain number in the workspace unit (live: "25" + Tab -> "25 mm").
+                    InputEvent::Blur => {
+                        let Some(d) = &this.ui.var_input else { return };
+                        if *st == d.name {
+                            return;
+                        }
+                        let units = this.doc.read(cx).session.doc.settings.units;
+                        let text = st.read(cx).value().trim().to_string();
+                        if let Some(u) = kind_unit(KINDS[d.kind].1, &units).filter(|_| text.parse::<f64>().is_ok()) {
+                            st.update(cx, |s, cx| s.set_value(format!("{text} {u}"), window, cx));
+                            cx.notify();
+                        }
                     }
+                    _ => {}
                 })
             })
             .collect();
@@ -226,6 +245,7 @@ impl PartStudioView {
         let row = |id: &'static str, label: &'static str, st: &Entity<InputState>, err: Option<&'static str>| {
             h_flex()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, move || format!("field:{label}")))
                 .h(px(28.))
                 .px(px(5.))
                 .child(div().w(px(64.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label))
@@ -328,5 +348,20 @@ impl PartStudioView {
                 .when(checkbox.is_none() && !text, |c| c.child(row("vi-min", "Minimum", &d.min, errs[1])).child(row("vi-max", "Maximum", &d.max, errs[2])))
                 .into_any_element(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::range_error;
+    use noshape_units::{Dim, UnitPrefs};
+
+    /// Live config-variable-input-change s9: a plain Default ("25") with "0 mm" / "100000 mm" keeps ✓ on; a stated
+    /// other unit doesn't (live 703).
+    #[test]
+    fn a_plain_number_is_in_the_workspace_unit() {
+        let units = UnitPrefs::default();
+        assert_eq!(range_error(Some(Dim::LENGTH), ["25", "0 mm", "100000 mm"], &units), None);
+        assert!(range_error(Some(Dim::LENGTH), ["25 in", "0 mm", "100000 mm"], &units).is_some_and(|(e, _)| e.contains("same units")));
     }
 }

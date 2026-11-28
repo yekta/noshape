@@ -1785,3 +1785,27 @@ fn reset_all_resets_saved_properties_not_typing(cx: &mut TestAppContext) {
     l.click(cx, "meta-reset", NONE);
     assert_eq!(pn(cx, &form), "", "a saved Part number is reset");
 }
+
+/// Live var-delete-used-variable s11: a Variable's row menu is Edit… | Add selection to folder… | Suppress, Dynamic
+/// suppression | Show dependencies… | Roll to here | Delete (Add comment: cloud), no Rename nor Zoom to selection.
+#[gpui::test]
+fn a_variables_row_menu_as_live(cx: &mut TestAppContext) {
+    let l = studio(cx, "fl-variable-menu", 1.);
+    let name = cx.update(|cx| {
+        let (doc, tab) = { let v = l.view.read(cx); (v.doc.clone(), v.tab) };
+        doc.update(cx, |d, cx| {
+            let units = d.session.doc.settings.units;
+            d.edit_studio(tab, "Variable", cx, |ps| {
+                let mut f = ps.new_feature("assignVariable", &units).unwrap();
+                f.params.set("name", noshape_model::ParamValue::Text("width".into()));
+                f.params.set("variableType", noshape_model::ParamValue::Enum("LENGTH".into()));
+                f.params.set("lengthValue", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("30 mm")));
+                ps.features.insert(0, f);
+            });
+        });
+        l.view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.name.clone()).expect("the variable")
+    });
+    wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+    l.right_click(cx, &format!("feature:{name}"));
+    assert_eq!(l.menu(cx), ["Edit…", "Add selection to folder…", "Suppress", "Dynamic suppression", "Show dependencies…", "Roll to here", "Delete"]);
+}

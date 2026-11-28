@@ -331,6 +331,14 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
         {
             name = format!("button:{rest}");
         }
+        // Live's runner finds a menu row by its text's start ("Configure suppression" is the row "Configure suppression
+        // with Thick", config-checkbox-suppression): the one row that starts so.
+        if name.starts_with("menu:")
+            && noshape_app_core::ui_script::bounds_of(&name).is_none()
+            && let [(longer, _)] = noshape_app_core::ui_script::named(&format!("{name} ")).as_slice()
+        {
+            name = longer.clone();
+        }
         if let Some(b) = noshape_app_core::ui_script::bounds_of(&name) {
             // A row's top or bottom edge (where a dragged row drops above or below it).
             return Ok(match t.get("edge").and_then(Value::as_str) {

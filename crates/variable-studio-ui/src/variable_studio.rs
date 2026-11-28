@@ -295,11 +295,12 @@ impl VariableStudioView {
     /// A Value cell's list for its text: the variables above the row, as the Part Studio's table (no "New variable…").
     fn value_completion(&mut self, key: &str, row: usize, st: &InputState, cx: &App) {
         let (scope, dim) = self.scope_above(row, cx);
+        // No list when nothing matches (live mistake-vs-circular s4: `#height` in the first row).
         let c = crate::var_complete::VarCompletion::compute(key, st, &scope, dim).map(|mut c| {
             c.new_variable = None;
             c
         });
-        self.set_completion(c);
+        self.set_completion(c.filter(|c| !c.entries.is_empty()));
     }
 
     /// Esc in a cell's editor: back to the committed text, the cell

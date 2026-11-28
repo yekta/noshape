@@ -2557,6 +2557,11 @@ impl PartStudioView {
             return;
         }
         let dialog = e.dialog.clone();
+        // A number of the wrong type ("10 deg" for a depth) isn't a step: Undo stays off (live
+        // mistake-var-unit-angle-in-depth s6).
+        if dialog.read(cx).has_invalid_value() {
+            return;
+        }
         e.history.checkpoint(&dialog.read(cx).feature);
     }
 
@@ -6915,6 +6920,8 @@ impl PartStudioView {
         let linked_doc = noshape_ops::workspace_update::linked_feature(&f.type_id).map(|(x, _)| x.path);
         let linked_outdated = self.ui.outdated_linked.contains(&id);
         let feature_name = f.name.clone();
+        // A Variable's row has no Rename nor Zoom to selection (live var-delete-used-variable s11).
+        let variable = f.type_id == "assignVariable";
         // A Derived feature's source studio ("Switch to qa5 src", live "qa5
         // derived" (6)).
         let derived_source: Option<(TabId, String)> = (f.type_id == "importDerived")
@@ -7073,6 +7080,10 @@ impl PartStudioView {
             let suppression_configured = view.read(cx).studio(cx).is_some_and(|s| s.configuration.configured.iter().any(|c| c.feature == id && c.param == noshape_model::configuration::SUPPRESSED_PARAM));
             let configure_name = feature_name.clone();
             let configure_input = first_config_input.clone();
+            // With a Checkbox input first, live names it (config-checkbox-suppression: "Configure suppression with Thick").
+            let configure_label = view.read(cx).studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| Some(&i.id) == configure_input.as_ref()).cloned())
+                .filter(|i| matches!(i.kind, noshape_model::configuration::ConfigInputKind::Checkbox { .. }))
+                .map_or_else(|| "Configure suppression".to_string(), |i| format!("Configure suppression with {}", i.name));
             let configure = move |m: crate::os_menu::OsMenu| {
                 if suppression_configured {
                     return m.item(item("Unconfigure suppression", Box::new(move |this, _, cx| {
@@ -7084,7 +7095,7 @@ impl PartStudioView {
                 let Some(input) = configure_input.clone() else { return m };
                 // Configure suppression adds the feature to the configuration table.
                 let name = configure_name.clone();
-                m.item(item("Configure suppression", Box::new(move |this, _, cx| {
+                m.item(item(&configure_label, Box::new(move |this, _, cx| {
                     this.add_configured(id, noshape_model::configuration::SUPPRESSED_PARAM, &input, cx);
                     this.right_panel = Some(config_panel::RightPanel::Configurations);
                     // Live feature-menu-configure-suppression: "Extrude 1 suppression configured in Configuration".
@@ -7116,7 +7127,7 @@ impl PartStudioView {
                 return rolls(m).separator().item(delete);
             }
             let rename = item("Rename", Box::new(move |this, w, cx| this.start_rename(id, w, cx)));
-            let mut m = menu.item(rename).separator().item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
+            let mut m = menu.when(!variable, |m| m.item(rename).separator()).item(item("Edit…", Box::new(move |this, w, cx| this.edit_feature(id, w, cx))));
             // Live 1714 / 1717: a failed feature adds Edit healthy moment of
             // <feature>…, which opens its normal edit dialog.
             if errored {
@@ -7189,7 +7200,7 @@ impl PartStudioView {
             if let Some((tab, name)) = derived_source.clone() {
                 m = m.separator().item(item(&format!("Switch to {name}"), Box::new(move |_, _, cx| cx.emit(PartStudioEvent::ActivateTab(tab)))).icon_name("part-studio"));
             }
-            m = m.separator().when(!errored, |m| m.item(item("Zoom to selection", Box::new(move |this, _, cx| {
+            m = m.separator().when(!errored && !variable, |m| m.item(item("Zoom to selection", Box::new(move |this, _, cx| {
                 if !this.selected_features.contains(&id) {
                     this.selected_features = vec![id];
                 }

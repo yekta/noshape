@@ -1544,6 +1544,24 @@ fn what_the_dialog_fills_in_on_opening_is_no_undo_step(cx: &mut TestAppContext) 
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, true));
 }
 
+/// Live mistake-var-unit-angle-in-depth s6: a depth of the wrong type ("10 deg") leaves Undo off; a good one after it
+/// is a step.
+#[gpui::test]
+fn a_value_of_the_wrong_type_is_no_undo_step(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "wrong-type-no-undo");
+    view.update(cx, |v, _| v.selection = vec![top.clone()]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let depth = |cx: &mut TestAppContext, t: &str| {
+        cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("depth", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new(t)), cx)));
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).draft_history_state())
+    };
+    assert_eq!(depth(cx, "10 deg"), (false, false), "a wrong type");
+    assert_eq!(depth(cx, "12 mm"), (true, false), "a good value");
+}
+
 /// Live 1990 (1.13): with the keyboard on a dialog control (a checkbox just clicked), Ctrl+Z does nothing; with it
 /// elsewhere, it steps the dialog's last edit.
 #[gpui::test]
@@ -8401,6 +8419,50 @@ fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
     });
     assert!(value.map(|p| format!("{p:?}")).is_some_and(|t| t.contains("40 mm")), "committed as 40 mm");
     assert_eq!(framed, Some(format!("cp-0-{}", rows[1])), "the cell below framed");
+}
+
+/// Live config-list-edit-active-row-value s24-s27: a value typed on a framed cell edited before replaces it whole,
+/// the first key too ("30", not "0").
+#[gpui::test]
+fn typing_on_a_framed_cell_edited_before_keeps_the_first_key(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-retype", &[("width", "30 mm")]);
+    let rows = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let id = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "assignVariable")).map(|f| f.id).expect("the variable");
+            v.edit_config("Configure", cx, |ps| {
+                let input = noshape_ops::config::add_input(ps, "List");
+                noshape_ops::config::add_option(ps, &input, "A".into());
+                noshape_ops::config::configure_parameter(ps, id, "lengthValue", &input);
+            });
+            v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+            match v.studio(cx).and_then(|s| s.configuration.inputs.first()).map(|i| &i.kind) {
+                Some(noshape_model::configuration::ConfigInputKind::List { options, .. }) => options.iter().map(|o| o.id.clone()).collect::<Vec<_>>(),
+                _ => Vec::new(),
+            }
+        })
+    });
+    let cell = format!("cp-0-{}", rows[1]);
+    let frame = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let f = cx.focus_handle();
+                w.focus(&f, cx);
+                v.ui.cfg_framed = Some((cell.clone(), f));
+                cx.notify();
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    let value = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.configuration.configured.first()).and_then(|c| c.values.get(&rows[1]).cloned()).map(|p| format!("{p:?}")).unwrap_or_default());
+    draw(cx, window);
+    frame(cx);
+    keys(cx, window, &["secondary-a", "2", "0", "enter"]);
+    let first = value(cx);
+    frame(cx);
+    keys(cx, window, &["secondary-a", "3", "0", "enter"]);
+    let second = value(cx);
+    assert_eq!((first.contains("\"20 mm\""), second.contains("\"30 mm\"")), (true, true), "({first}, {second})");
 }
 
 /// Live workflow 14 (qa CONFIG-NAME-FOCUS-BOX): the add row's Name input taking the keys has the blue focus box, and

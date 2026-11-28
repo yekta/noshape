@@ -68,6 +68,9 @@ impl PartStudioView {
         } else if self.ui.add_features.as_ref().is_some_and(|a| a.panel.read(cx).has_keyboard(window)) {
             // Add custom features with the keyboard outside its search box (live: its clicked tab or row, a div).
             json!({ "kind": "field", "label": null })
+        } else if self.ui.cfg_selects.values().any(|(s, _)| s.read(cx).has_focus(window)) {
+            // The Configurations box's list after a pick (live config-list-three-rows-pick: its empty focusser input).
+            json!({ "kind": "other", "label": null, "text": "", "selection": [0, 0], "all": false })
         } else if self.panel_row_focus.is_focused(window) || self.context_select_focus.is_focused(window) {
             // A pressed panel row, the contexts selector (live: a focused div, "other").
             json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
@@ -150,8 +153,10 @@ impl PartStudioView {
             .iter()
             .map(|r| {
                 let (kind, owner) = self.selection_kind_owner(r, cx);
-                // Live gives the open sketch's own entities no owner.
-                let own = matches!(r, Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch));
+                // Live gives a new sketch's own entities no owner; a sketch edited again owns them (live
+                // var-sketch-dimension-expression s4: "Sketch 1").
+                let new_sketch = self.edit.as_ref().is_some_and(|e| e.is_new);
+                let own = new_sketch && matches!(r, Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch));
                 // An inferred point (an edge's midpoint) reads as a POINT of its entity (live's reader since 11-04 00:34).
                 match r {
                     Reference::Implicit { .. } => json!({ "kind": "POINT", "owner": owner, "of": kind }),
@@ -253,8 +258,7 @@ impl PartStudioView {
         let message = message.or_else(|| self.sketch.as_ref().and_then(|ed| ed.message.clone()));
         // The Configuration panel's info box under an input nothing configures yet (live config-*).
         // (With a toast too, live reads both: "<note> / <toast>".)
-        let note = (self.right_panel == Some(super::config_panel::RightPanel::Configurations) && self.ui.cfg_note_shown)
-            .then_some("No features are configured Right click sketch dimensions, features, or feature parameters to configure them.");
+        let note = self.ui.cfg_note.filter(|_| self.right_panel == Some(super::config_panel::RightPanel::Configurations));
         let message = match (note, message) {
             (Some(n), Some(m)) => Some(format!("{n} / {m}")),
             (Some(n), None) => Some(n.to_string()),
@@ -346,7 +350,12 @@ impl PartStudioView {
                                     _ => Value::Null,
                                 }
                             };
-                            let mut rows: Vec<String> = options.iter().map(|o| o.name.clone()).collect();
+                            // A row name being typed reads as typed (live config-list-rename-row).
+                            let row_name = |o: &noshape_model::configuration::ListOption| {
+                                let key = format!("opt-{}-{}", i.id, o.id);
+                                typed(&key).filter(|_| self.ui.cfg_editing.as_deref() == Some(key.as_str())).unwrap_or_else(|| o.name.clone())
+                            };
+                            let mut rows: Vec<String> = options.iter().map(row_name).collect();
                             let mut values: Vec<Value> = options.iter().map(|o| json!(columns.iter().map(|(ci, c)| cell(*ci, c, &o.id)).collect::<Vec<_>>())).collect();
                             // The italic add row being typed in reads as a row (live config-list-three-rows-pick).
                             if let Some(t) = typed(&format!("opt-new-{}-{}", i.id, options.len())).filter(|t| !t.trim().is_empty()) {
@@ -357,7 +366,8 @@ impl PartStudioView {
                             json!({ "kind": "list", "default": name(default), "shown": shown.as_deref().and_then(name), "rows": rows, "columns": columns, "values": values })
                         }
                         K::Checkbox { default } => json!({ "kind": "checkbox", "default": default, "shown": shown.map(|v| v == "true"), "rows": [] }),
-                        K::Variable { default, .. } => json!({ "kind": "variable", "default": default.text, "shown": shown, "rows": [] }),
+                        // (Live's panel shows a variable's default, whatever the box holds: config-variable-input-change.)
+                        K::Variable { default, .. } => json!({ "kind": "variable", "default": default.text, "shown": default.text, "rows": [] }),
                         K::Text { default } => json!({ "kind": "text", "default": default, "shown": shown, "rows": [] }),
                     };
                     v["name"] = json!(i.name);
@@ -384,8 +394,11 @@ impl PartStudioView {
                 let (kind, value) = match &i.kind {
                     K::List { options, .. } => ("list", json!(value.and_then(|id| options.iter().find(|o| o.id == id).map(|o| o.name.clone())))),
                     K::Checkbox { .. } => ("checkbox", json!(value.map(|v| v == "true"))),
-                    K::Variable { .. } => ("variable", json!(value)),
-                    K::Text { .. } => ("text", json!(value)),
+                    // The box's field as typed (live config-variable-input-change: "5" before its Enter).
+                    K::Variable { .. } | K::Text { .. } => {
+                        let typed = self.panel_inputs.get(&format!("cfgbox-val-{}", i.id)).map(|(st, _)| st.read(cx).value().to_string());
+                        (if matches!(i.kind, K::Variable { .. }) { "variable" } else { "text" }, json!(typed.or(value)))
+                    }
                 };
                 json!({ "label": i.name, "kind": kind, "value": value })
             })

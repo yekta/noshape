@@ -2445,7 +2445,7 @@ impl FeatureDialog {
 
     /// An applied number of the wrong type: the title and the feature's row are red (live).
     pub fn has_invalid_value(&self) -> bool {
-        self.applied_value_error().is_some()
+        self.applied_value_error().is_some() || self.eval_errors(|_, typed| typed.to_string()).next().is_some()
     }
 
     /// A menu item's click leaves the keyboard outside the dialog (live ui-parity dialog-query-rclick-clear-all: after
@@ -4803,12 +4803,15 @@ impl Render for FeatureDialog {
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                 if std::mem::take(&mut this.press_applies_typed) {
                                     this.apply_typed(window, cx);
-                                } else if !blocked {
+                                } else {
                                     // The click takes the keyboard, also when the dialog stays open (live
-                                    // mistake-extrude-remove-flipped-out: a missing Remove, nothing focused).
+                                    // mistake-extrude-remove-flipped-out: a missing Remove, nothing focused) or the
+                                    // ✓ is disabled (live mistake-var-unit-sum s11: a Variable's value in error).
                                     window.focus(&this.focus, cx);
                                     this.keyboard_left = true;
-                                    cx.emit(DialogEvent::Accept { repeat: false })
+                                    if !blocked {
+                                        cx.emit(DialogEvent::Accept { repeat: false })
+                                    }
                                 }
                             })),
                     ))

@@ -79,6 +79,18 @@ fn feature_id(ctx: &mut Ctx, name: &str) -> Result<String, String> {
     list["features"].as_array().and_then(|fs| fs.iter().find(|f| f["name"] == name)).and_then(|f| f["id"].as_str()).map(str::to_string).ok_or_else(|| format!("no feature {name}"))
 }
 
+/// A start shape as live's runner draws it (live-pw uip/starts.js `rect`): a rectangle is four lines from its first
+/// corner along x, then y, back to it ((0, 0) → (40, 0) → (40, 30) → (0, 30)), so a start sketch lists its lines in
+/// live's order and direction (TICKETS VARS-START-LINE-ORDER).
+fn as_live_draws(shape: &Value) -> Value {
+    let c = |i: usize| -> Option<[f64; 2]> { Some([shape["points"][i].get(0)?.as_f64()?, shape["points"][i].get(1)?.as_f64()?]) };
+    let (Some(a), Some(b)) = (c(0), c(1)) else { return shape.clone() };
+    if shape["tool"] != "corner_rectangle" {
+        return shape.clone();
+    }
+    json!({ "tool": "line", "points": [a, [b[0], a[1]], b, [a[0], b[1]], a] })
+}
+
 /// Build start `start` (a `starts.json` value) into a new document at `path`.
 /// A start sketch's constraints as live's runner posts them over REST (live-pw uip/starts.js): a rectangle's corners
 /// coincident (ours: shared points) and its sides horizontal / vertical, a line or circle with none, nothing tied to
@@ -351,7 +363,7 @@ fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
                 .flat_map(|m| m.iter().map(|(tool, points)| json!({ "tool": tool, "points": points })))
                 .collect();
             if !shapes.is_empty() {
-                call(ctx, "sketch_draw", json!({ "sketch": id, "shapes": shapes })).map_err(what)?;
+                call(ctx, "sketch_draw", json!({ "sketch": id, "shapes": shapes.iter().map(as_live_draws).collect::<Vec<_>>() })).map_err(what)?;
                 live_start_constraints(ctx, &id, &shapes).map_err(what)?;
             }
             ctx.doc(None).map_err(|e| what(e.message))?.session.release_commits().map_err(|e| what(format!("{e:#}")))?;
@@ -496,6 +508,20 @@ mod tests {
         let h = call(&mut ctx, "history_list", json!({ "limit": 50 })).unwrap();
         let sketch: Vec<&str> = h["history"].as_array().into_iter().flatten().filter_map(|c| c["description"].as_str()).filter(|d| d.contains("Sketch 1")).collect();
         assert_eq!(sketch.len(), 1, "{h}");
+        // Its lines in live's order and direction (live-pw uip/starts.js), corners joined, sides horizontal / vertical.
+        let got = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" })).unwrap();
+        let ents = got["entities"].as_array().unwrap();
+        let lines: Vec<&Value> = ents.iter().filter(|e| e["type"] == "line").collect();
+        let ends: Vec<[f64; 4]> = lines.iter().map(|e| {
+            let p = |k: &str| [0, 1].map(|i| (e[k][i].as_f64().unwrap_or(f64::NAN) * 1e3).round() / 1e3);
+            let (a, b) = (p("start"), p("end"));
+            [a[0], a[1], b[0], b[1]]
+        }).collect();
+        assert_eq!(ends, [[0., 0., 40., 0.], [40., 0., 40., 30.], [40., 30., 0., 30.], [0., 30., 0., 0.]], "{got}");
+        assert!((0..4).all(|i| lines[i]["end_point"] == lines[(i + 1) % 4]["start_point"]), "corners shared: {got}");
+        let kinds: Vec<&str> = got["constraints"].as_array().unwrap().iter().filter_map(|c| c["type"].as_str()).collect();
+        assert_eq!(kinds.iter().filter(|k| ["Horizontal", "Vertical"].contains(k)).count(), 4, "{kinds:?}");
+        assert_eq!(got["regions"].as_array().map_or(0, Vec::len), 1, "{got}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

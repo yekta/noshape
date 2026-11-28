@@ -60,7 +60,10 @@ impl PartStudioView {
     pub(super) fn toggle_panel(&mut self, panel: RightPanel, window: &mut Window, cx: &mut Context<Self>) {
         self.right_panel = if self.right_panel == Some(panel) { None } else { Some(panel) };
         self.ui.show_code = None;
-        let _ = window;
+        // The click takes the keyboard off the Configurations box's list (live config-panel-close-keeps-config).
+        if self.ui.cfg_selects.values().any(|(s, _)| s.read(cx).has_focus(window)) {
+            window.focus(&self.focus, cx);
+        }
         cx.notify();
     }
 
@@ -202,8 +205,9 @@ impl PartStudioView {
                     return;
                 }
                 // Enter hands the keyboard back to the Part Studio (its
-                // shortcuts work again), like Onshape.
-                if matches!(ev, InputEvent::PressEnter { .. }) {
+                // shortcuts work again), like Onshape; the Configurations box's field keeps it, its value selected
+                // (live config-variable-input-change).
+                if matches!(ev, InputEvent::PressEnter { .. }) && !k.starts_with("cfgbox-val-") {
                     let fh = this.focus_handle(cx);
                     window.focus(&fh, cx);
                 }
@@ -302,7 +306,7 @@ impl PartStudioView {
             RightPanel::Appearance => self.render_appearance_panel(cx),
             RightPanel::Variables => self.render_variables(window, cx),
             RightPanel::Configurations => {
-                self.ui.cfg_note_shown = false;
+                self.ui.cfg_note = None;
                 self.render_configurations(window, cx)
             }
             RightPanel::CustomTables => self.render_custom_tables(cx),
@@ -1175,6 +1179,7 @@ impl PartStudioView {
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
         let caret = div()
             .id("cfg-configure-more")
+            .map(|d| crate::ui_script::mark(d, || "caret:Add configuration input".into()))
             .w(px(24.))
             .h(px(32.))
             .flex()
@@ -1444,10 +1449,11 @@ impl PartStudioView {
 
     /// A configuration variable's table (live 433): "Usages ①" over one row
     /// per use ("Extrude 1 Depth"), or the "No features are configured" note.
-    fn render_usages(&self, section: Div, id: &str, grid: Rgba, cx: &mut Context<Self>) -> Div {
+    fn render_usages(&mut self, section: Div, id: &str, grid: Rgba, cx: &mut Context<Self>) -> Div {
         let pal = p();
         let usages = self.variable_usages(id, cx);
         if usages.is_empty() {
+            self.ui.cfg_note = Some(NO_FEATURES_CONFIGURED);
             return section.child(
                 div().pt(px(5.)).pr(px(5.)).child(
                     v_flex()
@@ -1897,7 +1903,9 @@ impl PartStudioView {
                     );
                 }
                 if columns.is_empty() {
-                    self.ui.cfg_note_shown = true;
+                    // A List's note says how to configure; a Checkbox's is the heading alone (live config-checkbox-toggle).
+                    let list = matches!(input.kind, ConfigInputKind::List { .. });
+                    self.ui.cfg_note = Some(if list { NO_FEATURES_CONFIGURED_HINT } else { NO_FEATURES_CONFIGURED });
                     section = section.child(
                         div().pt(px(5.)).pr(px(5.)).child(
                             v_flex()
@@ -1909,8 +1917,8 @@ impl PartStudioView {
                                 .text_size(px(14.))
                                 .line_height(px(21.))
                                 .text_color(pal.info_text)
-                                .child(div().font_weight(FontWeight::BOLD).child("No features are configured"))
-                                .child("Right click sketch dimensions, features, or feature parameters to configure them."),
+                                .child(div().font_weight(FontWeight::BOLD).child(NO_FEATURES_CONFIGURED))
+                                .when(list, |d| d.child("Right click sketch dimensions, features, or feature parameters to configure them.")),
                         ),
                     );
                 }
@@ -1989,11 +1997,7 @@ impl PartStudioView {
                             }
                         },
                         _ => match k.key_char.clone().filter(|_| plain) {
-                            Some(ch) => {
-                                this.ui.cfg_editing = Some(c1.clone());
-                                this.ui.cfg_editing_focus = true;
-                                this.ui.cfg_edit_initial = Some(ch);
-                            }
+                            Some(ch) => this.type_into_framed(&c1, &ch, window, cx),
                             None => return,
                         },
                     }
@@ -2018,6 +2022,28 @@ impl PartStudioView {
             .into_any_element()
     }
 
+    /// Typing on a framed cell edits it from the typed text; keys typed before its input shows add to it.
+    fn type_into_framed(&mut self, cell: &str, ch: &str, window: &mut Window, cx: &mut Context<Self>) {
+        // The input shows already but hasn't the keyboard yet (focused in its first draw): the key goes on its text.
+        if self.ui.cfg_editing.as_deref() == Some(cell)
+            && self.ui.cfg_edit_initial.is_none()
+            && let Some((st, _)) = self.panel_inputs.get(cell).cloned()
+        {
+            st.update(cx, |s, cx| {
+                let text = format!("{}{ch}", s.value());
+                let end = text.len();
+                s.set_value(text, window, cx);
+                s.focus(window, cx);
+                s.set_selected_range(end..end, cx);
+            });
+            return;
+        }
+        let pending = self.ui.cfg_edit_initial.take().filter(|_| self.ui.cfg_editing.as_deref() == Some(cell)).unwrap_or_default();
+        self.ui.cfg_editing = Some(cell.to_string());
+        self.ui.cfg_editing_focus = true;
+        self.ui.cfg_edit_initial = Some(pending + ch);
+    }
+
     /// A table/title text that turns into an input on double-click (or from
     /// "Rename"); Enter or a click elsewhere commits.
     fn config_name_cell(&mut self, key: String, text: String, (size, weight): (Pixels, FontWeight), window: &mut Window, cx: &mut Context<Self>, commit: impl Fn(&mut Self, String, &mut Context<Self>) + 'static) -> AnyElement {
@@ -2037,7 +2063,11 @@ impl PartStudioView {
                     s.focus(window, cx);
                     // Typing on a framed value replaces it; a double-click selects it (live).
                     match initial {
-                        Some(t) => s.set_value(t, window, cx),
+                        Some(t) => {
+                            let end = t.len();
+                            s.set_value(t, window, cx);
+                            s.set_selected_range(end..end, cx);
+                        }
                         None => s.select_all(window, cx),
                     }
                 });
@@ -2211,9 +2241,7 @@ impl PartStudioView {
                         this.ui.cfg_editing = Some(c1.clone());
                         this.ui.cfg_editing_focus = true;
                     } else if let Some(ch) = k.key_char.clone().filter(|_| plain) {
-                        this.ui.cfg_editing = Some(c1.clone());
-                        this.ui.cfg_editing_focus = true;
-                        this.ui.cfg_edit_initial = Some(ch);
+                        this.type_into_framed(&c1, &ch, window, cx);
                     } else {
                         return;
                     }
@@ -2767,6 +2795,10 @@ impl PartStudioView {
                         Some((s, _)) => s.clone(),
                         None => {
                             let s = cx.new(|_| crate::os_select::OsSelect::new(SharedString::from(format!("cfgsel-{}", input.id))));
+                            // Onshape's focusser: a pick leaves the keyboard on the list (live config-list-three-rows-pick).
+                            s.update(cx, |s, cx| {
+                                s.focus_handle(cx);
+                            });
                             let iid = input.id.clone();
                             let sub = cx.subscribe(&s, move |this, _, ev: &crate::os_select::OsSelectEvent, cx| {
                                 let crate::os_select::OsSelectEvent::Picked(id) = ev;
@@ -3526,6 +3558,10 @@ impl PartStudioView {
 /// allowed, it commits nothing).
 /// A List / Checkbox table's cell for the runner (README config_cell): `config_cell:<row>:<column>`, the first table's,
 /// and `config_cell:<input>|<row>:<column>`.
+/// The Configuration panel's note under an input nothing configures yet, and live's reading of a List's (heading and hint).
+pub(super) const NO_FEATURES_CONFIGURED: &str = "No features are configured";
+pub(super) const NO_FEATURES_CONFIGURED_HINT: &str = "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.";
+
 fn config_cell_mark(d: Div, input: &str, row: &str, column: &str) -> Div {
     let d = crate::ui_script::mark_first(d, || format!("config_cell:{row}:{column}"));
     crate::ui_script::mark(d, || format!("config_cell:{input}|{row}:{column}"))

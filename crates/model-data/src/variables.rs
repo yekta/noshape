@@ -494,8 +494,9 @@ pub struct VariableStudioRefs {
 }
 
 impl VariableStudio {
-    /// Evaluate in dependency order (Variable Studios allow any order),
-    /// without the tables inserted into it (see [`studio_evaluation`]).
+    /// Evaluate top to bottom, a variable seeing only those above it (live mistake-vs-circular s5: `#height` in the
+    /// row above height is an error and its cell keeps the text), without the tables inserted into it (see
+    /// [`studio_evaluation`]).
     pub fn evaluate(&self, units: &noshape_units::UnitPrefs) -> noshape_units::TableEvaluation {
         self.evaluate_in(&noshape_units::EmptyScope, units)
     }
@@ -503,7 +504,7 @@ impl VariableStudio {
     /// Evaluate with `outer` (the inserted tables' variables) in scope.
     pub fn evaluate_in(&self, outer: &dyn noshape_units::VariableScope, units: &noshape_units::UnitPrefs) -> noshape_units::TableEvaluation {
         let table = noshape_units::VariableTable {
-            order: noshape_units::EvalOrder::Dependency,
+            order: noshape_units::EvalOrder::Sequential,
             entries: self
                 .variables
                 .iter()
@@ -783,6 +784,15 @@ mod studio_scope_tests {
 
     fn mm(q: Option<&Quantity>) -> f64 {
         q.map(|q| q.value * 1000.0).unwrap_or(f64::NAN)
+    }
+
+    /// Live mistake-vs-circular s5: a variable sees only the rows above it; `#height` above height is an error.
+    #[test]
+    fn a_studio_variable_sees_only_the_rows_above() {
+        let units = noshape_units::UnitPrefs::default();
+        let e = vs(&[("width", "#height"), ("height", "30 mm"), ("depth", "#height / 2")], false).evaluate(&units);
+        assert!(e.results[0].is_err(), "{:?}", e.results);
+        assert_eq!(mm(e.values.get("depth")), 15.0);
     }
 
     #[test]

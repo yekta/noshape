@@ -430,8 +430,8 @@ pub struct UiState {
     pub cache_key: Option<String>,
     /// A List input just added: its italic "Name" row takes the keyboard when next drawn (its id).
     pub cfg_focus_new_row: Option<String>,
-    /// The Configuration panel's last draw showed "No features are configured" under an input.
-    pub cfg_note_shown: bool,
+    /// The "No features are configured" note the Configuration panel's last draw showed under an input, if any.
+    pub cfg_note: Option<&'static str>,
     /// The contexts features referenced at the last regeneration (None until the first).
     pub known_contexts: Option<std::collections::HashSet<u32>>,
     /// A message the open dialog made ('New assembly context … created.' for its pick, a field's Configure), cleared
@@ -988,7 +988,7 @@ impl UiState {
             cache_save_task: None,
             cache_key: None,
             cfg_focus_new_row: None,
-            cfg_note_shown: false,
+            cfg_note: None,
             known_contexts: None,
             context_note: None,
             preview_for_cache: None,

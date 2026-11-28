@@ -1345,6 +1345,58 @@ def old_workspace_labels(a, b):
     return dict(b, dialog=dict(db, fields=fields))
 
 
+MASS_VARIANCE = 1e-3
+
+
+def mass_within_variance(a, b):
+    """Live's Mass properties numbers are Parasolid's approximate nominal, ±0.08 % about the exact value (core 11-28:
+    REST 33586.249 [33559.393, 33613.105] mm³; TICKETS MASS-PROPERTIES-VARIANCE-COMPARE): ours' value within 0.1 % of
+    live's, in the same unit, reads as live's."""
+    da, db = (a or {}).get("dialog"), (b or {}).get("dialog")
+    if not (isinstance(da, dict) and isinstance(db, dict) and da.get("title") == db.get("title") == "Mass and section properties"):
+        return b
+    num = re.compile(r"^(-?[0-9][0-9,]*(?:\.[0-9]+)?)(.*)$")
+    fields = []
+    for x, y in zip(da.get("fields") or [], db.get("fields") or []):
+        ma = num.match(str(x.get("text") or "")) if isinstance(x, dict) else None
+        mb = num.match(str(y.get("text") or "")) if isinstance(y, dict) else None
+        if ma and mb and ma.group(2) == mb.group(2) and x.get("label") == y.get("label"):
+            va, vb = float(ma.group(1).replace(",", "")), float(mb.group(1).replace(",", ""))
+            if abs(va - vb) <= MASS_VARIANCE * max(abs(va), abs(vb)):
+                y = dict(y, text=x.get("text"))
+        fields.append(y)
+    fields += (db.get("fields") or [])[len(fields):]
+    return dict(b, dialog=dict(db, fields=fields))
+
+
+INSERT_TABS = ["Current document", "Other documents", "Standard content"]
+
+
+def insert_as_panel(state):
+    """Live's recorder 2026-11-27.3 reads the Insert panel as a feature dialog, untitled or titled by its list's first row (its tabs, the search box
+    and the list's rows as boxes; TICKETS ASM-IMPORT-INSERT-AS-FEATURE): put back in the panel form every other take and
+    ours read. The search box reads by its placeholder: live's runner types the start's name in it to find the Part
+    Studio, a step of its own the scenarios don't have."""
+    d = (state or {}).get("dialog")
+    if not (isinstance(d, dict) and d.get("kind") == "feature" and [t.get("label") for t in d.get("tabs") or []][:3] == INSERT_TABS):
+        return state
+    text = [t.get("label") for t in d.get("tabs") or []]
+    text += [f"({f.get('label')})" for f in d.get("fields") or [] if f.get("kind") == "string"]
+    state["dialog"] = {"kind": "panel", "title": "Insert parts and assemblies", "text": text}
+    return state
+
+
+def old_reader_variables(a, b):
+    """Live's older recorder (states with no `configurations`) read no Part Studio configuration: `variables` null
+    outside a Variable Studio. Ours' Part Studio read with no variable table reads null against it."""
+    if not (isinstance(a, dict) and isinstance(b, dict)) or "configurations" in a or a.get("variables") is not None:
+        return b
+    v = b.get("variables")
+    if isinstance(v, dict) and not v.get("tables"):
+        b["variables"] = None
+    return b
+
+
 def insert_panel(state):
     d = (state or {}).get("dialog")
     if isinstance(d, dict) and d.get("kind") == "panel" and d.get("title") == "Insert parts and assemblies":
@@ -1589,11 +1641,13 @@ def compare(live, ours, whole_document=True):
         tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
         if isinstance(a, dict) and isinstance(b, dict) and a.get("dialog") is None and isinstance(b.get("dialog"), dict) and name in late_dialog:
             a = dict(a, dialog=late_dialog[name])
-        a = company_row(insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True)))
+        a = company_row(insert_panel(insert_as_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))))
         b = company_row(insert_panel(runner_names(old_workspace_labels(a, reference_manager_as_panel(a, material_as_panel(a, json.loads(json.dumps(b))))), start_name, False)))
         if free_plan:
             a, b = without_free_plan_rows(a), without_free_plan_rows(b)
         b = picker_as_read(b, picker_read)
+        b = mass_within_variance(a, b)
+        b = old_reader_variables(a, b)
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
         a, b = export_fields_by_label(a), export_fields_by_label(b)
