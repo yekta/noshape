@@ -1,25 +1,26 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-28 00:35 UTC. Read docs/DECISIONS.md
+Updated 2026-11-28 02:47 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 00:35 UTC): P0 SKETCH-USED-CURVES-NOT-SELECTABLE QUEUED 258b4169 (skasm-main, branch skasm-used-pick, 3c88f1b8a2)
-- Cause: a Select press on a used curve's middle hit its use glyph (ids 0xC000_0000|entity, scene sketch_mode.rs use_glyph_id) and
-  released as a constraint-glyph click (no selection). Fix: tool_down turns a press on a curve's own use glyph into DragState::Pending
-  (toggles the curve). Scene test in used_geometry_shows_use_glyphs_and_deleting_one_unlinks_it; GPU test
-  a_used_edges_line_is_clicked_and_boxed_in_its_sketch. The box report fix (ui_script) was already on main (psui), dropped.
-- p0v.sh (/root/skasm-scratch/bin) on vibex8 00:5x: scene 4/4, ps-ui 15/15, clippy clean. The 6 sketch-used-* replays all stop at
-  step 13 (setup) on .sketch.geometry[1].derivatives (live 17.8292, ours 18.1242: the spline-derivative report fix is batch-6, still
-  uncommitted in skasm ui_script.rs), so they don't reach the click: replay again from skasm once batch-6 lands. After it lands: drop the duplicate test/fix from skasm when rebasing; rm skasm-main's target if idle.
-- Still open: Use on the hole's rim (25.9,20.1,10): hover = Sketch 1's circle REGION seen through the hole; model_edge_at returned None
-  there (skasm sketch.rs Use press change kept, uncommitted; debug entities_along_ray hits next).
-- ASM-MC-SPLINE-FACE-ORIGIN-ENTITY (P2) drafted in skasm, untested: assembly eval.rs inference_candidates, B-spline/Bezier/Extrusion
-  faces offer their edges' midpoints and ends (end = POINT on the edge, align the edge), no centroid. Evidence: qa's FRAME rows decode
-  to live's connector at the spline end vertex (40,30,0) with Z = the natural spline's end tangent (-18,15) (block fastened), and at
-  Fillet 2's top edge midpoint (50,15,20), Z along it. Test spline_face_inferences_are_its_edges_points (assembly tests.rs). Then
-  ASM-MC-FRAME-ON-CURVED-FACES (likely mostly the same root), ASM-MATE-ERROR-ROW (P3).
-- Batch-6 open in skasm: a_lines_length_takes_zero: the first solve doesn't converge (LM; Length row at 0, comp_conflicts -> retry
-  excludes it -> Overconstrained [len]); solver.rs redundant patch is NOT the path (revert it). DBG prints removed.
+## NOW (11-28 02:47 UTC)
+- LANDED 572c7b23 (P0 used-curve click). QUEUED a9e00c4f (skasm-main, branch skasm-mc-spline, 2 commits; 5508f938 failed):
+  ASM-MC-SPLINE-FACE-ORIGIN-ENTITY (B-spline face: its edges' midpoints + ends, a corner once along its curved edge, no
+  centroid) + the arc chooser (nearer of centre and midpoint: live Fillet 1 midpoint, hinge 270 deg arc centre). T1s green.
+- ASM-MC-FRAME-ON-CURVED-FACES OPEN part (TICKETS row annotated): Fillet 2's edge on the spline face, live Z -y at its middle,
+  ours +y; flipping by edge.orientation() does NOT fix it (tried, reverted). Decoded: Part 2 top face connector Z +z (block
+  70..90 x 0..20 x 0..10), Fastened aligns Z; live Z: Fillet 2 edge on spline face -y, on top face +y, spline bottom edge +y.
+  Arc revolute (pin): live midpoint (1.17,1.17,20), Z +-(-0.707,0.707,0) (sign depends on the pin cylinder's Z). Replay
+  asm-spline-* takes after a9e00c4f lands (heavy: slot).
+- Worktree skasm rebased on main 02:4x (WIP uncommitted, 9 files): batch-6. solver.rs: free_line_edit_options now
+  allow_collapse: true (DIM-ZERO-ACCEPTED's cause: the free-line edit refused the collapse); the old redundant patch is
+  in /root/skasm-scratch/solver-redundant.patch (not the path). Main already had the spline-derivative report
+  (fit_spline_end_derivatives): nurbs.rs change dropped. sketch.rs Use press merged with main's face fallback.
+  T1 run tb6.sh (sketch, scene lib, ps-ui, asm-ui revolute, clippy) running; then commit + land, then the sketch-used-*
+  replays (p0v.sh-style, slot) from skasm.
+- Rim Use (25.9,20.1,10) still open: model_edge_at returned None there; debug entities_along_ray hits.
+- rb.sh syncs each worktree to ~/agents/<worktree>/src and cds there: scripts carry no cd (fixed 02:40). Crate T1s via rb.sh
+  without ~/bin/slot (lead 02:00); slot only for replays/suites.
 - qa P2 SKETCH-INFERENCE-TANGENT-AND-SPLINE-HORIZONTAL queued.
 
 ## NOW (11-27 19:50 UTC)
