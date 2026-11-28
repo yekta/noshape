@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-28 05:24 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-28 06:12 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 ## IN FLIGHT 11-28 04:45
@@ -14,18 +14,20 @@ c2-impeller-loft differs (Part 1 115536 -> 115591 mm3, live 119670: upstream #29
 round test asserts edges on faces (de975d18). (3) britatap Delete face 2 (58f84927): direct.rs adjacent_fillets takes
 an edge only along a fillet's rails (least-curved way); T1 features_c::delete_face_keeps_a_pipe_bend_tangent_across_it.
 Corpus A/B 04:4x: only britatap differs; parity 8/22 -> 12/22. Kernel 622/0, model 670/0, g++-13 ok.
-IN FLIGHT 05:2x: BRITATAP Split 3 (#13: ours dropped the whole target, live keeps 1/7/7 5966.7 mm2). Cause: split.rs
-sheet_point's far point of the big piece lies past the tool profile's end, nearest tool point on its boundary, so
-side_of's sign was wrong (both pieces "behind", Keep front removed both). Fix (UNCOMMITTED split.rs): sheet_side():
-if the far point's projection isn't square to the tool (|cos| < 0.9), cut_side(): the tool normal at a cut edge's
-middle against the way into the piece. Release cli (vibex8 ~/tmp/core/bt/cli) gives Split 3 = live 1/7/7. T1 (UNCOMMITTED)
-features_c::split_keeps_the_front_of_a_sheet_reaching_round_the_tool (U plane + half cylinder; one piece left).
-RUNNING (task, local /root/core-scratch/sp-run.sh): T1 with fix, then SWAPS split.rs to HEAD's for the without-run,
-restores from core-scratch/sp.F (ends RESTORED). If the run died: cp /root/core-scratch/sp.F to split.rs FIRST.
-Then: model tests, clippy, corpus A/B (vibex7, A = HEAD split.rs), parity britatap, commit, land.
-britatap rest: #12 Extrude 1 area 5309.019 vs 5309.235 (sketch with G2 + external refs solves 5 um apart; low);
-#14 Side blend curve Error "Bridging curve start and end points must be distinct." (corpus cli; parity harness said
-"Selected vertex does not belong to selected face."): next after Split 3. Then #15-#21 follow.
+COMMITTED 06:1x, NOT YET LANDED (worktree core-uip3, on the 57ac5e13 stack): land both with land.sh next.
+(1) a4b415977f britatap Split 3 (#13; ours dropped the whole target, live keeps 1/7/7): split.rs sheet_side()/cut_side()
+(far point's projection not square to the tool -> tool normal at a cut edge's middle vs the way into the piece). T1
+features_c::split_keeps_the_front_of_a_sheet_reaching_round_the_tool passes with, fails without (0 bodies). Model 671/0,
+kernel 623/0, g++-13 ok; corpus A/B 05:5x: only britatap differs (gains Surface 2 1/7/7, as live). Clippy: land.sh.
+(2) 6788d1346d britatap #14 Side blend curve: parity.rs query_with maps a cPoint sub-feature's created-by vertex
+(SUB_POINT) BEFORE live's id path (refs.jsonl had the Edge point vertex IT -> by_geometry fell back to the nearest
+vertex; both sides got one vertex, "Selected vertex does not belong to selected face."). Parity A/B 06:0x on the 18
+cPoint docs: only britatap moves, 13/22 -> 14/22 (A includes (1)); all others identical. Not yet checked: whether Side
+blend curve now matches live (14/22 = 12 + Split 3 + it? read vibex7 ~/tmp/core/pq/run-B.log) and what is next (#15+).
+The corpus doc's "must be distinct" is its stale import (both sides one face+vertex); parity is the measure.
+britatap #12 Extrude 1 (area 5309.019 vs 5309.235 = curve length x 43 mm; ours 3.3 + 1.7 um shorter): Cutback profile's
+two G2-joined Beziers have 4 free DOF; fitted live's control points (midpoint/dir/length) differ from ours by <= 9 um;
+ours is the smaller L2 move from the stored points (1.16e-3 vs live 1.33e-3 mm2): live minimises something else. PARKED.
 Probe setup vibex8 ~/tmp/core/{bt (britatap copy + live.jsonl), lib (sig/nscli/hkf/fdump)}.
 PARKED tonight (all blocked upstream / native blend faces): (a) c2-hunting-knife #51 Fillet 8 (16/36/22 vs 15/37/25):
 the dome ring is 2 edges (both seams end on it, archive 11-18), OCCT makes one blend face per spine edge -> 2 faces of
