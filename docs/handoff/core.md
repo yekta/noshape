@@ -1,14 +1,16 @@
 # Core modelling (agent "core"): current state
-P0s FROM LEAD 09:21, state 09:40:
- (1) britatap Fillet 1 (qa compat c2650a9a): NOT a Delete face regression. qa's corpus copy is from 11-18 (stale
-     translation: Side blend curve "start and end points must be distinct", Bridge patches and Fills error, in 0.4.74
-     too). Delete face 2 on it: 0.4.74 1/4/4, now 3/10/8 = live's 3/10/8 (area 0.017565); Fillet 1 then gets a
-     different (also non-live) body. Fresh parity save (pbt/save 08:16): Fillet 1 OK 12/21/11 (live 14/25/13).
-     Asked the lead: qa re-saves the corpus doc from a fresh parity save once 36683ed85a + 3a62fc14 + a69fe8e0 land.
- (2) 96b23e35 FAILED (vibe2 log): feature-studio-ui the_completion_list_shows_230_ms_after_the_key: fs_complete.rs timed
-     LIST_DELAY with std Instant against gpui's fake clock (loaded queue host: >20 ms wall -> list open at 210 ms fake).
-     Fix: executor clock (cx.background_executor().now()). Commit + land next.
- Then the Side blend curve (below). NORMAL_TO_PROFILE WIP set aside: /root/core-scratch/ntp-wip.patch (git apply).
+LEAD 10:1x: the Coons patch for Boundary surface (calibrated to both live areas, corpus A/B, Mac model tests). P0s of
+09:21 done: 96b23e35's fix landed (93e0b958 + 785a50de); britatap Fillet 1 = stale corpus copy (qa re-saves).
+WIP 10:4x (uncommitted, saved /root/core-scratch/held-coons.patch; kernel change -> Mac kernel run before land):
+ features.cpp op_coons_held (k::coons_surface_held): 2+2 Boundary surface with held sides = Boolean-sum Coons, cubic
+ Hermite across held sides (cross derivative = support's in-plane normal to the side x K x chord), quintic across
+ MATCH_CURVATURE sides (support's normal curvature), linear across unheld; surfaces.rs uses it before OCCT plate.
+ Probe env: NOSHAPE_BSURF_K (1), _Q (quintic, 1), _M (magnitude from V ends), _ARC (arc-length sides), _FADE (h0/h1).
+ Result (patch face, exact live = part evArea - supports' evArea): bridging plate 6683 -> 6762..6844 (live 6953.7),
+ britatap 2040.8 -> 2058..2063 (live 2083). K barely moves it (linear u blend: V profiles dictate): construction
+ differs. REQUESTS 10:3x (BSURF-HELD-AREA): live's evSurfaceDefinition of both patches -> live/core/bsurf-held-1128/.
+ Probe: vibex7 ~/tmp/core/pbt/{cli, save/ britatap, bsave/ bridging}, lib/fq.py, .hb.sh in core-uip3.
+ Side blend curve = live (below). NORMAL_TO_PROFILE WIP set aside: /root/core-scratch/ntp-wip.patch (git apply).
 
 Updated 11-28 07:32 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
@@ -43,14 +45,19 @@ splits there (2 x 134 mm2) = blend's run-over-an-edge split, not core (note for 
 (vCondition NORMAL_TO_PROFILE unheld -> warning "Boundary conditions are not applied yet"): top patch 2040.8 vs live
 2083.05. WIP (uncommitted, surfaces.rs, model 673/0): NORMAL_TO_PROFILE = Tangent to the piece extruded along the
 profile's plane normal (plane_normal): warning gone, area UNCHANGED 2040.8 (needs a T1 + corpus before landing).
-REAL CAUSE: Side blend curve (#14, bridgingCurve via std bridgingCurve.fs on our FS host; G3 both ends, CONTROL_POINTS,
-edge params 0.5, faces, tangency angles 0 deg): live Curve 1 length 58.910 mm, mid (91.755, -19.770, 296.483), bbox y max
--15.741; ours 58.93, mid (90.791, -22.565, 296.241); same ends. Next: which FS builtin (face curvature / derivatives for
-G3) differs; std bridgingCurve.fs computeG3ControlForFace (line ~838) takes evFaceCurvature + evFaceCurvatureDerivative
-(std evaluate.fs:849 -> our evFaceCurvatureDerivatives, crates/custom/src/custom/host/evaluate.rs:951: central
-difference of the 2nd form, 1e-5 m step) and evFaceTangentPlane at the edge param 0.5 with tangency angle 0. Check those
-on the head / pipe faces at the side points against analytic values (G2 alone: set match to CURVATURE in a copy and
-compare the curve's change); NOSHAPE_BRIDGE_NATIVE=1 forces the native (tangency-only) path for comparison.
+SIDE BLEND CURVE = LIVE (checked 10:2x): live's refs capture (evBox3d tight, evLength) of Curve 1: length 0.0589302664,
+box y max -0.016998186 = ours 58.930267 / -16.998186 (the 58.910 / -15.741 compared before were live.jsonl's loose part
+bbox; live's "mid" is its 0.5 arc-length point, ours query_entities' param midpoint). evFaceCurvatureDerivatives checked:
+self-consistent (normal change over its +-10 um step = |normalPrime| x 20 um); G1/G2/G3 lengths 57.31/58.26/58.93.
+So the top patch's area gap (2040.8 vs live 2083.05) is in Boundary surface itself: V NORMAL_TO_PROFILE (WIP patch
+/root/core-scratch/ntp-wip.patch: warning gone, area unchanged) / live's bsurf construction. Probe recipe (std prints):
+core-uip3 .bcp.py + .bc.sh patch the synced copy only (bridgingCurve.fs needs import string.fs for println/toString).
+NEXT (britatap #15/#16, and c2-surf-workshop-bridging Boundary surface 1: ours 17289 vs live 17559 mm2, same cause):
+tangency-held Boundary surfaces fill by OCCT plate (fill_surface + FillEdge supports, surfaces.rs ~889) and come out
+1.5-2 % small (britatap top patch 2040.8 vs live 2083.05; live's face areas here are mesh-based, ~0.04 % under: its
+half cylinder 10991.16 vs exact 10995.57). Plan: a Hermite Coons patch (cross-boundary derivative = support's
+in-plane normal to the edge x magnitude x profile spacing) for 2+2 profiles with held edges; calibrate the derivative
+scale on both live numbers, then corpus A/B (model suite rows for boundary surfaces).
 (Also: top bridge-patch faces 2040.8 vs live 2083.58 after Fill - Top; the parity's first diff is still #12 Extrude 1.)
 Probe: vibex7 ~/tmp/core/pbt/{cli, save/ (britatap re-saved 07:02 with the trim, 600)}, ~/tmp/core/lib (fq.py faces
 after features with type/area, parts.py, bp.py, fg.py). Live data: vibex7 ~/parity/models/c2-surf-workshop-britatap.
