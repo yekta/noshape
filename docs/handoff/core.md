@@ -1,46 +1,30 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-28 06:12 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-28 06:42 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 11-28 04:45
-LANDED: 434c2a49 (as 1d0bf5a6: extrude-hole evaluator side, spline-fillet-asm exact volume, blend #4 box-corner balls +
-reach + reprojection), macOS G2 sphere-fill T1 (aa19340a: cross-edge curvature 1.2 % vs band 5 %; lead picks it onto
-the release).
-QUEUED 57ac5e13 (worktree core-g2mac, from main; carries f27f2793): (1) e18766a8 impeller: an as-is OCCT round whose
-new vertices are looser than its radius isn't kept (feature 43 Fillet Flansch zum Stroemungskanal, tol 1.14 mm ->
-Extrude Bohrungssitz Ansaugflansch's Boolean no longer declines, 2.9 -> 0.25 s; bool's report). Corpus A/B 04:3x: only
-c2-impeller-loft differs (Part 1 115536 -> 115591 mm3, live 119670: upstream #29), statuses unchanged. (2) slanted-end
-round test asserts edges on faces (de975d18). (3) britatap Delete face 2 (58f84927): direct.rs adjacent_fillets takes
-an edge only along a fillet's rails (least-curved way); T1 features_c::delete_face_keeps_a_pipe_bend_tangent_across_it.
-Corpus A/B 04:4x: only britatap differs; parity 8/22 -> 12/22. Kernel 622/0, model 670/0, g++-13 ok.
-COMMITTED 06:1x, NOT YET LANDED (worktree core-uip3, on the 57ac5e13 stack): land both with land.sh next.
-(1) a4b415977f britatap Split 3 (#13; ours dropped the whole target, live keeps 1/7/7): split.rs sheet_side()/cut_side()
-(far point's projection not square to the tool -> tool normal at a cut edge's middle vs the way into the piece). T1
-features_c::split_keeps_the_front_of_a_sheet_reaching_round_the_tool passes with, fails without (0 bodies). Model 671/0,
-kernel 623/0, g++-13 ok; corpus A/B 05:5x: only britatap differs (gains Surface 2 1/7/7, as live). Clippy: land.sh.
-(2) 6788d1346d britatap #14 Side blend curve: parity.rs query_with maps a cPoint sub-feature's created-by vertex
-(SUB_POINT) BEFORE live's id path (refs.jsonl had the Edge point vertex IT -> by_geometry fell back to the nearest
-vertex; both sides got one vertex, "Selected vertex does not belong to selected face."). Parity A/B 06:0x on the 18
-cPoint docs: only britatap moves, 13/22 -> 14/22 (A includes (1)); all others identical. Not yet checked: whether Side
-blend curve now matches live (14/22 = 12 + Split 3 + it? read vibex7 ~/tmp/core/pq/run-B.log) and what is next (#15+).
-The corpus doc's "must be distinct" is its stale import (both sides one face+vertex); parity is the measure.
-britatap #12 Extrude 1 (area 5309.019 vs 5309.235 = curve length x 43 mm; ours 3.3 + 1.7 um shorter): Cutback profile's
-two G2-joined Beziers have 4 free DOF; fitted live's control points (midpoint/dir/length) differ from ours by <= 9 um;
-ours is the smaller L2 move from the stored points (1.16e-3 vs live 1.33e-3 mm2): live minimises something else. PARKED.
-Probe setup vibex8 ~/tmp/core/{bt (britatap copy + live.jsonl), lib (sig/nscli/hkf/fdump)}.
-PARKED tonight (all blocked upstream / native blend faces): (a) c2-hunting-knife #51 Fillet 8 (16/36/22 vs 15/37/25):
-the dome ring is 2 edges (both seams end on it, archive 11-18), OCCT makes one blend face per spine edge -> 2 faces of
-57.44 (live one 114.83); joining the edges first (probe vibex8 ~/tmp/core/hk/fp.cpp) fails (pcurves cross a seam).
-Needs a two-blend-face merge (surface concatenation) or native blend faces. Live also splits the loft side in 6
-(11-16 known class). (b) impeller #47 is downstream of #29 zum Halter (parked): parity diff list from #27 on.
-(c) body-draft-naming #8 Fillet 2 = the pinch corner (2.9 mm3). lora-enclosure matches to the end (item f done).
-If 434c2a49 fails: fix forward. qa 01:1x asked about 28329.612 in its UI takes: answered (live UI shows massproperties' nominal; compare UI takes within live's variance band). Not yet checked: a_round_over_a_slanted_end_across_a_turn fails without `reach`.
-IMPELLER P2 (kernel profiles vibex7 ~/tmp/core/kn/i-new.err / i-old.err): Extrude Bohrungssitz Ansaugflansch 2.9 s
-vs 0.5: noshape's Boolean declines in 12 ms (0.4.73: boolean.rust 284 ms), OCCT 2.8 s; with NOSHAPE_BOOL_FALLBACK=0
-"a face's vertex off its plane" (boolean.rs ~5625; that run also fails Delete face 2, so maybe not the real reason):
-told bool 00:5x (P2, for later; they'll say if an upstream feature of mine is sloppy). Delete face 2 4.1 vs 1.9 s:
-OCCT op_defeature on the bigger (live-like) part, 579 vs 85 edge-face intersections: not a regression in code.
+## IN FLIGHT 11-28 06:42
+QUEUED (vibe2): 57ac5e13 (core-g2mac: impeller round tol, slanted-end test, britatap Delete face 2), 96b23e35 (core-uip3
+stack: + a4b415977f britatap Split 3 and 6788d1346d parity cPoint sub-feature vertex before live's id; carries
+features.cpp from 57ac5e13, queued before the Mac rule), bc95a9cf (core-g2mac2 from main: G2 sphere-fill T1 band
+5 % -> 10 %: Mac arm64 gives 5.8 %, Linux 1.2 %, G1 26 %; Mac kernel tests 617/1 before, the test passes after).
+NEW RULE (lead 11-28, DECISIONS): any crates/kernel or crates/brep change (or their tests) runs that crate's tests once on
+the Mac (NOSHAPE_RB_HOST=mac, .mk.sh in core-uip3) before land.sh.
+britatap (parity 14/22): #14 Side blend curve now matches. #15 Bridge patch - Top WIP UNCOMMITTED in core-uip3:
+surfaces.rs trim_profiles(): in a 2x2 network each profile is split (k::split by vertices) where the other direction's
+profiles meet it inside, overhangs pruned; held conditions use the original edge's support for its pieces. Britatap: #15
+builds with live's 5/20/16 (was ERROR), area 25577.80 vs live 25621.04 (-0.17 %); #16 same; next diffs Fill - Top
+13/31/18 vs live 9/17/8 (live merges mirrored same-surface faces?), Fill - Bottom/Pipe end "not a closed loop".
+New T1 features_b::boundary_surface_profiles_are_trimmed_where_they_meet (planar 40x30 rectangle) RUNNING (.bst.sh,
+vibex7): check it passes, and fails without the fix; then corpus A/B (.bab.sh pattern) + commit + land.
+Remaining #15 gap: the V1 NORMAL_TO_PROFILE row is unheld (warning). Tried support = V1 piece extruded both ways along
+its sketch normal (Tangent): warning gone but area identical to 1e-6 -> unverified, removed. Live's bsurf likely a
+Hermite Coons with magnitude 1, not our fair fill: a bigger item.
+Probe: vibex7 ~/tmp/core/pbt/{cli (debug build, rebuild), save/ (britatap, 600)}, ~/tmp/core/lib (bp.py edges of a
+feature's profiles, parts.py, sg.py). features.cpp debug prints were restored (orig copy /root/core-scratch).
+#12 Extrude 1 PARKED (sketch solve minimal-move choice: live's control points <= 9 um off ours).
+Cleanup when done: vibex7 ~/tmp/core/pbt, vibex8 ~/tmp/core/bt (cli + britatap copy), worktrees core-g2mac/core-g2mac2
+after their lands.
 ## REPORT PENDING (lead at 395k at 20:40: not messaged): pulleys fix QUEUED 96280303. Earlier (16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
 (errors only when pieces < 2 AND an INTERNAL face/edge remains = a slit). Both said to lead 17:3x in thread.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
