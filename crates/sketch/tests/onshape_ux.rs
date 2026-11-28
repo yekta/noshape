@@ -970,6 +970,23 @@ fn a_fit_spline_takes_onshapes_end_derivatives() {
     assert!(sk.set_fit_spline_end_derivatives(line, d0, d1).is_err());
 }
 
+/// A drawn fit spline reports live's end derivatives: natural ends on its centripetal parameter (live
+/// spline-escape-after-two-points: the chord at both ends; spline-four-points-dblclick: (60.72, 75.75), (60.44, 75.94)).
+#[test]
+fn a_drawn_fit_spline_reports_lives_end_derivatives() {
+    let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+    let cases: [(&[DVec2], DVec2, DVec2); 2] = [
+        (&[mm(0.0, 0.0), mm(20.0673, 15.0835)], mm(20.0673, 15.0835), mm(20.0673, 15.0835)),
+        (&[mm(0.0, 0.0), mm(20.1866, 15.1523), mm(39.8231, 0.0), mm(59.9088, 15.1926)], mm(60.7232, 75.7504), mm(60.4415, 75.9356)),
+    ];
+    for (pts, d0, d1) in cases {
+        let mut sk = Sketch::new();
+        let s = sk.add_fit_spline_with_handles(pts).unwrap();
+        let (r0, r1) = sk.fit_spline_end_derivatives(s).unwrap();
+        assert!((r0 - d0).length() < 0.01e-3 && (r1 - d1).length() < 0.01e-3, "{r0:?} {r1:?}");
+    }
+}
+
 /// Live 2022: a free line's length set anew moves its start (the first click) and keeps its end, in all four
 /// directions, by its dimension once the sketch has another one (its lines B2, C2, D2; and A in the typed box).
 #[test]
