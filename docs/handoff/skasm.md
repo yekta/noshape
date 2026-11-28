@@ -3,6 +3,13 @@
 Updated 2026-11-28 08:45 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
+## NEXT (lead P0 11-28 08:5x): the sketch hover × state matrix
+- docs/parity/sketch-hover-matrix.md: 11 kinds × 8 states, preliminary score 14 =, 22 ?, 0 ✗, 52 L (reported to the lead).
+- Then: a scene test per row (crates/scene: `sketch_color` per state, pick states on hover/selection, glyph sprites,
+  priority) turning ? into = / ✗; fix ✗; file the L cells in live/REQUESTS.md (spline, text, circle, used curve hover/
+  select, over-defined colour, multi-select, face vs plane, glyph selected). GPU cells exist in part-studio-ui
+  hover_matrix_tests (sketch_cell harness, State enum); psui owns interaction-feel.md.
+
 ## NOW (11-28 08:45 UTC)
 - QUEUED (land.sh, no results yet; each carries the earlier ones): 75280e34, dd0fa834, 8728537c, ff59d97f, ab49ca2c
   (Mirror before its line passes over the Origin), 3196c652 (a free line's end Coincident with a used/fixed edge carries
