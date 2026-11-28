@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 08:3x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 08:5x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -45,12 +45,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - ps69 maker set: 7/13 match; the 6 that differ all have TICKETS rows (SKETCH-COINCIDENT-FREE-LINE-SLIDES,
   SKETCH-TANGENT-ARC-SPAN (skasm), SKETCH-DIM-CIRCLE-RIM-TOP (psui, waits REQUESTS 11-27 20:4x), UIP-COMPARE-*,
   extrude-offset-ring recorder owner). Nothing new.
-- TEST MEMORY (P2; earlyoom killed part-studio-ui tests at 5.2-5.4 GB on vibe2 11-27): ps70 on vibe2: whole binary
-  maxrss 3.75 GB; per test (690): the_dimension_tool_takes_the_hovered_line 3.2 GB (8 windows never closed), then
-  dialogs matrix 1.4, sketch tools matrix 1.2, line_end_dot 1.2; GPU tests ~0.8-0.9 GB each, median 0.22 GB.
-  Fix uncommitted in /root/psui-scratch/resp/close-windows.patch (`git apply` it): close_windows(cx) helper in
-  sketch_ui_tests.rs, called per case in those 4 tests. Next: Mac run of the 4 tests, then ps70-style RSS of them on
-  vibe2 (Linux numbers), commit, land.
+- TEST MEMORY (P2; earlyoom killed part-studio-ui tests at 5.2-5.4 GB on vibe2 11-27): ps70 whole binary maxrss
+  3.75 GB; the 4 heaviest tests kept a window per case alive. LANDING 08:5x: close_windows(cx) per case: dimension-tool
+  hover 3.2 -> 0.83 GB, dialogs matrix 1.4 -> 0.41, sketch tools matrix 1.2 -> 0.52, line-end dot 1.2 -> 0.80 (ps73).
+  Next heaviest are single-window GPU tests ~0.8-0.9 GB each (lavapipe targets); median 0.22 GB.
 - Export left open: Apply export rules live off (REQUESTS 05:3x/06:0x), EXPORT-REMEMBERED-START (Millimeter),
   export-step-spline-part s4 derived tolerances (same remembered class), import toast timing (REQUESTS 04:1x).
 - Section view hint after the plane pick: kept in the overlap takes, cleared in block's; parked, REQUESTS "psui 11-28 07:1x".
