@@ -2338,6 +2338,9 @@ impl SketchEditor {
             let n = (self.polygon_base_sides as f64 + delta.floor()).clamp(3.0, 50.0) as usize;
             self.polygon_sides = n;
         }
+        if self.tool == Tool::Offset && self.drag.is_none() {
+            self.offset_follow(&data.sketch, p);
+        }
         if self.tool == Tool::CenterArc && self.clicks.len() == 2 {
             let c = self.clicks[0].pos;
             let prev = self.cursor.unwrap_or(self.clicks[1].pos);
@@ -3104,11 +3107,13 @@ impl SketchEditor {
                 let ids: Vec<EntityId> = if self.selection.is_empty() || self.offset_pending.is_some() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
                 if ids.is_empty() {
                     // Live (workflows-1122 22 s18, ui-parity sketch-offset-key): a click away from the curves places
-                    // the offset as previewed, whatever the click's side and distance, and opens its distance box.
+                    // the offset as previewed (a line's whatever the click's side and distance, a circle's at the
+                    // click) and opens its distance box.
                     if self.offset_pending.is_none() {
                         return EditOutcome::none();
                     }
                     // (Placed by a click the tool ends: live's tool is none after it.)
+                    self.offset_follow(&data.sketch, p);
                     let out = self.commit_offset(data);
                     return out;
                 }
@@ -3508,6 +3513,20 @@ impl SketchEditor {
         self.offset_flip = false;
         self.offset_out = offset_goes_in(sk, &ids);
         self.offset_pending = Some(ids);
+    }
+
+    /// A pending circle's offset follows the pointer, either side (live sketch-offset-circle-inward: a click 3 mm inside
+    /// an r10 circle placed "2.96563 mm"; a line's stays as previewed, workflows-1122 22 s18: 9 mm above gave 5 mm).
+    fn offset_follow(&mut self, sk: &Sketch, p: DVec2) {
+        let Some([id]) = self.offset_pending.as_deref() else { return };
+        let Some(noshape_sketch::Curve2::Circle { center, radius }) = sk.curve(*id) else { return };
+        let r = (p - center).length();
+        if (r - radius).abs() <= self.world_per_px {
+            return;
+        }
+        self.offset_distance = (r - radius).abs();
+        // A lone circle's positive offset goes in.
+        self.offset_flip = (r < radius) == self.offset_out;
     }
 
     /// Offset tool on a model face (live: accepted, its outer loop offset as one chain): `ids` the loop's reference
@@ -13610,6 +13629,28 @@ mod tests {
         assert_eq!(ed.tool, Tool::Select);
         click(&mut ed, &mut d, v(0.02, 0.03));
         assert_eq!(count(&d, EntityKind::Line), 3);
+    }
+
+    /// Live sketch-offset-circle-inward: a circle's offset follows the pointer (a click 3 mm inside an r10 circle:
+    /// "2.96563 mm", inward); workflows-1122 22 s18: a line's stays as previewed (a click 9 mm above: 5 mm).
+    #[test]
+    fn a_circles_offset_follows_the_pointer_a_lines_does_not() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        let center = d.sketch.add_point(DVec2::ZERO);
+        d.sketch.add_entity(noshape_sketch::Geometry::Circle { center, radius: 0.01 }, false, false).unwrap();
+        click(&mut ed, &mut d, v(0.01, 0.0));
+        assert!(ed.offset_pending.is_some());
+        ed.pointer_move(&mut d, v(0.007, 0.0), false, false);
+        click(&mut ed, &mut d, v(0.007, 0.0));
+        let radii: Vec<f64> = d.sketch.entities().filter_map(|e| match d.sketch.curve(e.id) { Some(Curve2::Circle { radius, .. }) => Some(radius), _ => None }).collect();
+        assert!(radii.iter().any(|r| (r - 0.007).abs() < 1e-9), "{radii:?}");
+        let (mut ed, mut d) = editor(Tool::Offset);
+        d.sketch.add_line(v(0.0, 0.005), v(0.03, 0.005));
+        click(&mut ed, &mut d, v(0.018, 0.005));
+        ed.pointer_move(&mut d, v(0.018, 0.014), false, false);
+        click(&mut ed, &mut d, v(0.018, 0.014));
+        let ys: Vec<f64> = d.sketch.entities().filter_map(|e| match d.sketch.curve(e.id) { Some(Curve2::Line { a, .. }) => Some(a.y), _ => None }).collect();
+        assert!(ys.iter().any(|y| ((y - 0.005).abs() - 0.005).abs() < 1e-9), "5 mm off: {ys:?}");
     }
 
     /// Live offset-look-1121 (3): the pointer on the distance label hides the dimension's two arrowheads, not its line.

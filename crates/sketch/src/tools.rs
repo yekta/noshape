@@ -1152,7 +1152,7 @@ impl Sketch {
         let mut caps = Vec::new();
         for (items, closed) in self.chains(ids) {
             if items.len() == 1 && !closed {
-                let line = self.kind(items[0].0) == Some(EntityKind::Line);
+                let line = matches!(self.kind(items[0].0), Some(EntityKind::Line | EntityKind::FitSpline | EntityKind::BSpline));
                 let s = self.slot_around(items[0].0, width)?;
                 if line {
                     // Live: only the end cap is dimensioned (the offsets tie the rest).

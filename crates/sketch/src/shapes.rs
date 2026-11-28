@@ -379,7 +379,46 @@ impl Sketch {
                 }
                 self.c(&mut out, ConstraintKind::Equal { a: cap_s, b: cap_e });
             }
-            _ => return Err(SketchError::InvalidGeometry("slots follow lines and arcs".into())),
+            crate::entities::Geometry::FitSpline { .. } | crate::entities::Geometry::BSpline { .. } => {
+                // Live slot-on-spline: as on a line, the sides the spline's offsets (free splines: the solver holds no
+                // OFFSET between splines), the caps on its ends.
+                use crate::entities::EntityKind;
+                let (start, end) = self.endpoints(id).ok_or(SketchError::InvalidGeometry("slots follow open curves".into()))?;
+                let curve = self.curve(id).ok_or(SketchError::UnknownEntity(id))?;
+                let (a, b) = curve.domain();
+                let (p0, p1) = (self.point(start).unwrap(), self.point(end).unwrap());
+                let normal = |t: f64| curve.tangent(t).try_normalize().map(|d| d.perp() * h).ok_or(SketchError::InvalidGeometry("degenerate slot centerline".into()));
+                let (n0, n1) = (normal(a)?, normal(b)?);
+                let mut side = |sk: &mut Self, d: f64| -> Result<EntityId> {
+                    let r = sk.offset(&[id], d)?;
+                    out.points.extend(r.created.iter().copied().filter(|e| sk.kind(*e) == Some(EntityKind::Point)));
+                    r.created.into_iter().find(|e| sk.kind(*e).is_some_and(|k| k != EntityKind::Point)).ok_or(SketchError::InvalidGeometry("slot is wider than the spline allows".into()))
+                };
+                let left = side(self, h)?;
+                let right = side(self, -h)?;
+                // Each side's end at the spline's start first.
+                let ends = |sk: &Self, c: EntityId, at: DVec2| -> Option<(EntityId, EntityId)> {
+                    let (x, y) = sk.endpoints(c)?;
+                    Some(if (sk.point(x)? - at).length() <= (sk.point(y)? - at).length() { (x, y) } else { (y, x) })
+                };
+                let (la, lb) = ends(self, left, p0 + n0).ok_or(SketchError::UnknownEntity(left))?;
+                let (ra, rb) = ends(self, right, p0 - n0).ok_or(SketchError::UnknownEntity(right))?;
+                let (c0, c1) = (self.add_point(p0), self.add_point(p1));
+                let (sa, sb) = (self.add_point(p0 + n0), self.add_point(p0 - n0));
+                let (eb, ea) = (self.add_point(p1 - n1), self.add_point(p1 + n1));
+                let start_cap = self.add_arc_between(c0, sa, sb)?;
+                let end_cap = self.add_arc_between(c1, eb, ea)?;
+                out.points.extend([c0, c1, sa, sb, eb, ea]);
+                out.curves = vec![right, end_cap, left, start_cap];
+                for (a, b) in [(c0, start), (c1, end), (sa, la), (sb, ra), (eb, rb), (ea, lb)] {
+                    self.c(&mut out, ConstraintKind::Coincident { a, b });
+                }
+                for (l, c) in [(left, start_cap), (right, start_cap), (left, end_cap), (right, end_cap)] {
+                    self.c(&mut out, ConstraintKind::Tangent { a: c, b: l });
+                }
+                self.c(&mut out, ConstraintKind::Offset { reference: end_cap, curve: start_cap, master_ref: end, master: start, side: 1.0 });
+            }
+            _ => return Err(SketchError::InvalidGeometry("slots follow lines, arcs and splines".into())),
         }
         Ok(out)
     }

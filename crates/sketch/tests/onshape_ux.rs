@@ -109,6 +109,24 @@ fn slot_around_line_and_arc() {
     assert!((regions[0].area() - expect).abs() < 1e-2, "{} vs {expect}", regions[0].area());
 }
 
+/// Live slot-on-spline: Slot on a fit spline builds two offset splines and two caps on its ends (5 curves with the
+/// spline), 6 COINCIDENT and 4 TANGENT; one cap carries the width.
+#[test]
+fn a_slot_on_a_spline_wraps_it() {
+    let mut sk = Sketch::new();
+    let sp = sk.add_fit_spline(&[v(0.0, 0.0), v(0.03, 0.02), v(0.06, 0.0)]).unwrap();
+    let before = sk.constraints().count();
+    let (curves, caps) = sk.slot_chains(&[sp], 0.02).unwrap();
+    assert_eq!((curves.len(), caps.len()), (4, 1));
+    let kinds: Vec<EntityKind> = curves.iter().filter_map(|c| sk.kind(*c)).collect();
+    assert_eq!(kinds.iter().filter(|k| **k == EntityKind::Arc).count(), 2, "{kinds:?}");
+    let count = |k: fn(&ConstraintKind) -> bool| sk.constraints().skip(before).filter(|c| k(&c.kind)).count();
+    assert_eq!((count(|k| matches!(k, ConstraintKind::Coincident { .. })), count(|k| matches!(k, ConstraintKind::Tangent { .. }))), (6, 4));
+    sk.add_constraint(ConstraintKind::Diameter { curve: caps[0], value: 0.02 }).unwrap();
+    assert!(sk.solve().is_solved());
+    assert_eq!(sk.regions().len(), 1);
+}
+
 /// The Slot tool on a free arc (qa SKETCH-SLOT-ON-ARC: "Ø0" and no slot): the caps are the two on its ends, not
 /// its offset sides (which share its centre); the width dimension and Equal then keep the slot whole.
 #[test]
