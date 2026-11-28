@@ -10932,6 +10932,30 @@ fn mirror_before_its_line_passes_over_the_sketch_region(cx: &mut TestAppContext)
     assert!(!matches!(hover, Some(Reference::SketchEntity { .. })), "nor the circle: {hover:?}");
 }
 
+/// Live sketch-mirror-about-point-refused s12: Mirror with nothing selected, a click on a point lying on the Origin: the
+/// point and the Origin are no mirror line, the pick passes over them to what lies behind (live: the Front plane).
+#[gpui::test]
+fn mirror_before_its_line_passes_over_the_origin(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "mirror-origin-behind", Tool::Point);
+    let at = on_screen(cx, &view, DVec2::ZERO);
+    click(cx, window, &view, (at.x, at.y));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Mirror, w, cx))).unwrap();
+    draw(cx, window);
+    let origin = cx.update(|cx| view.read(cx).built.as_ref().and_then(|b| b.picks.ids_for(&Reference::Origin).first().copied())).expect("the Origin's pick");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            let m = Modifiers::default();
+            for ev in [ViewportEvent::PointerMove { position: at, modifiers: m }, ViewportEvent::Hover(Some(origin))] {
+                v.on_viewport_event(&vp, &ev, w, cx);
+            }
+        })
+    })
+    .unwrap();
+    let hover = cx.update(|cx| view.read(cx).hover.clone());
+    assert!(!matches!(hover, Some(Reference::Origin | Reference::SketchEntity { .. })), "neither the Origin nor the point: {hover:?}");
+}
+
 /// Live (ui-parity maker-*, sketch-used-*): N in a sketch on a face turns normal to it and pans the view's centre to the
 /// middle of the face's box, the zoom kept (the plate's 60 x 40 top face: the target over (30, 20)).
 #[gpui::test]
