@@ -38,3 +38,17 @@ with open(f.name, "w") as g:
     json.dump({"steps": [{"step": 1, "at": [155, 58]}, {"step": 2, "at": [1083, 568]}, {"step": 3, "pointer": {"at": [1889, 932]}}, {"step": 4, "at": [1107, 516]}, {"step": 5, "do": "wait"}]}, g)
 assert run.live_pointer_from(f.name) == [None, [155, 58], [1083, 568], [1889, 932], [1107, 516]], run.live_pointer_from(f.name)
 Path(f.name).unlink()
+# Remembered export settings per format (EXPORT-REMEMBERED-START): STL's own Units while the last export was STEP.
+seed = {"Format": "STEP", "Options": "Store file in a new tab", "STL": {"STL Format": "Binary", "Units": "Millimeter", "Resolution": "Medium"}}
+got = run.remembered_export(seed)
+assert (got["format"], got["options"], got["stl_units"], got["stl_resolution"], got["stl_text"]) == ("STEP", 2, 4, 1, False), got
+assert "mesh_resolution" not in run.remembered_export({"Format": "STL", "Resolution": "Fine"}), "STL's resolution is its own"
+got = run.remembered_export({"Format": "OBJ", "STEP": {"Version": "AP214", "Use latest version": False, "Include derived tolerances in export": True}})
+assert got["step"] == {"version": {"latest": False, "version": 1}, "derived_tolerances": True}, got
+assert run.remembered_export({"Format": "PARASOLID", "Version": "37.1", "Use latest version": False})["parasolid"] == {"latest": False, "version": 1}
+# Live's export toast names the start copy's file as its File name does.
+for live_msg, ours in (("start spline-fillet-asm Copy 1 - Part 1 is being prepared for export. You will receive a notification with its status.", "Part Studio 1 - Part 1"),
+                       ("start spline-fillet-asm asm Copy 1 is being prepared for export. You will receive a notification with its status.", "start spline-fillet-asm asm")):
+    st = {"message": live_msg}
+    run.normalize_live(st)
+    assert st["message"] == ours + " is being prepared for export. You will receive a notification with its status.", st

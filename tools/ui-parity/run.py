@@ -77,30 +77,32 @@ def remembered_export(seed):
     if index(EXPORT_OPTIONS, seed.get("Options")) is not None:
         out["options"] = EXPORT_OPTIONS.index(seed["Options"])
     res = index(EXPORT_RESOLUTIONS, seed.get("Resolution"))
-    units = index(EXPORT_UNITS, seed.get("Units"))
-    if fmt == "STL":
-        if res is not None:
-            out["stl_resolution"] = res
-        if units is not None:
-            out["stl_units"] = units
-        if "STL Format" in seed:
-            out["stl_text"] = seed["STL Format"] == "Text"
-    elif res is not None:
+    # Live remembers each format's own fields: {"STL": {label: value}} (or "STEP") is that format's while the last export
+    # was another one.
+    stl = seed if fmt == "STL" else seed.get("STL") or {}
+    if index(EXPORT_RESOLUTIONS, stl.get("Resolution")) is not None:
+        out["stl_resolution"] = EXPORT_RESOLUTIONS.index(stl["Resolution"])
+    if index(EXPORT_UNITS, stl.get("Units")) is not None:
+        out["stl_units"] = EXPORT_UNITS.index(stl["Units"])
+    if "STL Format" in stl:
+        out["stl_text"] = stl["STL Format"] == "Text"
+    if fmt != "STL" and res is not None:
         out["mesh_resolution"] = res
-    version = {"latest": bool(seed.get("Use latest version", True)), "version": index(EXPORT_VERSIONS.get(fmt, []), seed.get("Version")) or 0}
-    if fmt == "STEP":
+    version = lambda s, f: {"latest": bool(s.get("Use latest version", True)), "version": index(EXPORT_VERSIONS.get(f, []), s.get("Version")) or 0}
+    stp = seed if fmt == "STEP" else seed.get("STEP")
+    if stp:
         step = out["step"]
-        step["version"] = version
-        if index(EXPORT_PREPROCESSING, seed.get("Preprocessing")) is not None:
-            step["preprocessing"] = EXPORT_PREPROCESSING.index(seed["Preprocessing"])
+        step["version"] = version(stp, "STEP")
+        if index(EXPORT_PREPROCESSING, stp.get("Preprocessing")) is not None:
+            step["preprocessing"] = EXPORT_PREPROCESSING.index(stp["Preprocessing"])
         for label, key in (("Use custom units for export", "custom_units"), ("Include derived tolerances in export", "derived_tolerances"),
                            ("Use custom annotation text height for MBD export", "mbd_text_height")):
-            if label in seed:
-                step[key] = bool(seed[label])
-        if units is not None:
-            step["units"] = units
-    elif fmt in ("PARASOLID", "RHINO"):
-        out[fmt.lower()] = version
+            if label in stp:
+                step[key] = bool(stp[label])
+        if index(EXPORT_UNITS, stp.get("Units")) is not None:
+            step["units"] = EXPORT_UNITS.index(stp["Units"])
+    if fmt in ("PARASOLID", "RHINO"):
+        out[fmt.lower()] = version(seed, fmt)
     return out
 
 
@@ -646,6 +648,12 @@ def normalize_live(state):
                 # tab's copy keeps its name without " Copy N".
                 f["value"] = re.sub(r"^start \S+( Copy \d+)?( - |$)", r"Part Studio 1\2", f["value"])
                 f["value"] = re.sub(r" Copy \d+( - |$)", r"\1", f["value"])
+    # The export toast names the file as the File name does ("start spline-fillet-asm Copy 1 - Part 1 is being prepared
+    # for export. …": export-step-spline-part, export-asm-instances-stl).
+    msg = (state or {}).get("message")
+    if isinstance(msg, str) and (m := re.match(r"^(.*)( is being prepared for export\..*)$", msg, re.S)):
+        name = re.sub(r"^start \S+( Copy \d+)?( - |$)", r"Part Studio 1\2", m.group(1))
+        state["message"] = re.sub(r" Copy \d+( - |$)", r"\1", name) + m.group(2)
     # The Properties modal as live's recorder reads it since 2026-11-08 (Description, the category row labelled by its
     # value, Undo / Redo named), in its earlier form, ours' (part-menu-properties): no Description, "Category", the
     # icon buttons unnamed.

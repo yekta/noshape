@@ -46,6 +46,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   pattern boss takes = core's evaluator: FEATURE-PATTERN-BOSS-NOREAPPLY (core) filed; Sweep thin s7 (Trim ends on: ours
   sweeps, live fails) = SWEEP-THIN-EDGE-NO-TRIM's kept difference (parity rule); asm-mate-connector-realign s4 = an odd
   11-14 take (every other take focuses the revealed query field, as ours): retake in REQUESTS 11-28 09:3x.
+- 10:1x: EXPORT-REMEMBERED-START done in the runner (per-format "STL"/"STEP" seed blocks, export toast copy name; ps82
+  5/6, the 6th = Apply export rules). DIALOG-TAB-CLICK-KEEPS-FIELD-FOCUS verified (ps79). PICK-FACE-OVER-NEAR-EDGE: f558a0cb64
+  on main; split-face-ok s7 still picks the edge (our edge end shows ~1.3 px into Part 2 under the edge depth bias, the
+  rounded click lands 5.0 px off); a strict reach breaks live's 5 px hold (render test): renderer-depth fix, P3, open.
 - Crate tests now on the Mac slot (NOSHAPE_RB_HOST=mac, /root/psui-scratch/resp/ps75.sh pattern); replays on vibe2.
 - 4562f16f's content: Export remembers individual files; Measure panel reported to ui-parity; no-material notice once
   per measured set; flash_seq toast timers (ps68 rerun 30/30, 124/124; tickets ticked).

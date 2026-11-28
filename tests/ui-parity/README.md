@@ -46,7 +46,8 @@ ours.
 Export dialogs' last Format, Options, Units (and the format's own selects and checkboxes) across takes, so a take's
 Export opens at what the previous take left. These are the select and checkbox fields of the first Export… /
 Export N Parts / Export Drawing / Export as DXF/DWG dialog the take opened, as live showed them; ours presets them
-as its remembered export settings before the first state.
+as its remembered export settings before the first state. Live remembers each format's fields apart (behaviours "Per format"): `"STL"` or `"STEP": {label: value}`
+inside it holds that format's while the last export was another one (export-parts-two-selected switches STEP to STL).
 
 ### start
 A name from `starts.json`: a units setting and a feature list in FeatureScript terms (std's feature types and
