@@ -1337,6 +1337,197 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   return r2;
 }
 
+// Chains of collinear straight edges through vertices of only those two edges, between the same two faces (of any
+// surface: pcurves straight between their ends' points), as one edge. USD joins edges only within 1e-12 rad of the
+// chain's chord (c2-gamma-imported's Boolean 2: two 2 mm lines 1e-12 m apart between a plane and the round USD merged
+// from two quarter cylinders; live's edge is one).
+TopoDS_Shape join_collinear_lines(const TopoDS_Shape& s, HHist& hist)
+{
+  const KernelTimer timer("unify.join_lines");
+  ShapeAncMap ve, ef;
+  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto line_of = [](const TopoDS_Edge& e, gp_Lin& lin) {
+    TopLoc_Location               loc;
+    double                        f, l;
+    const occ::handle<Geom_Line>  c = occ::down_cast<Geom_Line>(BRep_Tool::Curve(e, loc, f, l));
+    if (c.IsNull())
+      return false;
+    lin = c->Lin().Transformed(loc.Transformation());
+    return true;
+  };
+  auto faces_ok = [&](const TopoDS_Edge& e) {
+    const ShapeList* fs = ef.Seek(e);
+    if (fs == nullptr || fs->Extent() != 2)
+      return false;
+    for (const TopoDS_Shape& f : *fs)
+      if (BRep_Tool::IsClosed(e, TopoDS::Face(f)))
+        return false;
+    return true;
+  };
+  ShapeIMap mergeable;
+  for (int i = 1; i <= ve.Extent(); ++i)
+  {
+    const ShapeList& es = ve(i);
+    if (es.Extent() != 2 || (t_unify_keep != nullptr && t_unify_keep->Contains(ve.FindKey(i))))
+      continue;
+    const TopoDS_Edge e1 = TopoDS::Edge(es.First()), e2 = TopoDS::Edge(es.Last());
+    gp_Lin            l1, l2;
+    if (e1.IsSame(e2) || kept_edge(e1) || kept_edge(e2) || (kept_ends(e1) && kept_ends(e2)) || !line_of(e1, l1) || !line_of(e2, l2))
+      continue;
+    if (!l1.Direction().IsParallel(l2.Direction(), 1e-9) || l1.Distance(l2.Location()) > 1e-7 || !faces_ok(e1) || !faces_ok(e2))
+      continue;
+    const TopoDS_Vertex v       = TopoDS::Vertex(ve.FindKey(i));
+    auto                far_end = [&](const TopoDS_Edge& e) {
+      const TopoDS_Vertex f = TopExp::FirstVertex(e);
+      return BRep_Tool::Pnt(f.IsSame(v) ? TopExp::LastVertex(e) : f);
+    };
+    const gp_Pnt pv = BRep_Tool::Pnt(v);
+    if (gp_Vec(pv, far_end(e1)).Dot(gp_Vec(pv, far_end(e2))) >= 0)
+      continue;
+    const ShapeList &f1 = ef.FindFromKey(e1), &f2 = ef.FindFromKey(e2);
+    if ((f1.First().IsSame(f2.First()) && f1.Last().IsSame(f2.Last())) || (f1.First().IsSame(f2.Last()) && f1.Last().IsSame(f2.First())))
+      mergeable.Add(v);
+  }
+  if (mergeable.IsEmpty())
+    return s;
+  ShapeIMap        edges;
+  std::vector<int> eup;
+  for (int i = 1; i <= mergeable.Extent(); ++i)
+    for (ShapeList::Iterator it(ve.FindFromKey(mergeable(i))); it.More(); it.Next())
+      if (edges.Add(it.Value()) > (int)eup.size())
+        eup.push_back((int)eup.size());
+  std::function<int(int)> eroot = [&](int i) { return eup[(size_t)i] == i ? i : eup[(size_t)i] = eroot(eup[(size_t)i]); };
+  for (int i = 1; i <= mergeable.Extent(); ++i)
+  {
+    const ShapeList& es = ve.FindFromKey(mergeable(i));
+    eup[(size_t)eroot(edges.FindIndex(es.First()) - 1)] = eroot(edges.FindIndex(es.Last()) - 1);
+  }
+  std::map<int, std::vector<int>> chains;
+  for (int i = 0; i < edges.Extent(); ++i)
+    chains[eroot(i)].push_back(i);
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+  HHist                          h  = new BRepTools_History();
+  std::vector<TopoDS_Shape>      gone;
+  bool                           any = false;
+  for (const auto& [c, members] : chains)
+  {
+    std::vector<TopoDS_Vertex> ends;
+    std::vector<TopoDS_Edge>   end_edges;
+    for (int m : members)
+    {
+      const TopoDS_Edge e = TopoDS::Edge(edges(m + 1));
+      for (const TopoDS_Vertex& v : {TopExp::FirstVertex(e), TopExp::LastVertex(e)})
+        if (!mergeable.Contains(v))
+        {
+          ends.push_back(v);
+          end_edges.push_back(e);
+        }
+    }
+    if (ends.size() != 2)
+      continue;
+    // (Along the first piece's own direction: it is replaced as the faces use it.)
+    gp_Lin l0;
+    line_of(TopoDS::Edge(edges(members[0] + 1)), l0);
+    if (gp_Vec(BRep_Tool::Pnt(ends[0]), BRep_Tool::Pnt(ends[1])).Dot(gp_Vec(l0.Direction())) < 0)
+    {
+      std::swap(ends[0], ends[1]);
+      std::swap(end_edges[0], end_edges[1]);
+    }
+    const gp_Pnt a = BRep_Tool::Pnt(ends[0]), b = BRep_Tool::Pnt(ends[1]);
+    const double len = a.Distance(b);
+    if (len <= 1e-7)
+      continue;
+    BRepBuilderAPI_MakeEdge mk(ends[0], ends[1]);
+    if (!mk.IsDone())
+      continue;
+    TopoDS_Edge ne = mk.Edge();
+    double      nf, nl;
+    BRep_Tool::Range(ne, nf, nl);
+    // Each face's pcurve straight from the ends' points on it (where the old pieces meet in it, a ruling of the surface
+    // there: checked at the middle and the quarters).
+    BRep_Builder bb;
+    bool         ok = true;
+    for (ShapeList::Iterator it(ef.FindFromKey(edges(members[0] + 1))); it.More() && ok; it.Next())
+    {
+      const TopoDS_Face& F = TopoDS::Face(it.Value());
+      gp_Pnt2d           uv[2];
+      for (int k = 0; k < 2 && ok; ++k)
+      {
+        double                          pf, pl;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(end_edges[k], F, pf, pl);
+        if (pc.IsNull())
+        {
+          ok = false;
+          break;
+        }
+        uv[k] = pc->Value(BRep_Tool::Parameter(ends[k], end_edges[k]));
+      }
+      if (!ok || uv[0].Distance(uv[1]) <= gp::Resolution())
+      {
+        ok = false;
+        break;
+      }
+      const occ::handle<Geom2d_Line> pl2 = new Geom2d_Line(uv[0], gp_Dir2d(gp_Vec2d(uv[0], uv[1])));
+      const double                   k2  = uv[0].Distance(uv[1]) / (nl - nf);
+      TopLoc_Location                sl;
+      const occ::handle<Geom_Surface> S = BRep_Tool::Surface(F, sl);
+      for (double t : {0.25, 0.5, 0.75})
+      {
+        const gp_Pnt2d q = pl2->Value(k2 * (nl - nf) * t);
+        if (S->Value(q.X(), q.Y()).Transformed(sl.Transformation()).Distance(a.Translated(gp_Vec(a, b) * t)) > 1e-7)
+          ok = false;
+      }
+      if (!ok)
+        break;
+      // (The edge's parameter the pcurve's from nf on: planes and rulings of cylinders and cones run at speed 1.)
+      if (std::abs(k2 - 1) > 1e-9)
+      {
+        ok = false;
+        break;
+      }
+      const occ::handle<Geom2d_Curve> pc = new Geom2d_Line(gp_Pnt2d(uv[0].XY() - pl2->Lin2d().Direction().XY() * nf), pl2->Lin2d().Direction());
+      bb.UpdateEdge(ne, pc, F, BRep_Tool::Tolerance(ne));
+    }
+    if (!ok)
+      continue;
+    bb.Range(ne, nf, nl);
+    const TopoDS_Edge e0 = TopoDS::Edge(edges(members[0] + 1));
+    rs->Replace(e0.Oriented(TopAbs_FORWARD), ne);
+    for (size_t i = 1; i < members.size(); ++i)
+      rs->Remove(edges(members[i] + 1));
+    for (int m : members)
+    {
+      h->AddModified(edges(m + 1), ne);
+      for (TopExp_Explorer x(edges(m + 1), TopAbs_VERTEX); x.More(); x.Next())
+        if (mergeable.Contains(x.Current()) && std::find_if(gone.begin(), gone.end(), [&](const TopoDS_Shape& g) { return g.IsSame(x.Current()); }) == gone.end())
+          gone.push_back(x.Current());
+    }
+    any = true;
+  }
+  if (!any)
+    return s;
+  const TopoDS_Shape r = rs->Apply(s);
+  {
+    const occ::handle<BRepTools_History> rebuilt = rs->History();
+    for (TopExp_Explorer e(s, TopAbs_FACE); e.More(); e.Next())
+      for (ShapeList::Iterator it(rebuilt->Modified(e.Current())); it.More(); it.Next())
+      {
+        if (!BRepCheck_Analyzer(it.Value()).IsValid())
+          return s;
+        if (!h->Modified(e.Current()).Contains(it.Value()))
+          h->AddModified(e.Current(), it.Value());
+      }
+  }
+  for (const TopoDS_Shape& v : gone)
+    if (!h->IsRemoved(v))
+      h->Remove(v);
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  hist->Merge(h);
+  return r;
+}
+
 // Optional ShapeUpgrade_UnifySameDomain post-processing, composing history
 // (skipped when it could change nothing; planar faces and straight edges
 // merged first by merge_planar).
@@ -6660,7 +6851,7 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
   if (!shared.IsSame(s0b))
   {
     HHist              ht;
-    const TopoDS_Shape r = rest(shared, ht);
+    const TopoDS_Shape r = join_collinear_lines(rest(shared, ht), ht);
     if (BRepCheck_Analyzer(r).IsValid())
     {
       if (hist.IsNull())
@@ -6671,7 +6862,8 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
       return r;
     }
   }
-  return rest(s0b, hist);
+  // (Also where the rest changed nothing: lines between faces merged before it.)
+  return join_collinear_lines(rest(s0b, hist), hist);
 }
 
 } // namespace

@@ -632,6 +632,54 @@ fn a_round_twenty_microns_under_a_flat_top_joins_its_line() {
     assert!(u.is_valid());
 }
 
+/// Two blocks with one 4 mm round stacked and fused, the upper one 1e-12 m off (as c2-gamma-imported's Boolean 2):
+/// the unified part has no vertex left between them, the round's lines on the side faces one edge each, as live's (USD
+/// joins lines only within 1e-12 rad of the chain's chord).
+#[test]
+fn stacked_rounded_blocks_unify_as_one_block() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    let p = |x: f64, y: f64| DVec2::new(x, y) * mm;
+    let profile = |x0: f64, reversed: bool| {
+        let mut segs = vec![
+            Segment2d::Line { a: p(x0, 0.0), b: p(10.0, 0.0) },
+            Segment2d::Line { a: p(10.0, 0.0), b: p(10.0, 6.0) },
+            Segment2d::Arc3 { a: p(10.0, 6.0), mid: p(6.0 + 4.0 * 0.5f64.sqrt(), 6.0 + 4.0 * 0.5f64.sqrt()), b: p(6.0, 10.0) },
+            Segment2d::Line { a: p(6.0, 10.0), b: p(x0, 10.0) },
+            Segment2d::Line { a: p(x0, 10.0), b: p(x0, 0.0) },
+        ];
+        if reversed {
+            segs.reverse();
+            for s in segs.iter_mut() {
+                *s = match *s {
+                    Segment2d::Line { a, b } => Segment2d::Line { a: b, b: a },
+                    Segment2d::Arc3 { a, mid, b } => Segment2d::Arc3 { a: b, mid, b: a },
+                    ref x => x.clone(),
+                };
+            }
+        }
+        segs
+    };
+    // (The upper block 1e-12 m off in x and y: its lines 5e-10 rad off the lower's chord, past OCCT's 1e-12 rad.)
+    let block = |z0: f64, x0: f64, reversed: bool, d: f64| {
+        let side = make_face_2d(&Plane::new(DVec3::new(d, d, z0) * mm, DVec3::Z, DVec3::X), &profile(x0, reversed), &[]).unwrap();
+        extrude(&side, DVec3::Z * 2.0 * mm).unwrap().shape
+    };
+    let mut bad = Vec::new();
+    for (x0, reversed, mirrored, swapped) in (0..16).map(|k| (if k & 1 == 0 { 0.0 } else { 5.0 }, k & 2 != 0, k & 4 != 0, k & 8 != 0)) {
+        let low = block(0.0, 0.0, false, 0.0);
+        let up = if mirrored { block(0.0, x0, reversed, 1e-9).transformed(&Transform::Mirror(Plane::new(DVec3::new(0.0, 0.0, 2.0) * mm, DVec3::Z, DVec3::X))).unwrap() } else { block(2.0, x0, reversed, 1e-9) };
+        let f = if swapped { fuse(&up, &low) } else { fuse(&low, &up) }.unwrap().shape;
+        let u = unify_same_domain(&f).unwrap().shape;
+        // (The round's lines and the side at x 10 have no vertex at z 2; a narrower upper block's step meets them only at x 5.)
+        let middle: Vec<DVec3> = u.vertices().iter().filter_map(|v| v.vertex_point().ok()).filter(|q| (q.z - 2.0 * mm).abs() < 1e-6 * mm && q.x > 5.5 * mm).collect();
+        if !middle.is_empty() || !u.is_valid() {
+            bad.push(format!("x0 {x0} reversed {reversed} mirrored {mirrored} swapped {swapped}: {middle:?} valid {}", u.is_valid()));
+        }
+    }
+    assert!(bad.is_empty(), "{bad:#?}");
+}
+
 /// A circular pattern's tools (one shape placed at each step: group_disjoint checks the first one against the rest):
 /// overlapping neighbours stay apart, neighbours apart share a group, and the cut is the one with each tool copied.
 #[test]
