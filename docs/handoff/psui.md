@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-28 09:3x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-28 09:3x UTC (ps79 rest). History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -42,10 +42,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   active (selected till ✓), ignored with Section planes active; T1 a_part_row_goes_into_the_section_dialogs_items_field.
   ps78: section-view-exclude-part, -include-tab-part 7/8 (s2 hint: live 09:2x: a pick within ~0.6 s keeps it; a take race); SECTION-VIEW-NEXT-FIELD ticked.
 - ps79 (to-verify rows): 12/17; ticked SWEEP-PART-FACE-PROFILE-ADD, MEASURE-READOUT-SKETCH-REGION,
-  FULL-ROUND-EMPTY-FIELDS-RED, LOFT-PROFILE-PICK-SKETCH-REGION, ASM-DIALOG-FLIP-TOGGLE-NAME. Still differ (next):
-  circular-pattern-feature-boss-reapply-ok s14 titleState live ok / ours error; mistake-linear-pattern-feature-boss-
-  reapply s10 live error / ours ok; mistake-sweep-thin-edge-trim-ends + sweep-thin-edge-no-trim-ok s7 Sweep row live
-  error / ours ok (core?); asm-mate-connector-realign s4 focus live "Realign" / ours "Primary axis entity" (ASM-DIALOG-FOCUS).
+  FULL-ROUND-EMPTY-FIELDS-RED, LOFT-PROFILE-PICK-SKETCH-REGION, ASM-DIALOG-FLIP-TOGGLE-NAME. The other 5 (09:3x):
+  pattern boss takes = core's evaluator: FEATURE-PATTERN-BOSS-NOREAPPLY (core) filed; Sweep thin s7 (Trim ends on: ours
+  sweeps, live fails) = SWEEP-THIN-EDGE-NO-TRIM's kept difference (parity rule); asm-mate-connector-realign s4 = an odd
+  11-14 take (every other take focuses the revealed query field, as ours): retake in REQUESTS 11-28 09:3x.
 - Crate tests now on the Mac slot (NOSHAPE_RB_HOST=mac, /root/psui-scratch/resp/ps75.sh pattern); replays on vibe2.
 - 4562f16f's content: Export remembers individual files; Measure panel reported to ui-parity; no-material notice once
   per measured set; flash_seq toast timers (ps68 rerun 30/30, 124/124; tickets ticked).
