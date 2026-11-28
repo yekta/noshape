@@ -1,37 +1,32 @@
 # Core modelling (agent "core"): current state
 LEAD 13:0x: continue the Coons patch for Boundary surface (calibrated to live's britatap / bridging areas, corpus A/B,
 Mac model tests). P0s of 09:21 done (93e0b958 + 785a50de).
-WIP 13:4x (uncommitted core-uip3; held-coons.patch = the patch without the fill fix): features.cpp op_coons_held
- (k::coons_surface_held): 2+2 Boundary surface with held sides = Boolean-sum Coons, cubic Hermite across held sides
- (cross derivative = support's in-plane normal x magnitude x chord; MATCH_CURVATURE held tangent), linear across
- unheld, sides by arc length; pinched support corner: across taken just inside the edge. surfaces.rs tries it before
- OCCT plate. Areas (plate -> held, live): bridging 17289 -> 17443 (17559), britatap Top 25578 -> 25598 (25621), Bottom
- 27591 -> 27628 (27635), singularities 6774 -> 6778 (6963, faces now live's 3/10/8). Pipe Bottom patch 693.5 vs plate
- ~635, live 616.7 (live relaxes tolerances there): the one worse case. Corpus A/B (13 docs) plate vs held: britatap
- +1 feature (score 129 -> 130/223), no other count change; BUT intro-fill Fill 1 82306 -> 82607 (live 82344): cause =
- fair_g1_fill bailing when ConnectEdgesToWires rebuilds an edge on another curve (matched only by curve handle), so
- the fill fell to OCCT plate (620 mm2 vs fair 318). FIX in WIP: a rebuilt edge matched by ends + middle (fill 318.45
- again). Tried and dropped: natural end on an unheld side opposite a held one; face bounded by the input edges.
- RUNNING: A/B opsB (held) vs opsC (+ fill fix), 20 docs (Boundary + Fill docs), vibex7 ~/tmp/core/pbt/ab2.log (slot,
- detached), waiter polls ABDONE. T1 features_b boundary_held_tangent_to_two_sheets_is_their_s_bridge; Mac kernel
- 618/0, model 674/0 and g++-13 OK on the held code (the fill fix needs one more Mac kernel run before land).
- NEXT: ab2 -> Mac kernel run (.mm.sh) -> commit -> land.sh -> report. Then: qa P2 FL-EDIT-PAST-DEPTH-FILLET-ERRORS
- (TICKETS 11e681c5a2); qa's re-save "regressions" are not translator ones: pipe Top warns for TANGENT_DIRECTION
- (unheld), singularities Thicken fails on the patch (plate too), mutualtrim Ruled surface 3 needs Ruled surface 1's
- SWEPT_EDGE / SWEPT_FACE names (derived from the tail-fin sketch's vertex / edge). NTP WIP: ntp-wip.patch.
- REQUESTS BSURF-HELD-AREA (live control net) still open.
+QUEUED efc4dd50 13:5x (vibe2): Boundary surface held sides = Coons patch (features.cpp op_coons_held,
+ k::coons_surface_held, surfaces.rs before OCCT plate): cubic Hermite across held sides (support's in-plane normal x
+ magnitude x chord; MATCH_CURVATURE held tangent), linear across unheld, sides by arc length, pinched corner across
+ taken inside the edge. + fair_g1_fill matches a rebuilt boundary edge by ends + middle (intro-fill Fill 1 fell to
+ OCCT plate next to the held patch: 82607 vs live 82344, now 82305). Areas plate -> held (live): bridging 17289 ->
+ 17443 (17559), britatap Top 25578 -> 25598 (25621), Bottom 27591 -> 27628 (27635), singularities 6774 -> 6778 (6963,
+ faces live's 3/10/8); pipe Bottom patch 693 vs plate ~635, live 617 (live relaxes tolerances): worse. A/Bs: 13 docs
+ plate vs held britatap +1 (129 -> 130/223); 20 Boundary + Fill docs held vs held+fix: only Fill 1. Mac kernel
+ 618/0 model 674/0 on the final code; T1 features_b boundary_held_tangent_to_two_sheets_is_their_s_bridge.
+ Dropped: quintic (pipe blow-up), natural end on unheld sides, face bounded by input edges (no effect).
+LANDING 15:27 core-uip3 (lead 14:0x list, all 4 done; kernel untouched): (1) 1 mm check no change (TICKETS
+ FL-EDIT-PAST-DEPTH note); (2) mutualtrim Ruled surface 3 on Ruled surface 1's swept edge (parity.rs SWEPT_*/CAP_* skip
+ the sketch-entity read; query.rs created_by counts a sheet's free Boundary edges); (3) Boundary surface
+ NORMAL_TO_PROFILE / TANGENT_DIRECTION held, sketch-profile conditions matched by ends+mid (same_edge); (4) translator
+ live_bodies memo (singularities' Thicken - Successful on Surface 3: valid solid, 12.4 s -> TICKETS THICKEN-SINGULARITIES-SLOW).
+ Evidence: T1s pass and fail without the fixes; Mac model 675/0, ops 524/0; parity A/B (vibex7 ab20): only britatap
+ 15 -> 20/22, mutualtrim Ruled surface 3 builds; userdocs A/B all SAME.
+ BSURF-HELD-AREA CAPTURED (live/core/bsurf-held-1128/: index.md, bridging.json, britatap.json): live's held patches
+  are non-rational B-splines deg u5 x v7, not Coons. Bridging JNK 6953.749 mm2 (u knots 0x6 .25 .375 .5 .625 .75 1x6,
+  v one deg-7 Bezier span, 11x8 poles); britatap JWK 2084.377 (20x18 knots, 14x10 poles); 5x5 tangent-plane grids +
+  edge curves. Next after this land: fit our held Boundary surfaces to that construction.
 
-Updated 11-28 13:39 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-28 14:12 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 11-28 07:32
-QUEUED (vibe2): 57ac5e13 (core-g2mac: impeller round tol, slanted-end test, britatap Delete face 2), 96b23e35 (Split 3 +
-parity cPoint vertex), bc95a9cf (core-g2mac2: G2 sphere-fill T1 band 5 % -> 10 %: Mac arm64 5.8 %, Linux 1.2 %, G1 26 %),
-3a62fc14 (core-uip3, 7 commits incl. the 96b23e35 stack: Boundary surface trim_profiles(): in a 2x2 network each profile
-split where the other direction's profiles meet it inside, overhangs pruned; T1 features_b::boundary_surface_profiles_
-are_trimmed_where_they_meet fails without it; corpus A/B ALL-SAME; model 672/0). No kernel change -> no Mac run.
-NEW RULE (lead 11-28, DECISIONS): any crates/kernel or crates/brep change (or their tests) runs that crate's tests once on
-the Mac (NOSHAPE_RB_HOST=mac, .mk.sh in core-uip3) before land.sh.
+## OLDER 11-28 (all landed or superseded)
 britatap (parity 14/22, first diff #12 Extrude 1 PARKED: sketch minimal-move choice). #15 Bridge patch - Top builds;
 remaining gap: V1 NORMAL_TO_PROFILE unheld (warning; live's bsurf likely Hermite Coons, bigger item).
 WIP UNCOMMITTED core-uip3 (kernel change: Mac run .mk.sh needed): bshared.rs join_surface() after the sew runs
@@ -52,10 +47,7 @@ splits there (2 x 134 mm2) = blend's run-over-an-edge split, not core (note for 
 (vCondition NORMAL_TO_PROFILE unheld -> warning "Boundary conditions are not applied yet"): top patch 2040.8 vs live
 2083.05. WIP (uncommitted, surfaces.rs, model 673/0): NORMAL_TO_PROFILE = Tangent to the piece extruded along the
 profile's plane normal (plane_normal): warning gone, area UNCHANGED 2040.8 (needs a T1 + corpus before landing).
-SIDE BLEND CURVE = LIVE (checked 10:2x): live's refs capture (evBox3d tight, evLength) of Curve 1: length 0.0589302664,
-box y max -0.016998186 = ours 58.930267 / -16.998186 (the 58.910 / -15.741 compared before were live.jsonl's loose part
-bbox; live's "mid" is its 0.5 arc-length point, ours query_entities' param midpoint). evFaceCurvatureDerivatives checked:
-self-consistent (normal change over its +-10 um step = |normalPrime| x 20 um); G1/G2/G3 lengths 57.31/58.26/58.93.
+SIDE BLEND CURVE = LIVE (checked 10:2x; details in git history of this file).
 So the top patch's area gap (2040.8 vs live 2083.05) is in Boundary surface itself: V NORMAL_TO_PROFILE (WIP patch
 /root/core-scratch/ntp-wip.patch: warning gone, area unchanged) / live's bsurf construction. Probe recipe (std prints):
 core-uip3 .bcp.py + .bc.sh patch the synced copy only (bridgingCurve.fs needs import string.fs for println/toString).
@@ -65,12 +57,8 @@ tangency-held Boundary surfaces fill by OCCT plate (fill_surface + FillEdge supp
 half cylinder 10991.16 vs exact 10995.57). Plan: a Hermite Coons patch (cross-boundary derivative = support's
 in-plane normal to the edge x magnitude x profile spacing) for 2+2 profiles with held edges; calibrate the derivative
 scale on both live numbers, then corpus A/B (model suite rows for boundary surfaces).
-(Also: top bridge-patch faces 2040.8 vs live 2083.58 after Fill - Top; the parity's first diff is still #12 Extrude 1.)
-Probe: vibex7 ~/tmp/core/pbt/{cli, save/ (britatap re-saved 07:02 with the trim, 600)}, ~/tmp/core/lib (fq.py faces
 after features with type/area, parts.py, bp.py, fg.py). Live data: vibex7 ~/parity/models/c2-surf-workshop-britatap.
 Cleanup when done: vibex7 ~/tmp/core/pbt, vibex8 ~/tmp/core/bt, worktrees core-g2mac/core-g2mac2 after their lands.
-## REPORT PENDING (lead at 395k at 20:40: not messaged): pulleys fix QUEUED 96280303. Earlier (16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
-(errors only when pieces < 2 AND an INTERNAL face/edge remains = a slit). Both said to lead 17:3x in thread.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
 - Suite 1126-2043 (190bd1b8; report vibex8 ~/tmp/qa/report.json, snapshot ~/tmp/qa/models-1126-2043-190bd1b8/<doc>/;
   copy core-scratch/suite/). blend parked: blend_direct.cpp is core's for now (note added to blend.md, acbf4dcd5).
@@ -100,7 +88,7 @@ Cleanup when done: vibex7 ~/tmp/core/pbt, vibex8 ~/tmp/core/bt, worktrees core-g
     Draft 2 12/27/17 vs live 13/28/17: face for face as live except live's 0.1 mm sliver face at the Fill corner (its
     11.778 edge split 11.678 + 0.1, two 0.1 OTHER edges at (50.634,14.575,63.93)): Parasolid artefact, not matched. The
     doc's only real difference left: Fill 1's 2.88 mm3 (#3, parked).
-  LEAD NOT YET TOLD (lead 245k at 14:2x): #3 queued 65e8a5e8 (half the gap + bridging Warning->Ok), #4 + #5 parked with the
+  LEAD NOT YET TOLD (lead 245k at 14:12): #3 queued 65e8a5e8 (half the gap + bridging Warning->Ok), #4 + #5 parked with the
   findings above, #6 status. Lead FYI still open: qa's ~13:xx verdict on impeller "Select a sketch plane." (69eae144).
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)

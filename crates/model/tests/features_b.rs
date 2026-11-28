@@ -2274,6 +2274,63 @@ fn boundary_held_tangent_to_two_sheets_is_their_s_bridge() {
     }
 }
 
+/// A U row "Normal to profile" (a Front sketch's line) or "Tangent direction" (Front's normal) is held: the patch leaves
+/// that profile square to Front (bsurf.fs createProfileConditions), with no "not applied yet" warning. Over the edges of a
+/// quarter cylinder (r 10 mm, 20 mm long) whose arcs start along Front's normal, the patch is that cylinder.
+#[test]
+fn boundary_normal_to_profile_and_tangent_direction_are_held() {
+    for cond in ["NORMAL_TO_PROFILE", "TANGENT_DIRECTION"] {
+        let mut s = Studio::new();
+        let mut arc = noshape_sketch::Sketch::new();
+        let a = arc.add_arc(DVec2::new(0.0, 0.01), DVec2::new(0.0, 0.0), DVec2::new(0.01, 0.01)).0;
+        let arc = s.sketch(Reference::Plane(DatumPlane::Right), arc);
+        s.add("extrude", move |p| {
+            p.set("bodyType", ParamValue::Enum("SURFACE".into()));
+            p.set("surfaceEntities", ParamValue::Query(vec![Reference::SketchEntity { sketch: arc, entity: a }]));
+            p.set("depth", expr("20 mm"));
+            p.set("symmetric", ParamValue::Bool(true));
+        });
+        let mut line = noshape_sketch::Sketch::new();
+        let l = line.add_line(DVec2::new(-0.01, 0.0), DVec2::new(0.01, 0.0)).0;
+        let line = s.sketch(Reference::Plane(DatumPlane::Front), line);
+        let r = s.ok();
+        let sheet = r.context.bodies.iter().find(|b| b.kind == BodyKind::Surface).unwrap();
+        let cylinder = sheet.shape.faces()[0].area().unwrap();
+        let edges = sheet.shape.edges();
+        let mid = |e: &noshape_kernel::Shape| {
+            let i = e.edge_info().unwrap();
+            e.point_at(0.5 * (i.first_param + i.last_param)).unwrap()
+        };
+        let named = |pick: &dyn Fn(DVec3) -> bool| edges.iter().zip(&sheet.edges).filter(|(e, _)| pick(mid(e))).map(|(_, n)| Reference::Edge((**n).clone())).collect::<Vec<_>>();
+        let top = named(&|m| m.z > 0.009);
+        let sides = named(&|m| (m.x.abs() - 0.01).abs() < 1e-9);
+        assert_eq!((top.len(), sides.len()), (1, 2));
+        let f = s.add("boundarySurface", move |p| {
+            let row = |pre: &str, e: Vec<Reference>, c: &str| {
+                let mut x = ParamValues::default();
+                x.set(&format!("{pre}ProfileEntities"), ParamValue::Query(e));
+                x.set(&format!("{pre}Condition"), ParamValue::Enum(c.into()));
+                x.set(&format!("{pre}Direction"), ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
+                x.set(&format!("{pre}Magnitude"), ParamValue::Expr(ExprValue::new("1")));
+                x
+            };
+            p.set("uProfilesArray", ParamValue::Array(vec![row("u", vec![Reference::SketchEntity { sketch: line, entity: l }], cond), row("u", top, "DEFAULT")]));
+            p.set("vProfilesArray", ParamValue::Array(sides.into_iter().map(|e| row("v", vec![e], "DEFAULT")).collect()));
+        });
+        let r = s.ok();
+        let st = r.display.features.iter().find(|x| x.id == f).unwrap();
+        assert_eq!(st.status, FeatureStatus::Ok, "{cond}: {:?}", st.message);
+        let patch = r.context.bodies.iter().rfind(|b| b.kind == BodyKind::Surface).unwrap();
+        let face = &patch.shape.faces()[0];
+        let area = face.area().unwrap();
+        assert!((area - cylinder).abs() < 1e-5 * cylinder, "{cond}: patch {} mm2, the cylinder {} mm2", area * 1e6, cylinder * 1e6);
+        for x in [-0.008, 0.0, 0.008] {
+            let n = face.normal_at_point(DVec3::new(x, 0.0, 0.0)).unwrap();
+            assert!(n.cross(DVec3::Z).length() < 1e-4, "{cond}: normal {n:?} at x {x}");
+        }
+    }
+}
+
 /// Live L28: a U row "Normal to profile" on a part edge (no sketch plane)
 /// fails with loft.fs's planar-profile text; the same rows with None work.
 #[test]

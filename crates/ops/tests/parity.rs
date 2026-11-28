@@ -3439,6 +3439,80 @@ fn a_region_query_is_read_from_onshapes_packed_form() {
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A Ruled surface on another's edge ruled from a sketch line's start, tangent to its face ruled from the line (packed
+/// `SWEPT_EDGE` / `SWEPT_FACE` of `<feature>.….patch`, deterministic ids empty) is ruled on those, not on the sketch's
+/// point and line the queries were derived from (c2-surf-intro-mutualtrim's re-saved Ruled surface 3: "A selected
+/// sketch entity no longer exists").
+#[test]
+fn a_ruled_surface_on_anothers_swept_edge_is_ruled_on_that_edge() {
+    let packed = |s: &str| format!("query=qCompressed(1.0,\"{s}\",id);");
+    let q = |id: &str, ids: &[&str], text: String| json!({ "btType": "BTMParameterQueryList-148", "parameterId": id, "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ids, "queryString": text }] });
+    let e = |id: &str, v: &str| json!({ "btType": "BTMParameterEnum-145", "parameterId": id, "value": v });
+    let n = |id: &str, v: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": v });
+    let line = packed("%B5$QueryM5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r0");
+    let swept_edge = packed("%B5$QueryM6S13$derivedFromVerticesA1C0M5Sa$entityTypeBa$EntityTypeS6$VERTEXSb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2.5$r0startS12$disambiguationDataA1M2Sb$derivedFromA1C0M5R1C3S4$EDGER3R4R5R7R8R9RaEfS12$disambiguationTypeS13$EXTERNAL_DEPENDENCYR1R10R3R4R5C8A1S11.1.-18.5$FRuledSynthOne1_2*patchR8Sa$SWEPT_EDGE");
+    let swept_face = packed("%B5$QueryM6S10$derivedFromEdgesA1C0M5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FbZU2oH5hP9eBC6_0wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdS2$r0S12$disambiguationDataA1M2Sb$derivedFromRdS12$disambiguationTypeS13$EXTERNAL_DEPENDENCYR1C3S4$FACER3R4R5C8A1S11.1.-16.5$FRuledSynthOne1_2*patchR8Sa$SWEPT_FACE");
+    let ruled = |id: &str, name: &str, ty: &str, edges: Value, faces: Value| {
+        json!({ "btType": "BTMFeature-134", "featureType": "ruledSurface", "featureId": id, "name": name, "parameters": [
+            e("surfaceOperationType", "NEW"), edges, e("ruledType", ty), n("angle", "0 deg"), n("distance", "10 mm"), faces] })
+    };
+    let top = packed("%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpS9$queryTypeS5$DUMMY");
+    let mut features = pack_src_model(vec![
+        // Along Top's normal from the sketch line at y 0: a 40 x 10 mm strip.
+        ruled("FRuledSynthOne1_2", "Ruled surface 1", "ALIGNED_WITH_VECTOR", q("edges", &[], line), q("axis", &[], top)),
+        // Tangent to that strip from its edge at x 0: a 10 x 10 mm square beside it.
+        ruled("FRuledSynthTwo3_2", "Ruled surface 3", "TANGENT", q("edges", &[], swept_edge), q("referenceFaces", &[], swept_face)),
+    ]);
+    features["sketches"] = json!({ "sketches": [{ "featureId": "FbZU2oH5hP9eBC6_0", "transformMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }] });
+    let sheet = |name: &str, area: f64| json!({ "name": name, "bodyType": "SHEET", "faces": 1, "edges": 4, "vertices": 4, "area": area });
+    let block = json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.04 * 0.03 * 0.01 });
+    let live = vec![
+        json!({ "index": 2, "status": "OK", "parts": [block.clone(), sheet("Surface 1", 4e-4)] }),
+        json!({ "index": 3, "status": "OK", "parts": [block, sheet("Surface 1", 4e-4), sheet("Surface 2", 1e-4)] }),
+    ];
+    let r = run_model("ruled-swept-edge", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
+/// A live body id resolved once keeps that part of ours while its box is about as near live's as another's
+/// (c2-surf-workshop-singularities' Thicken - Successful went to the problem loft beside the sheet live thickened): two
+/// blocks 10 and 10.2 mm tall in one place; Transform 1 lifts the first 0.1 mm, Transform 2 moves the same body 50 mm
+/// along x where live's box is a little nearer the taller block.
+#[test]
+fn a_live_body_keeps_the_part_it_was_resolved_to() {
+    let q = |id: &str, ids: &[&str]| json!({ "btType": "BTMParameterQueryList-148", "parameterId": id, "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ids, "queryString": "" }] });
+    let n = |id: &str, v: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": v });
+    let e = |id: &str, v: &str| json!({ "btType": "BTMParameterEnum-145", "parameterId": id, "value": v });
+    let line = |id: &str, p: (f64, f64), d: (f64, f64), l: f64| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startParam": 0.0, "endParam": l, "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": p.0, "pntY": p.1, "dirX": d.0, "dirY": d.1 } });
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=qCompressed(1.0,\"%B5$QueryM4Sa$entityTypeBa$EntityTypeS4$FACESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S3.7$TopplaneOpS9$queryTypeS5$DUMMY\",id);" }] }]);
+    let features = pack_src_model(vec![
+        json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": top, "constraints": [],
+            "entities": [line("s0", (0.0, 0.0), (1.0, 0.0), 0.04), line("s1", (0.04, 0.0), (0.0, 1.0), 0.03), line("s2", (0.04, 0.03), (-1.0, 0.0), 0.04), line("s3", (0.0, 0.03), (0.0, -1.0), 0.03)] }),
+        json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE2", "name": "Extrude 2", "parameters": [
+            e("operationType", "NEW"),
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualSketchRegionQuery-140", "deterministicIds": ["JR2"], "featureId": "FS2" }] },
+            n("depth", "10.2 mm")] }),
+        json!({ "btType": "BTMFeature-134", "featureType": "transform", "featureId": "FT1", "name": "Transform 1", "parameters": [q("entities", &["JB"]), e("transformType", "TRANSLATION_3D"), n("dz", "0.1 mm")] }),
+        json!({ "btType": "BTMFeature-134", "featureType": "transform", "featureId": "FT2", "name": "Transform 2", "parameters": [q("entities", &["JB"]), e("transformType", "TRANSLATION_3D"), n("dx", "50 mm")] }),
+    ]);
+    let refs = [
+        json!({ "index": 3, "id": "JR2", "kind": "SKETCH_REGION", "point": [0.02, 0.015, 0.0], "measure": 0.0012 }),
+        json!({ "index": 4, "id": "JB", "kind": "BODY", "box": [[0.0, 0.0, 0.0], [0.04, 0.03, 0.01]], "point": [0.02, 0.015, 0.005] }),
+        json!({ "index": 5, "id": "JB", "kind": "BODY", "box": [[0.0, 0.0, 0.00003], [0.04, 0.03, 0.0102]], "point": [0.02, 0.015, 0.0051] }),
+    ]
+    .iter()
+    .map(|v| v.to_string())
+    .collect::<Vec<_>>()
+    .join("\n");
+    let block = |name: &str, volume: f64, lo: [f64; 3], hi: [f64; 3]| json!({ "name": name, "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": volume, "bbox": { "min": lo, "max": hi } });
+    let live = vec![json!({ "index": 5, "status": "OK", "parts": [
+        block("Part 1", 1.2e-5, [0.05, 0.0, 0.0001], [0.09, 0.03, 0.0101]),
+        block("Part 2", 1.224e-5, [0.0, 0.0, 0.0], [0.04, 0.03, 0.0102]),
+    ] })];
+    let r = run_model("live-body-kept", &features, &live, &refs);
+    assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// A Composite part feature's part named as Onshape packs it (a DUMMY query of the BODY its opCreateCompositePart
 /// made: asm-infento-subs' studio 1dc32b, Transform 16 / 17 / 23 / 24 / 46 and Mirror 4) is ours of that feature, no
 /// live geometry needed: the Transform moves it 10 mm up.

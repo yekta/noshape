@@ -248,6 +248,10 @@ pub struct Translator<'a> {
     /// Import queries (bodies by import tag) as ours resolved them where live's geometry placed them: the same query
     /// later, without geometry, is those bodies (c2-gamma-imported's Boolean 2, its tags placed by Transform 1).
     import_bodies: HashMap<String, Vec<String>>,
+    /// Live's body ids as ours resolved them by geometry: a later reference to the same body keeps ours while its box is
+    /// about as near (c2-surf-workshop-singularities' Thicken - Successful: the boundary-fixed sheet, not the problem
+    /// loft whose box is as near).
+    live_bodies: HashMap<String, String>,
     /// Sketch entities (sketch, live id) ours made with Use: their PROJECTED constraint is that.
     used: std::collections::HashSet<(String, String)>,
     /// Sketch curves live made as a curved face's silhouette (SILHOUETTED): their Use keeps that one silhouette.
@@ -529,7 +533,7 @@ impl<'a> Translator<'a> {
                 config_defaults.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, our_frames: HashMap::new(), stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().into_iter().flatten().map(|(e, v)| (e.clone(), Arc::new(v.clone()))).collect(), profile_options: doc["profileOptions"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sub_points: HashMap::new(), context_helpers: Vec::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, our_frames: HashMap::new(), stale_uses: false, curves: HashMap::new(), construction: Default::default(), config_defaults, config_inputs: HashSet::new(), sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, live_states: doc["featureStates"].clone(), sub_feature: None, array_item: None, studios: HashMap::new(), sketch_bodies: doc["sketchBodies"]["sketches"].as_array().cloned().unwrap_or_default(), context_entities: doc["contextEntities"].as_array().cloned().unwrap_or_default(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, import_bodies: HashMap::new(), live_bodies: HashMap::new(), used: Default::default(), silhouettes: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().into_iter().flatten().map(|(e, v)| (e.clone(), Arc::new(v.clone()))).collect(), profile_options: doc["profileOptions"].as_object().cloned().unwrap_or_default(), connector_frames: doc["connectorFrames"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), derived_sketches: HashMap::new(), sketch_tabs: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new(), query_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -4153,6 +4157,11 @@ impl<'a> Translator<'a> {
         if !strings.iter().any(|s| s == "SKETCH_ENTITY") || (imprint && strings.iter().any(|s| s == "FACE" || s == "TOPOLOGY")) {
             return None;
         }
+        // Nor what a feature made from the entity (a Ruled surface's `SWEPT_EDGE` of `<feature>.….patch`, no `op` in its
+        // name: c2-surf-intro-mutualtrim's Ruled surface 3 went to the profile's point and line).
+        if strings.iter().any(|s| matches!(s.as_str(), "SWEPT_EDGE" | "SWEPT_FACE" | "SWEPT_BODY" | "CAP_FACE" | "CAP_EDGE" | "CAP_VERTEX")) {
+            return None;
+        }
         let mut ops = strings.iter().filter(|s| s.contains(".op") || s.ends_with("Op"));
         let first = ops.next()?;
         let sk = first.strip_suffix(".wireOp")?.to_string();
@@ -5372,11 +5381,16 @@ impl<'a> Translator<'a> {
                 // Bodies in one box (a part and the helix it was swept along): live's name for the body tells them apart.
                 let nearest = pool.iter().map(|b| off(b)).fold(f64::INFINITY, f64::min);
                 let tied: Vec<&Value> = pool.iter().copied().filter(|b| off(b) <= nearest + 1e-9).collect();
-                tied.iter()
-                    .find(|b| r.name.as_deref().is_some_and(|n| b["name"] == n))
+                // (Within 1 % of live's box diagonal of the nearest.)
+                let near = r.bbox.map_or(0.0, |[lo, hi]| 0.01 * (0..3).map(|i| (hi[i] - lo[i]).powi(2)).sum::<f64>().sqrt());
+                let before = self.live_bodies.get(id).and_then(|ours| pool.iter().find(|b| b["id"] == ours.as_str() && off(b) <= nearest + near));
+                let found = before
+                    .or_else(|| tied.iter().find(|b| r.name.as_deref().is_some_and(|n| b["name"] == n)))
                     .or(tied.first())
                     .and_then(|b| b["id"].as_str().map(str::to_string))
-                    .ok_or_else(|| format!("{id}: no part of ours"))
+                    .ok_or_else(|| format!("{id}: no part of ours"))?;
+                self.live_bodies.insert(id.to_string(), found.clone());
+                Ok(found)
             }
             "SKETCH_REGION" => self.region_at(p, r.measure, r.sketch_of.as_deref()).or_else(|e| if r.sketch_of.is_some() { self.region_at(p, r.measure, None) } else { Err(e) }),
             other => Err(format!("{id}: reference kind {other} not mapped")),

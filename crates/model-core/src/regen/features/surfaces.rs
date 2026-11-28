@@ -726,6 +726,56 @@ fn keep_edge_names(body: &mut Body, old: &Body, from: &[(DVec3, Option<Shape>)])
 /// Onshape's BSURF_PROFILE_ENDS_MISMATCH (live L28).
 const BSURF_ENDS: &str = "Could not extract boundary profiles matching at end points.";
 
+/// Whether two edges are one: the same shape, or the same ends and middle (a sketch entity's edge is made anew each time
+/// it is read).
+fn same_edge(a: &Shape, b: &Shape) -> bool {
+    if a.is_same(b) {
+        return true;
+    }
+    let (Ok((a0, a1)), Ok((b0, b1)), Some(am), Some(bm)) = (a.endpoints(), b.endpoints(), edge_mid(a), edge_mid(b)) else { return false };
+    let tol = 1e-9;
+    am.distance(bm) < tol && ((a0.distance(b0) < tol && a1.distance(b1) < tol) || (a0.distance(b1) < tol && a1.distance(b0) < tol))
+}
+
+/// An edge's midpoint (by parameter).
+fn edge_mid(e: &Shape) -> Option<DVec3> {
+    let i = e.edge_info().ok()?;
+    e.point_at(0.5 * (i.first_param + i.last_param)).ok()
+}
+
+/// The normal of a profile's sketch plane, else of the plane its edges lie in (none for a straight or non-planar one).
+fn profile_normal(ev: &EvalCtx, refs: &[Reference], edges: &[Shape]) -> Option<DVec3> {
+    let sketch = refs.iter().find_map(|r| match r {
+        Reference::SketchEntity { sketch, .. } | Reference::Sketch(sketch) => ev.ctx.sketch(*sketch).map(|s| s.frame.normal),
+        _ => None,
+    });
+    if sketch.is_some() {
+        return sketch;
+    }
+    let mut pts = Vec::new();
+    for e in edges {
+        let Ok(i) = e.edge_info() else { continue };
+        pts.extend((0..=8).filter_map(|j| e.point_at(i.first_param + (i.last_param - i.first_param) * j as f64 / 8.0).ok()));
+    }
+    let o = *pts.first()?;
+    let size = pts.iter().map(|p| p.distance(o)).fold(0.0, f64::max);
+    let n = pts.iter().flat_map(|a| pts.iter().map(move |b| (*a - o).cross(*b - o))).max_by(|x, y| x.length_squared().total_cmp(&y.length_squared()))?;
+    if n.length() < 1e-6 * size * size {
+        return None;
+    }
+    let n = n.normalize();
+    pts.iter().all(|p| (*p - o).dot(n).abs() < 1e-6 * size.max(1e-3)).then_some(n)
+}
+
+/// The face an edge sweeps along `d` on the side away from `centre` (a patch held tangent to it leaves the edge along
+/// `d`, towards `centre`).
+fn swept_behind(e: &Shape, d: DVec3, centre: DVec3) -> FResult<Shape> {
+    let mid = edge_mid(e).unwrap_or(centre);
+    let away = if d.dot(centre - mid) > 0.0 { -d } else { d };
+    let length = e.edge_info().map_or(1e-3, |i| i.length.max(1e-6));
+    k::extrude(e, away * length)?.shape.faces().into_iter().next().ok_or_else(|| FeatureError::new(BSURF_FAILED))
+}
+
 /// The two free ends of a chain of edges.
 fn chain_ends(edges: &[Shape]) -> Option<(DVec3, DVec3)> {
     let pts: Vec<DVec3> = edges.iter().filter_map(|e| e.endpoints().ok()).flat_map(|(a, b)| [a, b]).collect();
@@ -835,12 +885,30 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
     // Matched rows' edges held tangent (or in curvature) to their reference faces, else to the faces they bound.
     let mut held: Vec<k::FillEdge> = Vec::new();
     let mut unheld = false;
-    for (array, ents, cond, reference) in [("uProfilesArray", "uProfileEntities", "uCondition", "uReference"), ("vProfilesArray", "vProfileEntities", "vCondition", "vReference")] {
+    let mids: Vec<DVec3> = pieces.iter().filter_map(|(p, _)| edge_mid(p)).collect();
+    let centre = mids.iter().sum::<DVec3>() / mids.len().max(1) as f64;
+    for (array, ents, cond, reference, direction) in [("uProfilesArray", "uProfileEntities", "uCondition", "uReference", "uDirection"), ("vProfilesArray", "vProfileEntities", "vCondition", "vReference", "vDirection")] {
         for item in ev.params.array(array) {
             let continuity = match item.enum_(cond) {
                 "" | "DEFAULT" => continue,
                 "MATCH_TANGENT" => k::Continuity::Tangent,
                 "MATCH_CURVATURE" => k::Continuity::Curvature,
+                // bsurf.fs createProfileConditions: the patch leaves the profile along its sketch plane's normal, or
+                // along the picked direction: held tangent to the profile swept that way, behind it.
+                c @ ("NORMAL_TO_PROFILE" | "TANGENT_DIRECTION") => {
+                    let edges = curve_edges(ev, item.query(ents))?;
+                    let along = if c == "NORMAL_TO_PROFILE" { profile_normal(ev, item.query(ents), &edges) } else { item.query(direction).first().and_then(|r| ev.resolve_direction(r)) };
+                    let Some(d) = along.and_then(|d| d.try_normalize()) else {
+                        unheld = true;
+                        continue;
+                    };
+                    for e in &edges {
+                        for (p, _) in pieces.iter().filter(|(_, from)| same_edge(from, e)) {
+                            held.push(k::FillEdge { edge: p.clone(), support: Some(swept_behind(p, d, centre)?), continuity: k::Continuity::Tangent });
+                        }
+                    }
+                    continue;
+                }
                 _ => {
                     unheld = true;
                     continue;
@@ -849,7 +917,7 @@ pub fn boundary_surface(ev: &mut EvalCtx) -> FResult<()> {
             let faces: Vec<Shape> = ev.resolve_faces(item.query(reference)).iter().map(|&(bi, fi)| ev.face_shape(bi, fi)).collect::<FResult<_>>()?;
             for e in curve_edges(ev, item.query(ents))? {
                 match faces.iter().find(|f| f.index_of(&e, ShapeType::Edge).is_some()).cloned().or_else(|| adjacent_face(ev, &e)) {
-                    Some(support) => held.extend(pieces.iter().filter(|(_, from)| from.is_same(&e)).map(|(p, _)| k::FillEdge { edge: p.clone(), support: Some(support.clone()), continuity })),
+                    Some(support) => held.extend(pieces.iter().filter(|(_, from)| same_edge(from, &e)).map(|(p, _)| k::FillEdge { edge: p.clone(), support: Some(support.clone()), continuity })),
                     None => unheld = true,
                 }
             }

@@ -704,6 +704,7 @@ type Found = (f64, DVec3, Value, Option<noshape_kernel::Shape>);
 fn edge_touches(n: &noshape_model::reference::TopoName, f: noshape_model::reference::FeatureId) -> bool {
     match n {
         noshape_model::reference::TopoName::Edge { faces, .. } => faces.iter().any(|x| x.creator() == Some(f)),
+        noshape_model::reference::TopoName::Boundary { face, .. } => face.creator() == Some(f),
         _ => false,
     }
 }
