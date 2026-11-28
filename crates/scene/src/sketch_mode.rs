@@ -3209,6 +3209,9 @@ impl SketchEditor {
                             self.selection.push(e);
                         }
                     }
+                    // A linear pattern of a selection with a line in it keeps the tool, nothing made (live
+                    // sketch-linear-pattern-two-entities, rq-1128: a circle alone commits, a circle and a line don't).
+                    None if self.tool == Tool::LinearPattern && self.selection.iter().any(|e| data.sketch.kind(*e) == Some(EntityKind::Line)) => {}
                     // Clicking white space accepts the pattern / transform (Onshape); a pattern's tool ends there
                     // (live sketch-linear-pattern-click-commit, sketch-circular-pattern-click-commit: tool none).
                     None if !self.selection.is_empty() => {
@@ -10569,6 +10572,12 @@ mod tests {
         let cross = d.sketch.entities().find(|e| d.sketch.curve(e.id).is_some_and(|c| matches!(c, Curve2::Line { a, b } if (a.x - b.x).abs() < 1e-9 && a.y < 0.0))).expect("the crossing line").id;
         let at_cut = kinds.iter().filter(|k| matches!(k, ConstraintKind::Coincident { a, b } if (*b == cross && d.sketch.point(*a).is_some_and(|p| (p - mm(15.0, 0.0)).length() < 1e-6)) || (*a == cross && d.sketch.point(*b).is_some_and(|p| (p - mm(15.0, 0.0)).length() < 1e-6)))).count();
         assert_eq!(at_cut, 1, "the cut's COINCIDENT: before {before:?}, after {kinds:?}");
+        // Live rq-1128 (rq-trim-rect-edge-at-crossing-constraints): every old constraint stays and the cut-off corner
+        // (live's corner COINCIDENT, ours a shared point) stays on the bottom edge's line.
+        assert!(before.iter().all(|k| kinds.contains(k)), "before {before:?}, after {kinds:?}");
+        let bottom = d.sketch.entities().find(|e| d.sketch.curve(e.id).is_some_and(|c| matches!(c, Curve2::Line { a, b } if a.y.abs() < 1e-9 && b.y.abs() < 1e-9))).expect("the bottom edge").id;
+        let corner_on_bottom = kinds.iter().any(|k| matches!(k, ConstraintKind::Coincident { a, b } if *b == bottom && d.sketch.point(*a).is_some_and(|p| p.length() < 1e-9)));
+        assert!(corner_on_bottom, "the corner (0,0) on the bottom edge: {kinds:?}");
     }
 
     /// Live sketch-dim-arc-angle s9-s10: Dimension, an arc clicked twice: the second click unpicks it and no dimension
@@ -11016,8 +11025,9 @@ mod tests {
     fn a_pattern_accepted_in_white_space_ends_the_tool() {
         for tool in [Tool::LinearPattern, Tool::CircularPattern] {
             let (mut ed, mut d) = editor(tool);
-            let line = d.sketch.add_line(v(0.01, 0.01), v(0.02, 0.01));
-            ed.selection.push(line);
+            // (A circle, as the takes: a line in a linear pattern's selection keeps the tool.)
+            let seed = d.sketch.add_circle(v(0.015, 0.01), 0.003);
+            ed.selection.push(seed);
             ed.pattern_center = v(0.0, 0.0);
             let before = d.sketch.entities().count();
             click(&mut ed, &mut d, v(0.2, 0.2));
@@ -11038,6 +11048,23 @@ mod tests {
             let before = d.sketch.entities().count();
             ed.set_tool(then);
             assert_eq!((ed.tool, ed.selection.len(), d.sketch.entities().count()), (Tool::Select, 0, before), "{tool:?}");
+        }
+    }
+
+    /// Live sketch-linear-pattern-two-entities s17, rq-1128 linear pattern (a)/(b): an empty-space click commits a
+    /// circle's linear pattern, but with a line selected too the tool stays and nothing is made.
+    #[test]
+    fn a_linear_pattern_with_a_line_selected_ignores_an_empty_click() {
+        for with_line in [false, true] {
+            let (mut ed, mut d) = editor(Tool::LinearPattern);
+            ed.selection.push(d.sketch.add_circle(v(0.0, 0.0), 0.005));
+            if with_line {
+                ed.selection.push(d.sketch.add_line(v(-0.005, -0.01), v(0.005, -0.01)));
+            }
+            let before = d.sketch.entities().count();
+            click(&mut ed, &mut d, v(0.06, -0.04));
+            let made = d.sketch.entities().count() > before;
+            assert_eq!((made, ed.tool, ed.selection.len()), if with_line { (false, Tool::LinearPattern, 2) } else { (true, Tool::Select, 0) }, "with a line: {with_line}");
         }
     }
 

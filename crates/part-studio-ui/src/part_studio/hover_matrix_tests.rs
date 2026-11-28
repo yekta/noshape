@@ -682,6 +682,49 @@ cells! {
     sk_arc_selected: SK_ARC, State::Selected => edit |c| {
         assert!(shows(&c, 0xffa90a, 3.0) && shows(&c, 0xc88536, 2.0));
     }
+    // The matrix's other cells in sketch edit (live sk/*, measured by script): at rest the geometry is the under-defined
+    // blue #0000d0, the circle's centre a blue dot over the region's #e0e0e8 fill; hovered once selected stays selected;
+    // hovered with the circle selected keeps the hover look, the circle's band #ffa90a with the blue through (#c88030).
+    // (The selected disc's rim over the region's fill blends to near #ffc685, live's too: compared by share, not any pixel.)
+    sk_point_none: SK_POINT, State::Rest => edit |c| {
+        assert!(shows(&c, 0x0000d0, 3.5) && !shows(&c, 0xffc685, 6.0), "{:?}", near_centre(&c, 3.5).collect::<Vec<_>>());
+    }
+    sk_point_hovered_other_selected: SK_POINT, State::HoveredOtherSelected => edit |c| {
+        assert!(shows(&c, 0xffd8ac, 1.5) && shows(&c, 0xffc685, 5.5) && !shows(&c, 0xffa90a, 6.0));
+    }
+    sk_line_none: SK_LINE, State::Rest => edit |c| {
+        assert!(shows(&c, 0x0000d0, 1.5) && !shows(&c, 0xffc685, 6.0), "{:?}", near_centre(&c, 1.5).collect::<Vec<_>>());
+    }
+    sk_arc_none: SK_ARC, State::Rest => edit |c| {
+        assert!(shows(&c, 0x0000d0, 2.0) && !shows(&c, 0xffc685, 6.0), "{:?}", near_centre(&c, 2.0).collect::<Vec<_>>());
+    }
+    sk_arc_selected_hovered: SK_ARC, State::SelectedHovered => edit |c| {
+        assert!(shows(&c, 0xffa90a, 3.0) && shows(&c, 0xc88536, 2.0) && !shows(&c, 0xc89c96, 2.0));
+    }
+    sk_arc_hovered_other_selected: SK_ARC, State::HoveredOtherSelected => edit |c| {
+        assert!(shows(&c, 0xffc685, 3.0) && shows(&c, 0xc89c96, 2.0) && !shows(&c, 0xffa90a, 6.0));
+    }
+    sk_circle_hovered: SKETCH_OTHER, State::Hovered => edit |c| {
+        assert!(shows(&c, 0xffc685, 3.0) && shows(&c, 0xc89c96, 2.0), "{:?}", near_centre(&c, 2.0).collect::<Vec<_>>());
+    }
+    sk_circle_selected: SKETCH_OTHER, State::Selected => edit |c| {
+        assert!(shows(&c, 0xffa90a, 3.0) && shows(&c, 0xc88536, 2.0), "{:?}", near_centre(&c, 2.0).collect::<Vec<_>>());
+    }
+    sk_region_none: SK_CENTRE, State::Rest => edit |c| {
+        assert!(shows(&c, 0x0810c8, 1.5) && ring_of(&c, 0xe0e0e8, 6.0, 10.0) >= 0.8, "{:?}", near_centre(&c, 8.0).collect::<Vec<_>>());
+    }
+    sk_region_hovered: SK_CENTRE, State::Hovered => edit |c| {
+        assert!(shows(&c, 0xe0b088, 1.5) && ring_of(&c, 0xffc685, 3.5, 5.0) >= 0.6 && !shows(&c, 0xffa90a, 6.0), "{:?}", near_centre(&c, 5.0).collect::<Vec<_>>());
+    }
+    sk_region_selected: SK_CENTRE, State::Selected => edit |c| {
+        assert!(shows(&c, 0xe89818, 1.5) && ring_of(&c, 0xffa90a, 3.5, 5.0) >= 0.6 && ring_of(&c, 0xffc685, 3.5, 5.0) < 0.2, "{:?}", near_centre(&c, 5.0).collect::<Vec<_>>());
+    }
+    sk_region_selected_hovered: SK_CENTRE, State::SelectedHovered => edit |c| {
+        assert!(shows(&c, 0xe89818, 1.5) && ring_of(&c, 0xffa90a, 3.5, 5.0) >= 0.6 && ring_of(&c, 0xffc685, 3.5, 5.0) < 0.2);
+    }
+    sk_region_hovered_other_selected: SK_CENTRE, State::HoveredOtherSelected => edit |c| {
+        assert!(shows(&c, 0xe0b088, 1.5) && ring_of(&c, 0xffc685, 3.5, 5.0) >= 0.6 && shows(&c, 0xffa90a, 20.0) && shows(&c, 0xc88030, 20.0));
+    }
 }
 
 /// A batch 3 cell (live b3/): the matrix with Mate connector 1, Fillet 1 open at live's 1.3 mm when `dialog`, `target` in
