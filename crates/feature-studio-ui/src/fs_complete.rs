@@ -721,8 +721,9 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
         cx: &mut gpui_kit::App,
     ) -> gpui_kit::Task<anyhow::Result<gpui_kit::component::input::lsp_types::CompletionResponse>> {
         use gpui_kit::component::input::lsp_types::CompletionResponse;
-        // Matched off the UI thread (std's thousands of names, a long file's text before the caret).
-        let (text, wait, showing, asked) = (text.clone(), !self.showing.get(), self.showing.clone(), std::time::Instant::now());
+        // Matched off the UI thread (std's thousands of names, a long file's text before the caret); timed on the
+        // executor's clock, which tests advance by hand.
+        let (text, wait, showing, asked) = (text.clone(), !self.showing.get(), self.showing.clone(), cx.background_executor().now());
         cx.spawn(async move |cx| {
             let items = cx.background_executor().spawn(async move { completion_items(&text, offset) }).await;
             if items.is_empty() {
@@ -730,7 +731,7 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
                 return Ok(CompletionResponse::Array(items));
             }
             if wait {
-                cx.background_executor().timer(LIST_DELAY.saturating_sub(asked.elapsed())).await;
+                cx.background_executor().timer(LIST_DELAY.saturating_sub(cx.background_executor().now() - asked)).await;
             }
             showing.set(true);
             Ok(CompletionResponse::Array(items))
