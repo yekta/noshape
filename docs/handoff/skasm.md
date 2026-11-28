@@ -8,8 +8,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   released as a constraint-glyph click (no selection). Fix: tool_down turns a press on a curve's own use glyph into DragState::Pending
   (toggles the curve). Scene test in used_geometry_shows_use_glyphs_and_deleting_one_unlinks_it; GPU test
   a_used_edges_line_is_clicked_and_boxed_in_its_sketch. The box report fix (ui_script) was already on main (psui), dropped.
-- Not verified before queuing (vibex8 suite lock held by qa); replay run p0v.sh (/root/skasm-scratch/bin) queued on vibex8 for the
-  6 sketch-used-* takes. After it lands: drop the duplicate test/fix from skasm when rebasing; rm skasm-main's target if idle.
+- p0v.sh (/root/skasm-scratch/bin) on vibex8 00:5x: scene 4/4, ps-ui 15/15, clippy clean. The 6 sketch-used-* replays all stop at
+  step 13 (setup) on .sketch.geometry[1].derivatives (live 17.8292, ours 18.1242: the spline-derivative report fix is batch-6, still
+  uncommitted in skasm ui_script.rs), so they don't reach the click: replay again from skasm once batch-6 lands. After it lands: drop the duplicate test/fix from skasm when rebasing; rm skasm-main's target if idle.
 - Still open: Use on the hole's rim (25.9,20.1,10): hover = Sketch 1's circle REGION seen through the hole; model_edge_at returned None
   there (skasm sketch.rs Use press change kept, uncommitted; debug entities_along_ray hits next).
 - ASM-MC-SPLINE-FACE-ORIGIN-ENTITY (P2) drafted in skasm, untested: assembly eval.rs inference_candidates, B-spline/Bezier/Extrusion
