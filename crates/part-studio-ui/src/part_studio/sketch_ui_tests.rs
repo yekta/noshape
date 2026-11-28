@@ -7833,11 +7833,11 @@ fn use_on_a_shelled_boxs_rim_uses_its_outer_loop(cx: &mut TestAppContext) {
     assert_eq!((used, message), (8, None), "{hovered}");
 }
 
-/// qa FLOW-USE-OWN-FACE-REFUSED (cell 58 replayed: the click on the 7 px rim took its outer edge's midpoint, 3.6 px
-/// off): Use on a model edge's midpoint uses the edge (live behaviours "Use (U) on model edges": the midpoint dot lights
-/// with its edge; a click projects it).
+/// Live skasm use-mid-1128 (qa FLOW-USE-OWN-FACE-REFUSED: a click on the 7 px rim took its outer edge's midpoint, 3.6
+/// px off): a Use click within ~11.5 px of a model edge's midpoint makes a point there, though only the edge lights (a
+/// line 11.4 px off: the point, 11.7 px: the line); farther along it uses the edge.
 #[gpui::test]
-fn use_on_a_model_edges_midpoint_uses_the_edge(cx: &mut TestAppContext) {
+fn use_near_a_model_edges_midpoint_makes_a_point_there(cx: &mut TestAppContext) {
     let (window, view, _) = sketch_on_shelled_rim(cx, "use-edge-midpoint");
     let edge = cx.update(|cx| {
         let v = view.read(cx);
@@ -7845,16 +7845,29 @@ fn use_on_a_model_edges_midpoint_uses_the_edge(cx: &mut TestAppContext) {
         let (r, _) = body.edge_refs.iter().zip(&body.mesh.edges).find(|(_, pl)| pl.iter().all(|p| p[0].abs() < 1e-7 && (p[2] - 0.03).abs() < 1e-7)).expect("the rim's outer edge at x = 0");
         r.clone()
     });
-    let mid = Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint };
-    // (Its pick is made once the edge is lit: what a click with it hovered runs.)
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.use_reference(mid, w, cx))).unwrap();
-    draw(cx, window);
-    let (used, message) = cx.update(|cx| {
-        let v = view.read(cx);
-        let d = v.sketch_data(cx).unwrap();
-        (d.sketch.entities().filter(|e| e.external && e.kind() == noshape_sketch::EntityKind::Line).count(), v.sketch.as_ref().unwrap().message.clone())
+    let mid = glam::DVec3::new(0.0, 0.02, 0.03);
+    let px_per_m = cx.update(|cx| {
+        let vp = view.read(cx).viewport.read(cx);
+        vp.project(mid + glam::DVec3::Y * 0.001).unwrap().distance(vp.project(mid).unwrap()) / 0.001
     });
-    assert_eq!((used, message), (1, None), "(lines used, message)");
+    let along = |px: f64| mid + glam::DVec3::Y * (px / px_per_m);
+    assert!(along(20.0).y < 0.034, "20 px along stays on the edge ({px_per_m} px/m)");
+    let used = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let n = |k| d.sketch.entities().filter(|e| e.external && e.kind() == k).count();
+        (n(noshape_sketch::EntityKind::Point), n(noshape_sketch::EntityKind::Line))
+    });
+    let (_, message, hovered) = use_at(cx, window, &view, along(8.0), &edge);
+    assert!(hovered.starts_with("hover Some(Edge"), "only the edge lights: {hovered}");
+    assert_eq!((used(cx), message), ((1, 0), None), "8 px from the midpoint: (points, lines) used");
+    let point = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.entities().find(|e| e.external && e.kind() == noshape_sketch::EntityKind::Point).and_then(|e| d.sketch.point(e.id)).unwrap()
+    });
+    let frame = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame);
+    assert!(frame.to_world(point).distance(mid) < 1e-9, "the point sits on the midpoint: {point}");
+    let (lines, message, _) = use_at(cx, window, &view, along(20.0), &edge);
+    assert_eq!((lines, message, used(cx)), (1, None, (3, 1)), "20 px from the midpoint: the edge (and its ends)");
 }
 
 /// A sketch on the rim of qa's enclosure (60 x 40 x 30 box, vertical edges R5, shelled 2 mm with its top removed), in
@@ -7925,6 +7938,9 @@ fn use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge(cx: &mut TestAppCon
     draw(cx, window);
     let centre = block_centre(cx, &view);
     let (mid, away) = (on_screen(cx, &view, (a + b) * 0.5), on_screen(cx, &view, centre));
+    // (Away from the midpoint: within its reach Use makes a point there, live skasm use-mid-1128.)
+    let along = on_screen(cx, &view, a * 0.2 + b * 0.8);
+    assert!(along.distance(mid) > 20.0, "{along} is clear of the midpoint {mid}");
     let hover = |cx: &mut TestAppContext, at: DVec2, id: Option<u32>| {
         cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
             let vp = v.viewport.clone();
@@ -7945,8 +7961,8 @@ fn use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge(cx: &mut TestAppCon
         draw(cx, window);
     };
     let used = |cx: &mut TestAppContext| view.read_with(cx, |v, cx| v.sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.external && e.kind() == noshape_sketch::EntityKind::Line).count()));
-    hover(cx, mid, Some(pick));
-    press(cx, mid);
+    hover(cx, along, Some(pick));
+    press(cx, along);
     let first = used(cx);
     hover(cx, away, None);
     hover(cx, mid, Some(pick));
@@ -7970,6 +7986,8 @@ fn a_used_edges_line_is_clicked_and_boxed_in_its_sketch(cx: &mut TestAppContext)
     })));
     draw(cx, window);
     let mid = on_screen(cx, &view, (a + b) * 0.5);
+    // (The Use click away from the midpoint: within its reach Use makes a point there, live skasm use-mid-1128.)
+    let along = on_screen(cx, &view, a * 0.2 + b * 0.8);
     let event = |cx: &mut TestAppContext, evs: Vec<ViewportEvent>| {
         cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
             let vp = v.viewport.clone();
@@ -7984,13 +8002,14 @@ fn a_used_edges_line_is_clicked_and_boxed_in_its_sketch(cx: &mut TestAppContext)
         draw(cx, window);
     };
     let m = Modifiers::default();
-    let click = |hover: Option<u32>| vec![
-        ViewportEvent::PointerMove { position: mid, modifiers: m },
+    let click_at = |at: DVec2, hover: Option<u32>| vec![
+        ViewportEvent::PointerMove { position: at, modifiers: m },
         ViewportEvent::Hover(hover),
-        ViewportEvent::ToolDown { position: mid, modifiers: m, click_count: 1 },
-        ViewportEvent::ToolUp { position: mid, modifiers: m },
+        ViewportEvent::ToolDown { position: at, modifiers: m, click_count: 1 },
+        ViewportEvent::ToolUp { position: at, modifiers: m },
     ];
-    event(cx, click(Some(pick)));
+    let click = |hover: Option<u32>| click_at(mid, hover);
+    event(cx, click_at(along, Some(pick)));
     let used = cx.update(|cx| {
         let v = view.read(cx);
         v.sketch_data(cx).and_then(|d| d.sketch.entities().find(|e| e.external && e.kind() == noshape_sketch::EntityKind::Line).map(|e| e.id))
