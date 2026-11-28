@@ -924,6 +924,9 @@ impl Sketch {
             && !self.entity(*target).is_some_and(|e| e.external) {
                 return Err(SketchError::InvalidConstraint("pierce target must be external geometry".into()));
             }
+        if let ConstraintKind::Tangent { a, b } = kind {
+            self.tangent_onto_arc_span(a, b);
+        }
         let (hints, aux) = self.compute_hints(&kind);
         let driving = driving || !kind.is_dimension();
         let mut c = Constraint { id: ConstraintId(u32::MAX), kind, driving, hints, aux };
@@ -940,6 +943,40 @@ impl Sketch {
         self.constraints.insert(id, c);
         self.touch();
         Ok(id)
+    }
+
+    /// A circle made Tangent to an arc touches it on the arc's span (live maker-tangent-to-used-arc s16: a circle off
+    /// the arc's quarter moves through its centre to touch the quarter from inside, its radius kept): when the nearer
+    /// contact is off the span, a circle not yet constrained moves along its line through the arc's centre to the
+    /// nearest distance whose contact is on it.
+    fn tangent_onto_arc_span(&mut self, a: EntityId, b: EntityId) {
+        let (arc, circle) = match (self.curve(a), self.curve(b)) {
+            (Some(arc @ Curve2::Arc { .. }), Some(c @ Curve2::Circle { .. })) => ((arc, a), (c, b)),
+            (Some(c @ Curve2::Circle { .. }), Some(arc @ Curve2::Arc { .. })) => ((arc, b), (c, a)),
+            _ => return,
+        };
+        let ((Curve2::Arc { center: ca, radius: big, start_angle, end_angle }, _), (Curve2::Circle { center: cc, radius: r }, id)) = (arc, circle) else { return };
+        let Some(center) = self.entity(id).filter(|e| !e.external).and_then(|e| e.center()) else { return };
+        if !self.constraints_on(id).is_empty() || !self.constraints_on(center).is_empty() {
+            return;
+        }
+        let d = cc - ca;
+        let len = d.length();
+        if len < 1e-12 {
+            return;
+        }
+        let u = d / len;
+        let on_span = |dir: DVec2| (dir.y.atan2(dir.x) - start_angle).rem_euclid(std::f64::consts::TAU) <= end_angle - start_angle + 1e-9;
+        // Signed distances of the centre along u that touch, each with its contact's side (the arc inside a bigger
+        // circle touches on the far side).
+        let touch = [big + r, -(big + r), (big - r).abs(), -(big - r).abs()].map(|t| (t, if r > big && t.abs() < big + r { -t.signum() } else { t.signum() }));
+        let nearest = |ok: &dyn Fn(DVec2) -> bool| touch.iter().filter(|(_, side)| ok(u * *side)).min_by(|x, y| (x.0 - len).abs().total_cmp(&(y.0 - len).abs())).copied();
+        let Some((_, side)) = nearest(&|_| true) else { return };
+        if on_span(u * side) {
+            return;
+        }
+        let Some((t, _)) = nearest(&on_span) else { return };
+        let _ = self.set_point(center, ca + u * t);
     }
 
     /// Keeps only the constraints `keep` accepts, in their order: one pass (a constructive placement's trial

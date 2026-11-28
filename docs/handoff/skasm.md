@@ -3,7 +3,7 @@
 Updated 2026-11-28 11:37 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-28 11:37 UTC): 7416accd QUEUED (offset flip, chamfer COINCIDENT, MC top corner); ASM-FASTEN-SPLINE-FACE-ORIENTATION QUEUED (curved edge point X = binormal; Mac: assembly, model-core, model all, ops mate/connector/assembly, clippy green); SKETCH-USE-ARC-AS-MIDPOINT-POINT waits on live (REQUESTS 11:3x use-mid-1128: live's click 7.7 px from the arc's midpoint dot; rim cell 58 disagrees); next: replay on vibex8 when free
+## NOW (11-28 11:44 UTC): 7416accd + b4c488bf + the tangent arc span QUEUED (sketch.rs tangent_onto_arc_span: a circle with no constraints yet, made Tangent to an arc, moves along its line through the arc centre to the nearest touch on the span, radius kept; onshape_ux a_circle_tangent_to_an_arc_touches_it_on_its_span; Mac sketch 184 + ps-ui tangent green, clippy clean). Next: SKETCH-SLOT-ON-SPLINE's 3 OFFSET (needs a solver spline-offset equation; Offset tool splines are unlinked too), then SKETCH-ARC-ENDPOINT-ORDER (arcs are CCW-only: needs a direction flag). Waiting: live use-mid-1128 (SKETCH-USE-ARC-AS-MIDPOINT-POINT); replays on vibex8 (see below).
 All three items coded, not committed:
 1. Offset: live's (10,-4) and (10,-8) clicks FLIP the side (shots: copy -5 -> +5), they hit the hollow arrow (tail on the
    copy, running to -22). Ours: `offset_arrow_at` (whole arrow, 10 px from the segment) for click + hover look;

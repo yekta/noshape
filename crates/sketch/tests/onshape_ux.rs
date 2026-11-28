@@ -8,6 +8,27 @@ fn v(x: f64, y: f64) -> DVec2 {
     DVec2::new(x, y)
 }
 
+/// Live maker-tangent-to-used-arc s16: a circle Tangent to a corner arc (centre (8, 8), r 8, 180°–270°) from beyond
+/// the arc's open side moves through its centre to touch the quarter from inside, its radius kept (centre (4.44, 4.53));
+/// beside the quarter it touches it from outside, as before.
+#[test]
+fn a_circle_tangent_to_an_arc_touches_it_on_its_span() {
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    for (from, to, r) in [(mm(16.23, 16.01), mm(4.44, 4.53), 3.029e-3), (mm(-6.0, -5.0), DVec2::NAN, 2e-3)] {
+        let mut sk = Sketch::new();
+        let arc = sk.add_arc_angles(mm(8.0, 8.0), 8e-3, std::f64::consts::PI, 1.5 * std::f64::consts::PI);
+        let circle = sk.add_circle(from, r);
+        sk.add_constraint(ConstraintKind::Tangent { a: circle, b: arc }).unwrap();
+        assert!(sk.solve().is_solved());
+        let Some(Curve2::Circle { center, radius }) = sk.curve(circle) else { panic!() };
+        if to.is_nan() {
+            assert!((center - mm(8.0, 8.0)).length() > 8e-3, "outside: {center}");
+        } else {
+            assert!((center - to).length() < 6e-6 && (radius - r).abs() < 1e-9, "{center} r {radius}");
+        }
+    }
+}
+
 #[test]
 fn chamfer_corner_cuts_both_lines_and_keeps_virtual_sharp() {
     let mut sk = Sketch::new();
