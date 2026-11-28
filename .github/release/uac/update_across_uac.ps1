@@ -88,7 +88,8 @@ while (((Get-Date) - $start).TotalMinutes -lt 20) {
     Procs | ForEach-Object { T ("   {0} {1} ppid {2} s{3} {4}: {5}" -f $_.Name, $_.ProcessId, $_.ParentProcessId, $_.SessionId, [Integrity]::Of([int]$_.ProcessId), $_.CommandLine) }
     $seen = $now
   }
-  if ((Test-Path "$Out\as-user.txt") -and (Get-Content "$Out\as-user.txt" -Raw) -match ' done') { break }
+  # The reader may still be writing as-user.txt: a locked read is skipped this round (v0.4.74's check failed on it).
+  if ((Test-Path "$Out\as-user.txt") -and (Get-Content "$Out\as-user.txt" -Raw -ErrorAction SilentlyContinue) -match ' done') { break }
 }
 $after = Installed
 foreach ($f in 'as-user.txt', 'update.log', 'update-helper.log') { if (Test-Path "$Out\$f") { T "${f}:`n$((Get-Content "$Out\$f" -Raw).Trim())" } }
